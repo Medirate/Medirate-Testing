@@ -52,6 +52,24 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+
+    /* Add gradient variables */
+    --primary-glow: conic-gradient(
+      from 10deg at 50% 50%,
+      #eb7494 0deg,
+      #ae77b2 55deg,
+      #97b5da 120deg,
+      #0099ca 160deg,
+      transparent 360deg
+    );
+    --secondary-glow: conic-gradient(
+      from 90deg at 50% 50%,
+      #ff8b7e 0deg,
+      #4e8ee2 160deg,
+      #7ed2da 120deg,
+      #8bdce0 55deg,
+      transparent 360deg
+    );
   }
 
   .dark {
@@ -84,7 +102,49 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Reusable gradient background */
+  .reusable-gradient-bg {
+    position: relative; /* Keep gradient within its section */
+    overflow: hidden; /* Prevent gradient from exceeding container */
+  }
+
+  .reusable-gradient-bg::before,
+  .reusable-gradient-bg::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.2; /* Adjust for better clarity */
+  }
+
+  .reusable-gradient-bg::before {
+    background: var(--primary-glow);
+    width: 140%; /* Slightly larger to fill the section */
+    height: 140%;
+    top: -20%; /* Adjust positioning */
+    left: -20%;
+    filter: blur(100px);
+    z-index: -2; /* Ensure it stays behind all content */
+  }
+
+  .reusable-gradient-bg::after {
+    background: var(--secondary-glow);
+    width: 120%; /* Secondary glow should be smaller */
+    height: 120%;
+    top: -10%;
+    left: -10%;
+    filter: blur(70px);
+    z-index: -3;
+  }
+
+  .footer {
+    background-color: black;
+    text-align: center;
+    color: white;
+    padding: 20px;
   }
 }

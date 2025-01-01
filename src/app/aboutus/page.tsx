@@ -1,10 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Facebook, Linkedin } from "lucide-react";
+import Footer from "@/app/components/footer"; // Import the Footer component
 
 export default function AboutUs() {
   return (
-    <div>
+    <div className="relative">
       {/* Hero Section */}
       <section className="relative w-full h-[400px] md:h-[500px]">
         <Image
@@ -22,8 +23,11 @@ export default function AboutUs() {
         </div>
       </section>
 
-      {/* About Us Content */}
-      <section className="py-12 px-6 bg-white">
+      {/* About Us Content with Gradient */}
+      <section className="relative py-12 px-6 overflow-hidden">
+        {/* Gradient Background */}
+        <div className="absolute inset-0 -z-10 reusable-gradient-bg"></div>
+
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-start lg:space-x-12">
           {/* Greg's Image */}
           <div className="w-full lg:w-1/3 flex justify-center mb-8 lg:mb-0">
@@ -65,34 +69,7 @@ export default function AboutUs() {
       </section>
 
       {/* Footer Section */}
-      <footer className="bg-black py-12 text-center text-white">
-        <div className="flex flex-col items-center">
-          <Image
-            src="/top-black.png"
-            alt="Medirate Logo"
-            width={100}
-            height={50}
-          />
-          <div className="mt-4 flex space-x-6">
-            <Link href="https://facebook.com" target="_blank" rel="noreferrer">
-              <Facebook className="w-8 h-8 text-white hover:text-blue-600 transition-colors" />
-            </Link>
-            <Link
-              href="https://linkedin.com"
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Linkedin className="w-8 h-8 text-white hover:text-blue-400 transition-colors" />
-            </Link>
-          </div>
-          <p className="mt-6 max-w-2xl text-gray-300 text-sm">
-            Praesent sit amet nulla a libero luctus dictum eu vitae risus.
-            Nullam efficitur at lorem vitae tristique. Nunc malesuada accumsan
-            convallis. Praesent eros sem, imperdiet ac ante vitae, ultricies
-            fringilla justo.
-          </p>
-        </div>
-      </footer>
+      <Footer /> {/* Replace the inline footer with the Footer component */}
     </div>
   );
 }

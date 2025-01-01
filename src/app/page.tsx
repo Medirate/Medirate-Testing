@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Facebook, Linkedin } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import Footer from "@/app/components/footer"; // Import the Footer component
 
 export default function Home() {
   return (
@@ -43,13 +44,15 @@ export default function Home() {
       </div>
 
       {/* About MediRate Section */}
-      <section className="py-16 bg-white relative overflow-hidden">
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#012C61]/30 to-transparent opacity-50 blur-3xl" />
+      <section className="py-16 relative overflow-hidden reusable-gradient-bg">
+        
+
+        {/* Content */}
         <div className="max-w-7xl mx-auto px-6 lg:flex lg:items-center lg:justify-between">
           {/* Text Content */}
           <div className="lg:w-1/2">
             <h2 className="text-4xl font-lemonMilkRegular text-[#012C61] mb-6 font-lightBold">
-              ABOUT MEDIRATE TEST-1
+              ABOUT MEDIRATE
             </h2>
             <p className="text-gray-700 leading-relaxed mb-6">
               MediRate is the nation’s only comprehensive database of Medicaid
@@ -77,7 +80,7 @@ export default function Home() {
                 Subscribe Today
               </a>
               <a
-                href="/read-more"
+                href="/oursolution"
                 className="bg-[#012C61] text-white px-6 py-3 rounded-md transition-colors duration-300 hover:bg-transparent hover:border hover:border-[#012C61] hover:text-[#012C61]"
               >
                 Read More
@@ -102,7 +105,7 @@ export default function Home() {
       <section className="bg-[#012C61] py-16">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Card 1: Our Solution */}
-          <Link href="/our-solution" passHref>
+          <Link href="/oursolution" passHref>
             <div className="bg-white rounded-lg overflow-hidden shadow-lg cursor-pointer transition-transform transform hover:scale-105">
               <Image
                 src="/images/doctor-looking-at-screen.png"
@@ -158,36 +161,7 @@ export default function Home() {
       </section>
 
       {/* Footer Section */}
-      <footer className="bg-black py-12 text-center text-white">
-        <div className="flex flex-col items-center">
-          <Image
-            src="/top-black.png"
-            alt="Medirate Logo"
-            width={100}
-            height={50}
-          />
-          <div className="mt-4 flex space-x-6">
-            {/* Facebook */}
-            <Link href="https://facebook.com" target="_blank" rel="noreferrer">
-              <Facebook className="w-8 h-8 text-white hover:text-blue-600 transition-colors" />
-            </Link>
-            {/* LinkedIn */}
-            <Link
-              href="https://linkedin.com"
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Linkedin className="w-8 h-8 text-white hover:text-blue-400 transition-colors" />
-            </Link>
-          </div>
-          <p className="mt-6 max-w-2xl text-gray-300 text-sm">
-            Praesent sit amet nulla a libero luctus dictum eu vitae risus.
-            Nullam efficitur at lorem vitae tristique. Nunc malesuada accumsan
-            convallis. Praesent eros sem, imperdiet ac ante vitae, ultricies
-            fringilla justo.
-          </p>
-        </div>
-      </footer>
+      <Footer /> {/* Replace the inline footer with the Footer component */}
     </div>
   );
 }
