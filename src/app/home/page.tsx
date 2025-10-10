@@ -31,7 +31,8 @@ import {
   Clock,
   FileCheck,
   FileX,
-  FileClock
+  FileClock,
+  Download
 } from "lucide-react";
 import { 
   fetchRecentRateChanges,
@@ -138,6 +139,97 @@ const HomePage = () => {
   // Pagination for rate changes
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  
+  // CSV Export state
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+
+  // CSV Export utility function
+  const exportToCSV = (data: any[], filename: string = 'recent_rate_changes.csv') => {
+    if (!data || data.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    // Define CSV headers
+    const headers = [
+      'Service Code',
+      'Service Description',
+      'State',
+      'Service Category',
+      'Old Rate',
+      'New Rate',
+      'Percentage Change',
+      'Effective Date',
+      'Provider Type',
+      'Change Type'
+    ];
+
+    // Convert data to CSV format
+    const csvContent = [
+      headers.join(','),
+      ...data.map(item => [
+        `"${item.serviceCode || ''}"`,
+        `"${(item.serviceDescription || '').replace(/"/g, '""')}"`, // Escape quotes
+        `"${item.state || ''}"`,
+        `"${item.serviceCategory || ''}"`,
+        `"${item.oldRate || ''}"`,
+        `"${item.newRate || ''}"`,
+        `"${item.percentageChange || 0}"`,
+        `"${item.effectiveDate || ''}"`,
+        `"${item.providerType || ''}"`,
+        `"${item.isChange ? 'Rate Change' : 'Latest Rate'}"`
+      ].join(','))
+    ].join('\n');
+
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // CSV Download handler
+  const handleDownloadCSV = () => {
+    if (!filteredRateChanges || filteredRateChanges.length === 0) {
+      alert('No data to export. Please select a state first.');
+      return;
+    }
+
+    setIsExporting(true);
+    setExportProgress(0);
+
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setExportProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 100);
+
+    // Export the data
+    setTimeout(() => {
+      const filename = selectedState 
+        ? `recent_rate_changes_${selectedState.replace(/\s+/g, '_')}.csv`
+        : 'recent_rate_changes.csv';
+      
+      exportToCSV(filteredRateChanges, filename);
+      
+      setExportProgress(100);
+      setTimeout(() => {
+        setIsExporting(false);
+        setExportProgress(0);
+      }, 500);
+    }, 1000);
+  };
 
   // Fetch state metrics data on component mount
   useEffect(() => {
@@ -1057,6 +1149,57 @@ const HomePage = () => {
                 </div>
               </div>
             </div>
+
+            {/* Export Button */}
+            {filteredRateChanges.length > 0 && (
+              <div className="mb-6 flex justify-end">
+                <button
+                  onClick={handleDownloadCSV}
+                  disabled={isExporting}
+                  className={`group relative flex items-center px-6 py-3 rounded-lg transition-all duration-200 font-semibold shadow-lg transform ${
+                    isExporting 
+                      ? 'bg-gray-400 cursor-not-allowed' 
+                      : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 hover:shadow-xl hover:-translate-y-0.5'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    {isExporting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        <span>Exporting... {exportProgress}%</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="mr-2 group-hover:animate-bounce" />
+                        <span>Export CSV</span>
+                        <span className="ml-2 bg-green-500 text-xs px-2 py-1 rounded-full">
+                          {filteredRateChanges.length}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {!isExporting && (
+                    <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 rounded-lg transition-opacity duration-200"></div>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Export Progress Bar */}
+            {isExporting && (
+              <div className="mb-4 bg-gray-100 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Exporting data...</span>
+                  <span className="text-sm text-gray-500">{exportProgress}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-green-600 h-2 rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${exportProgress}%` }}
+                  ></div>
+                </div>
+              </div>
+            )}
 
             {/* Loading State */}
             {isLoadingRateChanges && (
