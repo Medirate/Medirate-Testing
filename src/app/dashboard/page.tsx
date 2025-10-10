@@ -3,8 +3,9 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import AppLayout from "@/app/components/applayout";
 import { FaExclamationCircle, FaFilter, FaDownload } from 'react-icons/fa';
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
+import { format } from 'date-fns';
 import Select from 'react-select';
 import { useProtectedPage } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -167,6 +168,160 @@ const customFilterOption = (option: any, inputValue: string) => {
   
   // If no match at start, check if the label contains the search term
   return label.includes(searchTerm);
+};
+
+// Professional Date Picker Component
+const ProfessionalDatePicker = ({ 
+  selected, 
+  onChange, 
+  placeholder, 
+  disabled = false,
+  minDate,
+  maxDate,
+  className = ""
+}: {
+  selected: Date | null;
+  onChange: (date: Date | null) => void;
+  placeholder: string;
+  disabled?: boolean;
+  minDate?: Date;
+  maxDate?: Date;
+  className?: string;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(selected ? format(selected, 'MM/dd/yyyy') : '');
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      onChange(date);
+      setInputValue(format(date, 'MM/dd/yyyy'));
+    } else {
+      onChange(null);
+      setInputValue('');
+    }
+    setIsOpen(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  };
+
+  const handleInputClick = () => {
+    if (!disabled) {
+      setIsOpen(true);
+    }
+  };
+
+  const handleClear = () => {
+    onChange(null);
+    setInputValue('');
+    setIsOpen(false);
+  };
+
+  return (
+    <div className={`relative ${className}`}>
+      <div className="relative">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={handleInputChange}
+          onClick={handleInputClick}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={`w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${
+            disabled ? 'bg-gray-50 cursor-not-allowed' : 'cursor-pointer hover:border-gray-400'
+          }`}
+          readOnly
+        />
+        <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+          {selected && !disabled && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+          <svg className="w-5 h-5 text-gray-400 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </div>
+      </div>
+
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-xl shadow-2xl border border-gray-200 p-6 min-w-[320px]">
+            <DayPicker
+              mode="single"
+              selected={selected || undefined}
+              onSelect={handleDateSelect}
+              disabled={disabled}
+              fromDate={minDate}
+              toDate={maxDate}
+              className="rdp"
+              classNames={{
+                months: 'flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0',
+                month: 'space-y-4',
+                caption: 'flex justify-center pt-1 relative items-center',
+                caption_label: 'text-sm font-medium text-gray-900',
+                nav: 'space-x-1 flex items-center',
+                nav_button: 'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100',
+                nav_button_previous: 'absolute left-1',
+                nav_button_next: 'absolute right-1',
+                table: 'w-full border-collapse space-y-1',
+                head_row: 'flex',
+                head_cell: 'text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]',
+                row: 'flex w-full mt-2',
+                cell: 'h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20',
+                day: 'h-9 w-9 p-0 font-normal aria-selected:opacity-100',
+                day_selected: 'bg-blue-600 text-white hover:bg-blue-600 hover:text-white focus:bg-blue-600 focus:text-white',
+                day_today: 'bg-blue-100 text-blue-600 font-semibold',
+                day_outside: 'day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30',
+                day_disabled: 'text-muted-foreground opacity-50',
+                day_range_middle: 'aria-selected:bg-accent aria-selected:text-accent-foreground',
+                day_hidden: 'invisible',
+              }}
+              components={{
+                IconLeft: () => (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                ),
+                IconRight: () => (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                ),
+              }}
+            />
+            <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDateSelect(new Date())}
+                className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+              >
+                Today
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
 };
 
 // CSV Export utility function
@@ -1607,59 +1762,24 @@ export default function Dashboard() {
             <div className="flex flex-row gap-6 w-[400px] justify-center">
               <div className="flex flex-col gap-2 w-1/2">
                 <label className="block text-sm font-bold text-[#012C61]">Start Date</label>
-                <DatePicker
+                <ProfessionalDatePicker
                   selected={startDate}
                   onChange={handleStartDateChange}
-                  selectsStart
-                  startDate={startDate}
-                  endDate={endDate}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder="Select start date"
                   disabled={!!selections.fee_schedule_date || !selections.service_category}
-                  isClearable
-                  includeDates={availableDates.map(date => parseTimezoneNeutralDate(date))}
-                  popperClassName="datepicker-zindex"
-                  showYearDropdown
-                  showMonthDropdown
-                  dropdownMode="select"
-                  yearDropdownItemNumber={15}
-                  scrollableYearDropdown
-                  dateFormat="MM/dd/yyyy"
-                  placeholderText="Select start date"
-                  autoComplete="off"
-                  showPopperArrow={false}
-                  calendarStartDay={1}
-                  monthsShown={1}
-                  withPortal={false}
-                  todayButton="Today"
+                  maxDate={endDate || undefined}
+                  className="w-full"
                 />
               </div>
               <div className="flex flex-col gap-2 w-1/2">
                 <label className="block text-sm font-bold text-[#012C61]">End Date</label>
-                <DatePicker
+                <ProfessionalDatePicker
                   selected={endDate}
                   onChange={handleEndDateChange}
-                  selectsEnd
-                  startDate={startDate}
-                  endDate={endDate}
-                  minDate={startDate || undefined}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder="Select end date"
                   disabled={!!selections.fee_schedule_date || !selections.service_category}
-                  isClearable
-                  includeDates={availableDates.map(date => parseTimezoneNeutralDate(date))}
-                  popperClassName="datepicker-zindex"
-                  showYearDropdown
-                  showMonthDropdown
-                  dropdownMode="select"
-                  yearDropdownItemNumber={15}
-                  scrollableYearDropdown
-                  dateFormat="MM/dd/yyyy"
-                  placeholderText="Select end date"
-                  autoComplete="off"
-                  showPopperArrow={false}
-                  calendarStartDay={1}
-                  monthsShown={1}
-                  withPortal={false}
-                  todayButton="Today"
+                  minDate={startDate || undefined}
+                  className="w-full"
                 />
               </div>
             </div>
@@ -2431,151 +2551,6 @@ export default function Dashboard() {
         }
         .datepicker-zindex {
           z-index: 999999999 !important;
-        }
-        
-        /* Enhanced DatePicker Styling */
-        .react-datepicker {
-          border: 1px solid #e5e7eb;
-          border-radius: 0.5rem;
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-          font-family: inherit;
-        }
-        
-        .react-datepicker__header {
-          background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-          border-bottom: none;
-          border-radius: 0.5rem 0.5rem 0 0;
-          padding: 1rem;
-        }
-        
-        .react-datepicker__current-month,
-        .react-datepicker__day-name {
-          color: white;
-          font-weight: 600;
-        }
-        
-        .react-datepicker__day-name {
-          color: rgba(255, 255, 255, 0.8);
-          font-size: 0.875rem;
-        }
-        
-        .react-datepicker__month-dropdown,
-        .react-datepicker__year-dropdown {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 0.375rem;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        }
-        
-        .react-datepicker__month-option,
-        .react-datepicker__year-option {
-          padding: 0.5rem 1rem;
-          transition: background-color 0.2s;
-        }
-        
-        .react-datepicker__month-option:hover,
-        .react-datepicker__year-option:hover {
-          background-color: #f3f4f6;
-        }
-        
-        .react-datepicker__day {
-          border-radius: 0.375rem;
-          transition: all 0.2s;
-          margin: 0.125rem;
-        }
-        
-        .react-datepicker__day:hover {
-          background-color: #dbeafe;
-          color: #1d4ed8;
-        }
-        
-        .react-datepicker__day--selected {
-          background-color: #3b82f6;
-          color: white;
-          font-weight: 600;
-        }
-        
-        .react-datepicker__day--in-range {
-          background-color: #dbeafe;
-          color: #1d4ed8;
-        }
-        
-        .react-datepicker__day--in-selecting-range {
-          background-color: #bfdbfe;
-          color: #1e40af;
-        }
-        
-        .react-datepicker__day--today {
-          background-color: #fef3c7;
-          color: #92400e;
-          font-weight: 600;
-        }
-        
-        .react-datepicker__day--disabled {
-          color: #9ca3af;
-          cursor: not-allowed;
-        }
-        
-        .react-datepicker__day--disabled:hover {
-          background-color: transparent;
-          color: #9ca3af;
-        }
-        
-        .react-datepicker__today-button {
-          background: #f3f4f6;
-          border-top: 1px solid #e5e7eb;
-          color: #374151;
-          font-weight: 500;
-          padding: 0.75rem;
-          transition: background-color 0.2s;
-        }
-        
-        .react-datepicker__today-button:hover {
-          background: #e5e7eb;
-        }
-        
-        .react-datepicker__navigation {
-          background: rgba(255, 255, 255, 0.1);
-          border: none;
-          border-radius: 0.375rem;
-          color: white;
-          height: 2rem;
-          width: 2rem;
-          transition: all 0.2s;
-        }
-        
-        .react-datepicker__navigation:hover {
-          background: rgba(255, 255, 255, 0.2);
-          transform: scale(1.05);
-        }
-        
-        .react-datepicker__navigation--previous {
-          left: 1rem;
-        }
-        
-        .react-datepicker__navigation--next {
-          right: 1rem;
-        }
-        
-        .react-datepicker__input-container input {
-          border: 1px solid #d1d5db;
-          border-radius: 0.5rem;
-          padding: 0.75rem 1rem;
-          font-size: 0.875rem;
-          transition: all 0.2s;
-          width: 100%;
-        }
-        
-        .react-datepicker__input-container input:focus {
-          outline: none;
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-        
-        .react-datepicker__input-container input:disabled {
-          background-color: #f9fafb;
-          color: #9ca3af;
-          cursor: not-allowed;
         }
       `}</style>
     </AppLayout>
