@@ -15,40 +15,31 @@ export async function GET(request: NextRequest) {
     console.log('📁 Found blobs:', blobs.length);
     console.log('📁 Blob details:', blobs.map(b => ({ pathname: b.pathname, size: b.size })));
     
-    // Transform blob data to match our document interface
+    // Transform blob data to show actual storage structure
     const documents = blobs.map(blob => {
       const fileName = blob.pathname.split('/').pop() || 'Document';
+      const filePath = blob.pathname;
       const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
       
-      // Determine document type based on file extension and name
-      let documentType = 'document';
-      if (fileName.toLowerCase().includes('rate') || fileName.toLowerCase().includes('schedule')) {
-        documentType = 'state_note';
-      } else if (fileName.toLowerCase().includes('policy') || fileName.toLowerCase().includes('guideline')) {
-        documentType = 'policy';
-      } else if (fileName.toLowerCase().includes('form') || fileName.toLowerCase().includes('application')) {
-        documentType = 'form';
-      } else if (fileName.toLowerCase().includes('report') || fileName.toLowerCase().includes('analysis')) {
-        documentType = 'report';
-      } else if (fileExtension === 'pdf') {
-        documentType = 'state_note'; // Default PDFs to state notes
-      } else if (fileExtension === 'csv' || fileExtension === 'xlsx') {
-        documentType = 'report'; // Default data files to reports
-      }
+      // Extract folder structure from pathname
+      const pathParts = filePath.split('/').filter(part => part && part !== '');
+      const folderPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : 'Root';
       
       return {
         id: blob.url.split('/').pop() || blob.url,
         title: fileName,
-        type: documentType,
+        type: fileExtension, // Show actual file extension
+        folder: folderPath, // Show actual folder path
         state: extractStateFromPath(blob.pathname),
-        category: getCategoryFromPath(documentType),
-        description: `Document uploaded on ${new Date(blob.uploadedAt).toLocaleDateString()}`,
+        category: folderPath, // Use folder as category
+        description: `File in ${folderPath} - Uploaded on ${new Date(blob.uploadedAt).toLocaleDateString()}`,
         uploadDate: blob.uploadedAt,
         lastModified: blob.uploadedAt,
         fileSize: formatFileSize(blob.size),
         downloadUrl: blob.url,
-        tags: extractTagsFromPath(blob.pathname),
-        isPublic: true
+        tags: [fileExtension, folderPath],
+        isPublic: true,
+        filePath: filePath // Include full path for reference
       };
     });
 

@@ -87,22 +87,23 @@ export default function Documents() {
     return matchesSearch && matchesCategory && matchesState;
   });
 
-  // Group documents by type
+  // Group documents by folder path (actual storage structure)
   const groupedDocuments = filteredDocuments.reduce((acc, doc) => {
-    if (!acc[doc.type]) {
-      acc[doc.type] = [];
+    const folder = doc.folder || 'Root';
+    if (!acc[folder]) {
+      acc[folder] = [];
     }
-    acc[doc.type].push(doc);
+    acc[folder].push(doc);
     return acc;
   }, {} as Record<string, Document[]>);
 
-  const documentTypes = [
-    { key: 'state_note', label: 'State Notes', icon: FileText, description: 'State-specific notes and updates' },
-    { key: 'policy', label: 'Policies', icon: FileText, description: 'Policy documents and guidelines' },
-    { key: 'guideline', label: 'Guidelines', icon: FileText, description: 'Implementation guidelines' },
-    { key: 'form', label: 'Forms', icon: FileText, description: 'Application and reporting forms' },
-    { key: 'report', label: 'Reports', icon: FileText, description: 'Analysis and research reports' }
-  ];
+  // Generate document types dynamically from actual folders
+  const documentTypes = Object.keys(groupedDocuments).map(folder => ({
+    key: folder,
+    label: folder === 'Root' ? 'Root Directory' : folder,
+    icon: FileText,
+    description: `Files in ${folder}`
+  }));
 
   const categories = Array.from(new Set(documents.map(doc => doc.category)));
   const states = Array.from(new Set(documents.map(doc => doc.state).filter(Boolean)));
@@ -297,11 +298,12 @@ export default function Documents() {
                                     {getTypeIcon(doc.type)}
                                     <h3 className="text-lg font-semibold text-gray-900 ml-2">{doc.title}</h3>
                                     <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(doc.type)}`}>
-                                      {doc.type.replace('_', ' ')}
+                                      .{doc.type}
                                     </span>
                                   </div>
                                   
-                                  <p className="text-gray-600 mb-3">{doc.description}</p>
+                                  <p className="text-gray-600 mb-2">{doc.description}</p>
+                                  <p className="text-sm text-blue-600 mb-3">📁 {doc.filePath}</p>
                                   
                                   <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
                                     <div className="flex items-center">
