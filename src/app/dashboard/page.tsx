@@ -257,12 +257,12 @@ const ProfessionalDatePicker = ({
             className="fixed inset-0 z-40" 
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-xl shadow-2xl border border-gray-200 p-6 min-w-[320px]">
+          <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-xl shadow-2xl border border-gray-200 p-4 min-w-[280px]">
             {/* Year and Month Selectors */}
-            <div className="mb-4 pb-4 border-b border-gray-200">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="mb-3 pb-3 border-b border-gray-200">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Year</label>
                   <select
                     value={selected ? selected.getFullYear() : new Date().getFullYear()}
                     onChange={(e) => {
@@ -271,7 +271,7 @@ const ProfessionalDatePicker = ({
                       newDate.setFullYear(newYear);
                       onChange(newDate);
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   >
                     {Array.from({ length: 20 }, (_, i) => {
                       const year = new Date().getFullYear() - 10 + i;
@@ -284,7 +284,7 @@ const ProfessionalDatePicker = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Month</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Month</label>
                   <select
                     value={selected ? selected.getMonth() : new Date().getMonth()}
                     onChange={(e) => {
@@ -293,11 +293,11 @@ const ProfessionalDatePicker = ({
                       newDate.setMonth(newMonth);
                       onChange(newDate);
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   >
                     {[
-                      'January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December'
+                      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
                     ].map((month, index) => (
                       <option key={index} value={index}>
                         {month}
@@ -329,10 +329,10 @@ const ProfessionalDatePicker = ({
                 nav_button_next: 'absolute right-1',
                 table: 'w-full border-collapse space-y-1',
                 head_row: 'flex',
-                head_cell: 'text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]',
-                row: 'flex w-full mt-2',
-                cell: 'h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20',
-                day: 'h-9 w-9 p-0 font-normal aria-selected:opacity-100',
+                head_cell: 'text-muted-foreground rounded-md w-7 font-normal text-[0.7rem]',
+                row: 'flex w-full mt-1',
+                cell: 'h-7 w-7 text-center text-xs p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20',
+                day: 'h-7 w-7 p-0 font-normal aria-selected:opacity-100',
                 day_selected: 'bg-blue-600 text-white hover:bg-blue-600 hover:text-white focus:bg-blue-600 focus:text-white',
                 day_today: 'bg-blue-100 text-blue-600 font-semibold',
                 day_outside: 'day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30',
@@ -341,18 +341,18 @@ const ProfessionalDatePicker = ({
                 day_hidden: 'invisible',
               }}
             />
-            <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
+            <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-200">
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => handleDateSelect(new Date())}
-                className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
               >
                 Today
               </button>
