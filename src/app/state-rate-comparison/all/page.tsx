@@ -134,12 +134,16 @@ const parseRate = (rate: string | number | undefined): number => {
 const isNonNumericRate = (rate: string | number | undefined): boolean => {
   if (typeof rate === 'number') return false;
   if (typeof rate === 'string') {
-    const cleanedRate = rate.replace(/[$,]/g, '').trim();
+    const trimmedRate = rate.trim();
+    // Check for empty, null, or dash values
+    if (!trimmedRate || trimmedRate === '-' || trimmedRate === 'null' || trimmedRate === '') return true;
+    
+    const cleanedRate = trimmedRate.replace(/[$,]/g, '').trim();
     // Check if it's a valid number
     const numericValue = parseFloat(cleanedRate);
     if (isNaN(numericValue)) return true;
     // Check for common non-numeric indicators
-    const lowerRate = rate.toLowerCase();
+    const lowerRate = trimmedRate.toLowerCase();
     return lowerRate.includes('manual') || 
            lowerRate.includes('cost-based') || 
            lowerRate.includes('billed') || 
