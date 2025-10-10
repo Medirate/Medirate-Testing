@@ -258,6 +258,56 @@ const ProfessionalDatePicker = ({
             onClick={() => setIsOpen(false)}
           />
           <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-xl shadow-2xl border border-gray-200 p-6 min-w-[320px]">
+            {/* Year and Month Selectors */}
+            <div className="mb-4 pb-4 border-b border-gray-200">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
+                  <select
+                    value={selected ? selected.getFullYear() : new Date().getFullYear()}
+                    onChange={(e) => {
+                      const newYear = parseInt(e.target.value);
+                      const newDate = new Date(selected || new Date());
+                      newDate.setFullYear(newYear);
+                      onChange(newDate);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  >
+                    {Array.from({ length: 20 }, (_, i) => {
+                      const year = new Date().getFullYear() - 10 + i;
+                      return (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Month</label>
+                  <select
+                    value={selected ? selected.getMonth() : new Date().getMonth()}
+                    onChange={(e) => {
+                      const newMonth = parseInt(e.target.value);
+                      const newDate = new Date(selected || new Date());
+                      newDate.setMonth(newMonth);
+                      onChange(newDate);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  >
+                    {[
+                      'January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'
+                    ].map((month, index) => (
+                      <option key={index} value={index}>
+                        {month}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            
             <DayPicker
               mode="single"
               selected={selected || undefined}
@@ -266,6 +316,8 @@ const ProfessionalDatePicker = ({
               fromDate={minDate}
               toDate={maxDate}
               className="rdp"
+              showOutsideDays
+              fixedWeeks
               classNames={{
                 months: 'flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0',
                 month: 'space-y-4',
