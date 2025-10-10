@@ -21,6 +21,7 @@ import {
   Mail,
   Home,
   Users,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -293,6 +294,27 @@ const SideNav = ({
                     style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
                     Rate History
+                  </span>
+                </Link>
+              </li>
+              <li className="group">
+                <Link
+                  href="/documents"
+                  onClick={() => setActiveTab("documents")}
+                  className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                    activeTab === "documents" ? "bg-gray-200/20" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-center w-6 h-6">
+                    <FileText size={20} />
+                  </div>
+                  <span
+                    className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                      isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                    }`}
+                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                  >
+                    Documents
                   </span>
                 </Link>
               </li>
