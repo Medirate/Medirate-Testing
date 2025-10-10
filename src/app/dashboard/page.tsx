@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import AppLayout from "@/app/components/applayout";
-import { FaExclamationCircle, FaFilter } from 'react-icons/fa';
+import { FaExclamationCircle, FaFilter, FaDownload } from 'react-icons/fa';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import Select from 'react-select';
@@ -169,6 +169,64 @@ const customFilterOption = (option: any, inputValue: string) => {
   return label.includes(searchTerm);
 };
 
+// CSV Export utility function
+const exportToCSV = (data: ServiceData[], filename: string = 'dashboard_data.csv') => {
+  if (!data || data.length === 0) {
+    alert('No data to export');
+    return;
+  }
+
+  // Define CSV headers
+  const headers = [
+    'State',
+    'Service Category',
+    'Service Code',
+    'Service Description',
+    'Rate per Base Unit',
+    'Duration Unit',
+    'Effective Date',
+    'Provider Type',
+    'Modifier 1',
+    'Modifier 2',
+    'Modifier 3',
+    'Modifier 4',
+    'Program',
+    'Location/Region'
+  ];
+
+  // Convert data to CSV format
+  const csvContent = [
+    headers.join(','),
+    ...data.map(item => [
+      `"${item.state_name || ''}"`,
+      `"${item.service_category || ''}"`,
+      `"${item.service_code || ''}"`,
+      `"${(item.service_description || '').replace(/"/g, '""')}"`, // Escape quotes in description
+      `"${item.rate || ''}"`,
+      `"${item.duration_unit || ''}"`,
+      `"${item.rate_effective_date || ''}"`,
+      `"${item.provider_type || ''}"`,
+      `"${item.modifier_1 ? (item.modifier_1_details ? `${item.modifier_1} - ${item.modifier_1_details}` : item.modifier_1) : ''}"`,
+      `"${item.modifier_2 ? (item.modifier_2_details ? `${item.modifier_2} - ${item.modifier_2_details}` : item.modifier_2) : ''}"`,
+      `"${item.modifier_3 ? (item.modifier_3_details ? `${item.modifier_3} - ${item.modifier_3_details}` : item.modifier_3) : ''}"`,
+      `"${item.modifier_4 ? (item.modifier_4_details ? `${item.modifier_4} - ${item.modifier_4_details}` : item.modifier_4) : ''}"`,
+      `"${item.program || ''}"`,
+      `"${item.location_region || ''}"`
+    ].join(','))
+  ].join('\n');
+
+  // Create and download the file
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 // New "jump to first letter" filter function for specific fields
 const jumpToLetterFilterOption = (option: any, inputValue: string) => {
   if (!inputValue) return true; // Show all options when no input
@@ -216,6 +274,8 @@ export default function Dashboard() {
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }[]>([]);
   const [pendingFilters, setPendingFilters] = useState<Set<keyof Selections>>(new Set());
   const [displayedItems, setDisplayedItems] = useState(50); // Adjust this number based on your needs
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
   
   const itemsPerPage = 50; // Adjust this number based on your needs
 
@@ -906,6 +966,109 @@ export default function Dashboard() {
 
   // Update hasMoreItems logic for Load More mode
   const hasMoreItems = data.length < totalCount;
+
+  // Function to fetch all data for export (handles pagination)
+  const fetchAllDataForExport = useCallback(async (): Promise<ServiceData[]> => {
+    if (totalCount <= sortedData.length) {
+      // If we already have all data, return it
+      return sortedData;
+    }
+
+    setIsExporting(true);
+    setExportProgress(0);
+    
+    try {
+      const allData: ServiceData[] = [...sortedData];
+      const totalPages = Math.ceil(totalCount / itemsPerPage);
+      
+      // Fetch remaining pages
+      for (let page = 2; page <= totalPages; page++) {
+        setExportProgress(Math.round((page - 1) / totalPages * 100));
+        
+        const filters: any = {};
+        for (const [key, value] of Object.entries(selections)) {
+          if (value) filters[key] = value;
+        }
+        if (startDate) filters.start_date = startDate.toISOString().split('T')[0];
+        if (endDate) filters.end_date = endDate.toISOString().split('T')[0];
+        filters.page = String(page);
+        filters.itemsPerPage = String(itemsPerPage);
+        
+        // Use a separate API call that doesn't interfere with main data state
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value) params.append(key, value);
+        });
+        const url = `/api/state-payment-comparison?${params.toString()}`;
+        
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result && Array.isArray(result.data)) {
+          allData.push(...result.data);
+        }
+        
+        // Small delay to prevent overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      setExportProgress(100);
+      return allData;
+    } catch (error) {
+      console.error('Error fetching all data for export:', error);
+      throw error;
+    } finally {
+      setIsExporting(false);
+    }
+  }, [sortedData, totalCount, itemsPerPage, selections, startDate, endDate]);
+
+  // CSV Download handler
+  const handleDownloadCSV = useCallback(async () => {
+    if (!sortedData || sortedData.length === 0) {
+      alert('No data to export. Please search for data first.');
+      return;
+    }
+
+    try {
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `dashboard_data_${timestamp}.csv`;
+      
+      // Get all data (handles pagination automatically)
+      const allData = await fetchAllDataForExport();
+      
+      // Apply the same sorting that's currently applied to the table
+      const sortedAllData = [...allData].sort((a, b) => {
+        for (const sort of sortConfig) {
+          const { key, direction } = sort;
+          let aValue: any = a[key];
+          let bValue: any = b[key];
+          if (key === 'rate') {
+            aValue = parseFloat((aValue || '0').replace(/[^0-9.-]/g, ''));
+            bValue = parseFloat((bValue || '0').replace(/[^0-9.-]/g, ''));
+          } else if (key === 'rate_effective_date') {
+            aValue = aValue ? parseTimezoneNeutralDate(aValue).getTime() : 0;
+            bValue = bValue ? parseTimezoneNeutralDate(bValue).getTime() : 0;
+          } else {
+            aValue = (aValue || '').toString().toLowerCase();
+            bValue = (bValue || '').toString().toLowerCase();
+          }
+          if (aValue < bValue) {
+            return direction === 'asc' ? -1 : 1;
+          }
+          if (aValue > bValue) {
+            return direction === 'asc' ? 1 : -1;
+          }
+        }
+        return 0;
+      });
+      
+      exportToCSV(sortedAllData, filename);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Export failed. Please try again.');
+    }
+  }, [sortedData, fetchAllDataForExport, sortConfig]);
 
   // Update handlePageChange for Pagination mode
   const handlePageChange = async (page: number) => {
@@ -1831,6 +1994,75 @@ export default function Dashboard() {
         {/* Show the table when filters are applied and data is loaded */}
         {!loading && hasSearched && data.length > 0 && (
           <>
+          {/* Download CSV Button */}
+          <div className="mb-6 flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+            <div className="flex items-center space-x-4">
+              <div className="text-sm text-gray-600">
+                <span className="font-medium text-gray-800">Showing {sortedData.length} of {totalCount} records</span>
+                {totalCount > sortedData.length && (
+                  <span className="ml-2 text-amber-600 font-medium">
+                    (Export will include all {totalCount} records)
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              {totalCount > sortedData.length && (
+                <div className="text-xs text-gray-500 bg-amber-100 px-2 py-1 rounded">
+                  Large dataset detected
+                </div>
+              )}
+              <button
+                onClick={handleDownloadCSV}
+                disabled={isExporting}
+                className={`group relative flex items-center px-6 py-3 rounded-lg transition-all duration-200 font-semibold shadow-lg transform ${
+                  isExporting 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 hover:shadow-xl hover:-translate-y-0.5'
+                } text-white`}
+              >
+                <div className="flex items-center">
+                  {isExporting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <span>Exporting... {exportProgress}%</span>
+                    </>
+                  ) : (
+                    <>
+                      <FaDownload className="mr-2 group-hover:animate-bounce" />
+                      <span>Export CSV</span>
+                      <span className="ml-2 bg-green-500 text-xs px-2 py-1 rounded-full">
+                        {totalCount > sortedData.length ? totalCount : sortedData.length}
+                      </span>
+                    </>
+                  )}
+                </div>
+                {!isExporting && (
+                  <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 rounded-lg transition-opacity duration-200"></div>
+                )}
+              </button>
+            </div>
+          </div>
+          
+          {/* Export Progress Bar */}
+          {isExporting && (
+            <div className="mb-4 bg-gray-100 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">Exporting data...</span>
+                <span className="text-sm text-gray-500">{exportProgress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-green-600 h-2 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${exportProgress}%` }}
+                ></div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Fetching all {totalCount} records. This may take a moment for large datasets.
+              </p>
+            </div>
+          )}
+          
           <div 
             className="rounded-lg shadow-lg bg-white relative z-30 overflow-x-auto"
             style={{ 
