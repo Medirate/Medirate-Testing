@@ -1613,11 +1613,24 @@ export default function Dashboard() {
                   selectsStart
                   startDate={startDate}
                   endDate={endDate}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   disabled={!!selections.fee_schedule_date || !selections.service_category}
                   isClearable
                   includeDates={availableDates.map(date => parseTimezoneNeutralDate(date))}
                   popperClassName="datepicker-zindex"
+                  showYearDropdown
+                  showMonthDropdown
+                  dropdownMode="select"
+                  yearDropdownItemNumber={15}
+                  scrollableYearDropdown
+                  dateFormat="MM/dd/yyyy"
+                  placeholderText="Select start date"
+                  autoComplete="off"
+                  showPopperArrow={false}
+                  calendarStartDay={1}
+                  monthsShown={1}
+                  withPortal={false}
+                  todayButton="Today"
                 />
               </div>
               <div className="flex flex-col gap-2 w-1/2">
@@ -1629,11 +1642,24 @@ export default function Dashboard() {
                   startDate={startDate}
                   endDate={endDate}
                   minDate={startDate || undefined}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                   disabled={!!selections.fee_schedule_date || !selections.service_category}
                   isClearable
                   includeDates={availableDates.map(date => parseTimezoneNeutralDate(date))}
                   popperClassName="datepicker-zindex"
+                  showYearDropdown
+                  showMonthDropdown
+                  dropdownMode="select"
+                  yearDropdownItemNumber={15}
+                  scrollableYearDropdown
+                  dateFormat="MM/dd/yyyy"
+                  placeholderText="Select end date"
+                  autoComplete="off"
+                  showPopperArrow={false}
+                  calendarStartDay={1}
+                  monthsShown={1}
+                  withPortal={false}
+                  todayButton="Today"
                 />
               </div>
             </div>
@@ -2405,6 +2431,151 @@ export default function Dashboard() {
         }
         .datepicker-zindex {
           z-index: 999999999 !important;
+        }
+        
+        /* Enhanced DatePicker Styling */
+        .react-datepicker {
+          border: 1px solid #e5e7eb;
+          border-radius: 0.5rem;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+          font-family: inherit;
+        }
+        
+        .react-datepicker__header {
+          background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+          border-bottom: none;
+          border-radius: 0.5rem 0.5rem 0 0;
+          padding: 1rem;
+        }
+        
+        .react-datepicker__current-month,
+        .react-datepicker__day-name {
+          color: white;
+          font-weight: 600;
+        }
+        
+        .react-datepicker__day-name {
+          color: rgba(255, 255, 255, 0.8);
+          font-size: 0.875rem;
+        }
+        
+        .react-datepicker__month-dropdown,
+        .react-datepicker__year-dropdown {
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 0.375rem;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .react-datepicker__month-option,
+        .react-datepicker__year-option {
+          padding: 0.5rem 1rem;
+          transition: background-color 0.2s;
+        }
+        
+        .react-datepicker__month-option:hover,
+        .react-datepicker__year-option:hover {
+          background-color: #f3f4f6;
+        }
+        
+        .react-datepicker__day {
+          border-radius: 0.375rem;
+          transition: all 0.2s;
+          margin: 0.125rem;
+        }
+        
+        .react-datepicker__day:hover {
+          background-color: #dbeafe;
+          color: #1d4ed8;
+        }
+        
+        .react-datepicker__day--selected {
+          background-color: #3b82f6;
+          color: white;
+          font-weight: 600;
+        }
+        
+        .react-datepicker__day--in-range {
+          background-color: #dbeafe;
+          color: #1d4ed8;
+        }
+        
+        .react-datepicker__day--in-selecting-range {
+          background-color: #bfdbfe;
+          color: #1e40af;
+        }
+        
+        .react-datepicker__day--today {
+          background-color: #fef3c7;
+          color: #92400e;
+          font-weight: 600;
+        }
+        
+        .react-datepicker__day--disabled {
+          color: #9ca3af;
+          cursor: not-allowed;
+        }
+        
+        .react-datepicker__day--disabled:hover {
+          background-color: transparent;
+          color: #9ca3af;
+        }
+        
+        .react-datepicker__today-button {
+          background: #f3f4f6;
+          border-top: 1px solid #e5e7eb;
+          color: #374151;
+          font-weight: 500;
+          padding: 0.75rem;
+          transition: background-color 0.2s;
+        }
+        
+        .react-datepicker__today-button:hover {
+          background: #e5e7eb;
+        }
+        
+        .react-datepicker__navigation {
+          background: rgba(255, 255, 255, 0.1);
+          border: none;
+          border-radius: 0.375rem;
+          color: white;
+          height: 2rem;
+          width: 2rem;
+          transition: all 0.2s;
+        }
+        
+        .react-datepicker__navigation:hover {
+          background: rgba(255, 255, 255, 0.2);
+          transform: scale(1.05);
+        }
+        
+        .react-datepicker__navigation--previous {
+          left: 1rem;
+        }
+        
+        .react-datepicker__navigation--next {
+          right: 1rem;
+        }
+        
+        .react-datepicker__input-container input {
+          border: 1px solid #d1d5db;
+          border-radius: 0.5rem;
+          padding: 0.75rem 1rem;
+          font-size: 0.875rem;
+          transition: all 0.2s;
+          width: 100%;
+        }
+        
+        .react-datepicker__input-container input:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .react-datepicker__input-container input:disabled {
+          background-color: #f9fafb;
+          color: #9ca3af;
+          cursor: not-allowed;
         }
       `}</style>
     </AppLayout>
