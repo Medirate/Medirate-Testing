@@ -47,92 +47,10 @@ export default function Documents() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedState, setSelectedState] = useState<string>('all');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['state_notes', 'policies']));
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  // Mock data - replace with actual API calls
-  const mockDocuments: Document[] = [
-    {
-      id: '1',
-      title: 'Texas Medicaid Rate Schedule 2024',
-      type: 'state_note',
-      state: 'Texas',
-      category: 'Rate Information',
-      description: 'Comprehensive rate schedule for Texas Medicaid services including all service categories and their corresponding rates.',
-      uploadDate: '2024-01-15',
-      lastModified: '2024-01-20',
-      fileSize: '2.3 MB',
-      downloadUrl: '/documents/texas-rates-2024.pdf',
-      tags: ['rates', 'texas', 'medicaid', '2024'],
-      isPublic: true
-    },
-    {
-      id: '2',
-      title: 'California Provider Guidelines',
-      type: 'guideline',
-      state: 'California',
-      category: 'Provider Information',
-      description: 'Guidelines for healthcare providers participating in California Medicaid program.',
-      uploadDate: '2024-01-10',
-      lastModified: '2024-01-18',
-      fileSize: '1.8 MB',
-      downloadUrl: '/documents/california-guidelines.pdf',
-      tags: ['guidelines', 'california', 'providers'],
-      isPublic: true
-    },
-    {
-      id: '3',
-      title: 'New York State Notes - Q1 2024',
-      type: 'state_note',
-      state: 'New York',
-      category: 'State Updates',
-      description: 'Quarterly state notes covering policy changes and rate updates for New York Medicaid.',
-      uploadDate: '2024-03-01',
-      lastModified: '2024-03-05',
-      fileSize: '3.1 MB',
-      downloadUrl: '/documents/ny-state-notes-q1-2024.pdf',
-      tags: ['state-notes', 'new-york', 'q1-2024'],
-      isPublic: true
-    },
-    {
-      id: '4',
-      title: 'Medicaid Policy Update - National',
-      type: 'policy',
-      category: 'Policy Updates',
-      description: 'National policy updates affecting all Medicaid programs across states.',
-      uploadDate: '2024-02-15',
-      lastModified: '2024-02-20',
-      fileSize: '4.2 MB',
-      downloadUrl: '/documents/national-policy-update.pdf',
-      tags: ['policy', 'national', 'medicaid'],
-      isPublic: true
-    },
-    {
-      id: '5',
-      title: 'Provider Application Form',
-      type: 'form',
-      category: 'Forms',
-      description: 'Standard application form for new Medicaid providers.',
-      uploadDate: '2024-01-05',
-      lastModified: '2024-01-08',
-      fileSize: '0.8 MB',
-      downloadUrl: '/documents/provider-application.pdf',
-      tags: ['form', 'application', 'providers'],
-      isPublic: true
-    },
-    {
-      id: '6',
-      title: 'Florida Rate Analysis Report',
-      type: 'report',
-      state: 'Florida',
-      category: 'Analysis',
-      description: 'Comprehensive analysis of Florida Medicaid rates compared to national averages.',
-      uploadDate: '2024-02-01',
-      lastModified: '2024-02-10',
-      fileSize: '5.7 MB',
-      downloadUrl: '/documents/florida-rate-analysis.pdf',
-      tags: ['analysis', 'florida', 'rates', 'comparison'],
-      isPublic: true
-    }
-  ];
+  // Fetch documents from API
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -140,9 +58,12 @@ export default function Documents() {
       setError(null);
       
       try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setDocuments(mockDocuments);
+        const response = await fetch('/api/documents');
+        if (!response.ok) {
+          throw new Error('Failed to fetch documents');
+        }
+        const data = await response.json();
+        setDocuments(data.documents || []);
       } catch (err) {
         setError('Failed to load documents');
         console.error('Error fetching documents:', err);
@@ -204,6 +125,37 @@ export default function Documents() {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  const handleFileUpload = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setUploading(true);
+    
+    try {
+      const formData = new FormData(event.currentTarget);
+      
+      const response = await fetch('/api/documents', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (response.ok) {
+        // Refresh documents list
+        const fetchResponse = await fetch('/api/documents');
+        const data = await fetchResponse.json();
+        setDocuments(data.documents || []);
+        setShowUploadForm(false);
+        // Reset form
+        (event.target as HTMLFormElement).reset();
+      } else {
+        setError('Upload failed');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      setError('Upload failed');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const getTypeIcon = (type: string) => {
@@ -309,6 +261,120 @@ export default function Documents() {
             </CardContent>
           </Card>
 
+          {/* Upload Section */}
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg">Upload Documents</CardTitle>
+                  <CardDescription>Upload new documents to the repository</CardDescription>
+                </div>
+                <button
+                  onClick={() => setShowUploadForm(!showUploadForm)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  {showUploadForm ? 'Cancel' : 'Upload Document'}
+                </button>
+              </div>
+            </CardHeader>
+            {showUploadForm && (
+              <CardContent>
+                <form onSubmit={handleFileUpload} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                      <input
+                        type="text"
+                        name="title"
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Document title"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                      <select
+                        name="type"
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="state_note">State Note</option>
+                        <option value="policy">Policy</option>
+                        <option value="guideline">Guideline</option>
+                        <option value="form">Form</option>
+                        <option value="report">Report</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">State (Optional)</label>
+                      <input
+                        type="text"
+                        name="state"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="e.g., Texas, California"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                      <input
+                        type="text"
+                        name="category"
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="e.g., Rate Information"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      name="description"
+                      required
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Document description"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tags (comma-separated)</label>
+                    <input
+                      type="text"
+                      name="tags"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="e.g., rates, texas, medicaid"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">File</label>
+                    <input
+                      type="file"
+                      name="file"
+                      required
+                      accept=".pdf,.doc,.docx,.txt,.xlsx,.xls"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowUploadForm(false)}
+                      className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={uploading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                    >
+                      {uploading ? 'Uploading...' : 'Upload'}
+                    </button>
+                  </div>
+                </form>
+              </CardContent>
+            )}
+          </Card>
+
           {/* Loading State */}
           {isLoading && (
             <div className="flex justify-center items-center py-12">
@@ -411,12 +477,24 @@ export default function Documents() {
                                 
                                 <div className="ml-4">
                                   <button
-                                    onClick={() => {
-                                      // Handle download
-                                      const link = document.createElement('a');
-                                      link.href = doc.downloadUrl;
-                                      link.download = doc.title;
-                                      link.click();
+                                    onClick={async () => {
+                                      try {
+                                        // Use the download API route
+                                        const response = await fetch(`/api/documents/download?url=${encodeURIComponent(doc.downloadUrl)}`);
+                                        if (response.ok) {
+                                          const blob = await response.blob();
+                                          const url = window.URL.createObjectURL(blob);
+                                          const link = document.createElement('a');
+                                          link.href = url;
+                                          link.download = doc.title;
+                                          link.click();
+                                          window.URL.revokeObjectURL(url);
+                                        } else {
+                                          console.error('Download failed');
+                                        }
+                                      } catch (error) {
+                                        console.error('Download error:', error);
+                                      }
                                     }}
                                     className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                                   >
