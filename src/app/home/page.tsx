@@ -1060,16 +1060,16 @@ const HomePage = () => {
                 <h3 className="text-sm font-medium text-gray-500">Total Records</h3>
                 <p className="text-xl font-bold text-gray-900">{filteredRateChanges.length.toLocaleString()}</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {filteredRateChanges.filter(c => c.isChange).length} actual changes, {filteredRateChanges.filter(c => !c.isChange).length} latest rates
+                  {filteredRateChanges.filter((c: any) => c.isChange).length} actual changes, {filteredRateChanges.filter((c: any) => !c.isChange).length} latest rates
                 </p>
               </div>
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-gray-500">Avg. % Change</h3>
                 <p className="text-xl font-bold text-gray-900">
                   {(() => {
-                    const actualChanges = filteredRateChanges.filter(change => change.isChange);
+                    const actualChanges = filteredRateChanges.filter((change: any) => change.isChange);
                     return actualChanges.length > 0 
-                      ? (actualChanges.reduce((sum, change) => sum + change.percentageChange, 0) / actualChanges.length).toFixed(1)
+                      ? (actualChanges.reduce((sum: number, change: any) => sum + change.percentageChange, 0) / actualChanges.length).toFixed(1)
                       : '0.0';
                   })()}%
                 </p>
@@ -1077,13 +1077,13 @@ const HomePage = () => {
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-gray-500">States Affected</h3>
                 <p className="text-xl font-bold text-gray-900">
-                  {new Set(filteredRateChanges.map(c => c.state)).size}
+                  {new Set(filteredRateChanges.map((c: any) => c.state)).size}
                 </p>
               </div>
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-gray-500">Service Categories</h3>
                 <p className="text-xl font-bold text-gray-900">
-                  {new Set(filteredRateChanges.map(c => c.serviceCategory)).size}
+                  {new Set(filteredRateChanges.map((c: any) => c.serviceCategory)).size}
                 </p>
               </div>
             </div>
@@ -1103,7 +1103,7 @@ const HomePage = () => {
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">All Categories</option>
-                    {filterOptions.serviceCategories.map(category => (
+                    {filterOptions.serviceCategories.map((category: any) => (
                       <option key={category} value={category}>{category}</option>
                     ))}
                   </select>
@@ -1116,7 +1116,7 @@ const HomePage = () => {
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">All Codes</option>
-                    {filterOptions.serviceCodes.map(code => (
+                    {filterOptions.serviceCodes.map((code: any) => (
                       <option key={code} value={code}>{code}</option>
                     ))}
                   </select>
@@ -1129,7 +1129,7 @@ const HomePage = () => {
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">All Types</option>
-                    {filterOptions.providerTypes.map(type => (
+                    {filterOptions.providerTypes.map((type: any) => (
                       <option key={type} value={type}>{type}</option>
                     ))}
                   </select>
@@ -1142,7 +1142,7 @@ const HomePage = () => {
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">All Programs</option>
-                    {filterOptions.programs.map(program => (
+                    {filterOptions.programs.map((program: any) => (
                       <option key={program} value={program}>{program}</option>
                     ))}
                   </select>
@@ -1248,7 +1248,7 @@ const HomePage = () => {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {paginatedRateChanges.length > 0 ? (
-                        paginatedRateChanges.map((change) => (
+                        paginatedRateChanges.map((change: any) => (
                           <tr key={change.id} className="hover:bg-gray-50">
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{change.serviceCode}</td>
                             <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title={change.serviceDescription}>{change.serviceDescription}</td>

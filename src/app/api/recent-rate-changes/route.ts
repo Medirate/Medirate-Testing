@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
     let changeIndex = 0;
     for (const [key, records] of serviceGroups) {
       // Sort by date to get chronological order
-      const sortedRecords = records.sort((a, b) => 
+      const sortedRecords = records.sort((a: any, b: any) => 
         new Date(a.rate_effective_date).getTime() - new Date(b.rate_effective_date).getTime()
       );
       
