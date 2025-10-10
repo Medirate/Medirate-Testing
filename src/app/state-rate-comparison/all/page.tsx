@@ -4106,7 +4106,57 @@ export default function StatePaymentComparison() {
                         return typeof avg === 'number' && !isNaN(avg) && avg > 0;
                       });
                       
+                      // Check for non-numeric rates in the data regardless of chart display
+                      const nonNumericStatesInData = filterOptions.states.filter((state: any) => {
+                        const stateData = data.filter(item => item.state_name === state && item.service_code === filterSets[0].serviceCode);
+                        return stateData.some(item => isNonNumericRate(item.rate));
+                      });
+                      
                       if (statesWithData.length === 0) {
+                        // Show non-numeric rate message even if no chart data
+                        if (nonNumericStatesInData.length > 0) {
+                          return (
+                            <div>
+                              {/* Non-numeric rate message */}
+                              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <div className="flex items-start">
+                                  <FaExclamationCircle className="h-5 w-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <h3 className="text-sm font-medium text-yellow-800 mb-2">
+                                      Non-Numeric Rates Detected
+                                    </h3>
+                                    <div className="text-sm text-yellow-700">
+                                      {nonNumericStatesInData.map((state: string, index: number) => {
+                                        const stateData = data.filter(item => item.state_name === state && item.service_code === filterSets[0].serviceCode);
+                                        const nonNumericItem = stateData.find(item => isNonNumericRate(item.rate));
+                                        return (
+                                          <div key={index} className="mb-2">
+                                            <p className="font-medium">{state} - Service Code: {filterSets[0].serviceCode}</p>
+                                            <p className="text-xs text-yellow-600 mt-1">
+                                              {getNonNumericRateMessage(nonNumericItem?.rate, state, filterSets[0].serviceCode)}
+                                            </p>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center justify-center h-64">
+                                <div className="text-center">
+                                  <FaChartBar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                  <p className="text-gray-600 mb-2 font-medium">No numeric data available for chart</p>
+                                  <p className="text-sm text-gray-500">
+                                    The selected criteria contain non-numeric rates that cannot be displayed in the chart. 
+                                    See the message above for details about alternative rate methodologies.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        
                         return (
                           <div className="flex items-center justify-center h-64">
                             <div className="text-center">
