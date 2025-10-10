@@ -61,6 +61,8 @@ export default function Documents() {
           throw new Error('Failed to fetch documents');
         }
         const data = await response.json();
+        console.log('📄 Documents API response:', data);
+        console.log('📄 Documents count:', data.documents?.length || 0);
         setDocuments(data.documents || []);
       } catch (err) {
         setError('Failed to load documents');

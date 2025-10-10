@@ -12,22 +12,45 @@ export async function GET(request: NextRequest) {
 
     // List all files in the blob store
     const { blobs } = await list();
+    console.log('📁 Found blobs:', blobs.length);
+    console.log('📁 Blob details:', blobs.map(b => ({ pathname: b.pathname, size: b.size })));
     
     // Transform blob data to match our document interface
-    const documents = blobs.map(blob => ({
-      id: blob.url.split('/').pop() || blob.url,
-      title: blob.pathname.split('/').pop() || 'Document',
-      type: getDocumentTypeFromPath(blob.pathname),
-      state: extractStateFromPath(blob.pathname),
-      category: getCategoryFromPath(blob.pathname),
-      description: `Document uploaded on ${new Date(blob.uploadedAt).toLocaleDateString()}`,
-      uploadDate: blob.uploadedAt,
-      lastModified: blob.uploadedAt,
-      fileSize: formatFileSize(blob.size),
-      downloadUrl: blob.url,
-      tags: extractTagsFromPath(blob.pathname),
-      isPublic: true
-    }));
+    const documents = blobs.map(blob => {
+      const fileName = blob.pathname.split('/').pop() || 'Document';
+      const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+      
+      // Determine document type based on file extension and name
+      let documentType = 'document';
+      if (fileName.toLowerCase().includes('rate') || fileName.toLowerCase().includes('schedule')) {
+        documentType = 'state_note';
+      } else if (fileName.toLowerCase().includes('policy') || fileName.toLowerCase().includes('guideline')) {
+        documentType = 'policy';
+      } else if (fileName.toLowerCase().includes('form') || fileName.toLowerCase().includes('application')) {
+        documentType = 'form';
+      } else if (fileName.toLowerCase().includes('report') || fileName.toLowerCase().includes('analysis')) {
+        documentType = 'report';
+      } else if (fileExtension === 'pdf') {
+        documentType = 'state_note'; // Default PDFs to state notes
+      } else if (fileExtension === 'csv' || fileExtension === 'xlsx') {
+        documentType = 'report'; // Default data files to reports
+      }
+      
+      return {
+        id: blob.url.split('/').pop() || blob.url,
+        title: fileName,
+        type: documentType,
+        state: extractStateFromPath(blob.pathname),
+        category: getCategoryFromPath(documentType),
+        description: `Document uploaded on ${new Date(blob.uploadedAt).toLocaleDateString()}`,
+        uploadDate: blob.uploadedAt,
+        lastModified: blob.uploadedAt,
+        fileSize: formatFileSize(blob.size),
+        downloadUrl: blob.url,
+        tags: extractTagsFromPath(blob.pathname),
+        isPublic: true
+      };
+    });
 
     return NextResponse.json({ documents });
   } catch (error) {
