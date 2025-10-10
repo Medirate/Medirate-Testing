@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { list } from '@vercel/blob';
-import { auth } from '@kinde-oss/kinde-auth-nextjs/server';
+import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
 
 export async function GET(request: NextRequest) {
   try {
-    const { isAuthenticated } = await auth();
+    const { isAuthenticated } = await getKindeServerSession();
     
     if (!isAuthenticated) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
