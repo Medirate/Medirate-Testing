@@ -963,15 +963,21 @@ const HomePage = () => {
             {/* Summary Cards for Rate Changes */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-500">Total Changes</h3>
+                <h3 className="text-sm font-medium text-gray-500">Total Records</h3>
                 <p className="text-xl font-bold text-gray-900">{filteredRateChanges.length.toLocaleString()}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {filteredRateChanges.filter(c => c.isChange).length} actual changes, {filteredRateChanges.filter(c => !c.isChange).length} latest rates
+                </p>
               </div>
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-gray-500">Avg. % Change</h3>
                 <p className="text-xl font-bold text-gray-900">
-                  {filteredRateChanges.length > 0 
-                    ? (filteredRateChanges.reduce((sum, change) => sum + change.percentageChange, 0) / filteredRateChanges.length).toFixed(1)
-                    : '0.0'}%
+                  {(() => {
+                    const actualChanges = filteredRateChanges.filter(change => change.isChange);
+                    return actualChanges.length > 0 
+                      ? (actualChanges.reduce((sum, change) => sum + change.percentageChange, 0) / actualChanges.length).toFixed(1)
+                      : '0.0';
+                  })()}%
                 </p>
               </div>
               <div className="bg-gray-50 rounded-lg p-4">
@@ -1106,14 +1112,22 @@ const HomePage = () => {
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{formatRate(change.oldRate)}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{formatRate(change.newRate)}</td>
                             <td className={`px-4 py-3 whitespace-nowrap text-sm font-medium flex items-center ${
-                              change.percentageChange > 0 ? 'text-green-600' : 'text-red-600'
+                              change.isChange 
+                                ? (change.percentageChange > 0 ? 'text-green-600' : 'text-red-600')
+                                : 'text-blue-600'
                             }`}>
-                              {change.percentageChange > 0 ? (
-                                <ArrowUp className="h-3 w-3 mr-1" />
+                              {change.isChange ? (
+                                <>
+                                  {change.percentageChange > 0 ? (
+                                    <ArrowUp className="h-3 w-3 mr-1" />
+                                  ) : (
+                                    <ArrowDown className="h-3 w-3 mr-1" />
+                                  )}
+                                  {change.percentageChange > 0 ? '+' : ''}{change.percentageChange.toFixed(1)}%
+                                </>
                               ) : (
-                                <ArrowDown className="h-3 w-3 mr-1" />
+                                <span className="text-blue-600">Latest Rate</span>
                               )}
-                              {change.percentageChange > 0 ? '+' : ''}{change.percentageChange.toFixed(1)}%
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{formatDate(change.effectiveDate)}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{change.providerType || '-'}</td>

@@ -85,22 +85,89 @@ export async function GET(request: NextRequest) {
     let changeCount = 0;
     
     for (const [key, records] of serviceGroups) {
-      if (records.length < 2) continue; // Need at least 2 records to show a change
-      
       // Sort by date to get chronological order
       const sortedRecords = records.sort((a, b) => 
         new Date(a.rate_effective_date).getTime() - new Date(b.rate_effective_date).getTime()
       );
       
-      // Find the most recent change
+      // Get the latest record
       const latestRecord = sortedRecords[sortedRecords.length - 1];
-      const previousRecord = sortedRecords[sortedRecords.length - 2];
       
-      const latestRate = parseFloat(latestRecord.rate?.replace(/[$,]/g, '') || '0');
-      const previousRate = parseFloat(previousRecord.rate?.replace(/[$,]/g, '') || '0');
-      
-      if (latestRate !== previousRate) {
-        const percentageChange = previousRate > 0 ? ((latestRate - previousRate) / previousRate) * 100 : 0;
+      // If we have multiple records, try to find a change
+      if (records.length >= 2) {
+        const previousRecord = sortedRecords[sortedRecords.length - 2];
+        const latestRate = parseFloat(latestRecord.rate?.replace(/[$,]/g, '') || '0');
+        const previousRate = parseFloat(previousRecord.rate?.replace(/[$,]/g, '') || '0');
+        
+        if (latestRate !== previousRate) {
+          // This is an actual rate change
+          const percentageChange = previousRate > 0 ? ((latestRate - previousRate) / previousRate) * 100 : 0;
+          
+          changes.push({
+            id: `${latestRecord.state_name}-${latestRecord.service_code}-${latestRecord.rate_effective_date}`,
+            state: latestRecord.state_name,
+            serviceCategory: latestRecord.service_category,
+            serviceCode: latestRecord.service_code,
+            serviceDescription: latestRecord.service_description,
+            program: latestRecord.program,
+            locationRegion: latestRecord.location_region,
+            providerType: latestRecord.provider_type,
+            durationUnit: latestRecord.duration_unit,
+            modifier1: latestRecord.modifier_1,
+            modifier1Details: latestRecord.modifier_1_details,
+            modifier2: latestRecord.modifier_2,
+            modifier2Details: latestRecord.modifier_2_details,
+            modifier3: latestRecord.modifier_3,
+            modifier3Details: latestRecord.modifier_3_details,
+            modifier4: latestRecord.modifier_4,
+            modifier4Details: latestRecord.modifier_4_details,
+            oldRate: previousRecord.rate,
+            newRate: latestRecord.rate,
+            oldRateNumeric: previousRate,
+            newRateNumeric: latestRate,
+            percentageChange: percentageChange,
+            effectiveDate: latestRecord.rate_effective_date,
+            previousDate: previousRecord.rate_effective_date,
+            changeCount: records.length,
+            isChange: true
+          });
+          
+          totalPercentageChange += percentageChange;
+          changeCount++;
+        } else {
+          // No rate change, but show the latest rate
+          changes.push({
+            id: `${latestRecord.state_name}-${latestRecord.service_code}-${latestRecord.rate_effective_date}`,
+            state: latestRecord.state_name,
+            serviceCategory: latestRecord.service_category,
+            serviceCode: latestRecord.service_code,
+            serviceDescription: latestRecord.service_description,
+            program: latestRecord.program,
+            locationRegion: latestRecord.location_region,
+            providerType: latestRecord.provider_type,
+            durationUnit: latestRecord.duration_unit,
+            modifier1: latestRecord.modifier_1,
+            modifier1Details: latestRecord.modifier_1_details,
+            modifier2: latestRecord.modifier_2,
+            modifier2Details: latestRecord.modifier_2_details,
+            modifier3: latestRecord.modifier_3,
+            modifier3Details: latestRecord.modifier_3_details,
+            modifier4: latestRecord.modifier_4,
+            modifier4Details: latestRecord.modifier_4_details,
+            oldRate: latestRecord.rate,
+            newRate: latestRecord.rate,
+            oldRateNumeric: latestRate,
+            newRateNumeric: latestRate,
+            percentageChange: 0,
+            effectiveDate: latestRecord.rate_effective_date,
+            previousDate: latestRecord.rate_effective_date,
+            changeCount: records.length,
+            isChange: false
+          });
+        }
+      } else {
+        // Only one record, show it as the latest rate
+        const latestRate = parseFloat(latestRecord.rate?.replace(/[$,]/g, '') || '0');
         
         changes.push({
           id: `${latestRecord.state_name}-${latestRecord.service_code}-${latestRecord.rate_effective_date}`,
@@ -120,18 +187,16 @@ export async function GET(request: NextRequest) {
           modifier3Details: latestRecord.modifier_3_details,
           modifier4: latestRecord.modifier_4,
           modifier4Details: latestRecord.modifier_4_details,
-          oldRate: previousRecord.rate,
+          oldRate: latestRecord.rate,
           newRate: latestRecord.rate,
-          oldRateNumeric: previousRate,
+          oldRateNumeric: latestRate,
           newRateNumeric: latestRate,
-          percentageChange: percentageChange,
+          percentageChange: 0,
           effectiveDate: latestRecord.rate_effective_date,
-          previousDate: previousRecord.rate_effective_date,
-          changeCount: records.length
+          previousDate: latestRecord.rate_effective_date,
+          changeCount: 1,
+          isChange: false
         });
-        
-        totalPercentageChange += percentageChange;
-        changeCount++;
       }
     }
     
