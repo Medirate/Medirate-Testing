@@ -7,23 +7,37 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const days = parseInt(searchParams.get('days') || '30'); // Default to last 30 days
     const limit = parseInt(searchParams.get('limit') || '100'); // Default to 100 records
+    const state = searchParams.get('state'); // Get specific state if provided
     
     // Calculate date range
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     
-    console.log(`🔍 Fetching recent rate changes from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    console.log(`🔍 Fetching recent rate changes from ${startDate.toISOString()} to ${endDate.toISOString()}${state ? ` for state: ${state}` : ''}`);
     
-    // Query the database for recent rate changes
-    // We'll get all records and then process them to find actual changes
-    const { data: allData, error: allError } = await supabase
+    // Build query based on whether we have a specific state
+    let query = supabase
       .from('master_data_sept_2')
-      .select('*')
-      .gte('rate_effective_date', startDate.toISOString().split('T')[0])
-      .lte('rate_effective_date', endDate.toISOString().split('T')[0])
-      .order('rate_effective_date', { ascending: false })
-      .limit(1000); // Get more data to process changes
+      .select('*');
+    
+    if (state) {
+      // If specific state is requested, get ALL records for that state (no date restriction)
+      // but prioritize recent ones
+      query = query
+        .eq('state_name', state.toUpperCase())
+        .order('rate_effective_date', { ascending: false })
+        .limit(2000); // Get more records for state-specific queries
+    } else {
+      // If no specific state, use date range for recent changes
+      query = query
+        .gte('rate_effective_date', startDate.toISOString().split('T')[0])
+        .lte('rate_effective_date', endDate.toISOString().split('T')[0])
+        .order('rate_effective_date', { ascending: false })
+        .limit(1000);
+    }
+    
+    const { data: allData, error: allError } = await query;
     
     if (allError) {
       console.error('Error fetching data:', allError);

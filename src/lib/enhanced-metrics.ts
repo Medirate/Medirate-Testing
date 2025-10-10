@@ -725,9 +725,14 @@ export function getRecentRateChangesSummary(data: RecentRateChangesData): {
 /**
  * Fetch recent rate changes data from the API
  */
-export async function fetchRecentRateChanges(days: number = 30, limit: number = 100): Promise<RecentRateChangesData | null> {
+export async function fetchRecentRateChanges(days: number = 30, limit: number = 100, state?: string): Promise<RecentRateChangesData | null> {
   try {
-    const response = await fetch(`/api/recent-rate-changes?days=${days}&limit=${limit}`);
+    let url = `/api/recent-rate-changes?days=${days}&limit=${limit}`;
+    if (state) {
+      url += `&state=${encodeURIComponent(state)}`;
+    }
+    
+    const response = await fetch(url);
     
     if (!response.ok) {
       console.error('Failed to fetch recent rate changes:', response.status, response.statusText);

@@ -173,7 +173,9 @@ const HomePage = () => {
       setRateChangesError(null);
       
       try {
-        const data = await fetchRecentRateChanges(30, 50); // Last 30 days, limit to 50 changes
+        // If a state is selected, fetch data for that specific state
+        // Otherwise, fetch general recent changes
+        const data = await fetchRecentRateChanges(30, 50, selectedState || undefined);
         if (data) {
           setRecentRateData(data);
           console.log('✅ Recent rate changes loaded successfully:', data);
@@ -189,7 +191,7 @@ const HomePage = () => {
     };
 
     fetchRateChanges();
-  }, []);
+  }, [selectedState]); // Add selectedState as dependency
 
   // Fetch rate developments data on component mount
   useEffect(() => {
