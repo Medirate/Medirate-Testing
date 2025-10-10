@@ -832,16 +832,6 @@ const HomePage = () => {
                       title: "Documents & State Notes",
                       description: "Access official documents and state-specific notes for detailed context."
                     },
-                    {
-                      icon: Lightbulb,
-                      title: "What's New This Week",
-                      description: "Discover the latest updates and key highlights for the current week."
-                    },
-                    {
-                      icon: Bot,
-                      title: "Chatbot Assistant",
-                      description: "Get instant answers and assistance with common queries."
-                    }
                   ].map((module, index) => (
                     <div
                       key={index}
