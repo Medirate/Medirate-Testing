@@ -287,7 +287,7 @@ export default function Dashboard() {
     try {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value);
+        if (value && typeof value === 'string') params.append(key, value);
       });
       const url = `/api/state-payment-comparison?${params.toString()}`;
       
@@ -997,7 +997,7 @@ export default function Dashboard() {
         // Use a separate API call that doesn't interfere with main data state
         const params = new URLSearchParams();
         Object.entries(filters).forEach(([key, value]) => {
-          if (value) params.append(key, value);
+          if (value && typeof value === 'string') params.append(key, value);
         });
         const url = `/api/state-payment-comparison?${params.toString()}`;
         
