@@ -98,6 +98,7 @@ export async function GET(request: NextRequest) {
     let totalPercentageChange = 0;
     let changeCount = 0;
     
+    let changeIndex = 0;
     for (const [key, records] of serviceGroups) {
       // Sort by date to get chronological order
       const sortedRecords = records.sort((a, b) => 
@@ -118,7 +119,7 @@ export async function GET(request: NextRequest) {
           const percentageChange = previousRate > 0 ? ((latestRate - previousRate) / previousRate) * 100 : 0;
           
           changes.push({
-            id: `${latestRecord.state_name}-${latestRecord.service_code}-${latestRecord.rate_effective_date}`,
+            id: `${latestRecord.state_name}-${latestRecord.service_code}-${latestRecord.rate_effective_date}-${changeIndex}`,
             state: latestRecord.state_name,
             serviceCategory: latestRecord.service_category,
             serviceCode: latestRecord.service_code,
@@ -148,10 +149,11 @@ export async function GET(request: NextRequest) {
           
           totalPercentageChange += percentageChange;
           changeCount++;
+          changeIndex++;
         } else {
           // No rate change, but show the latest rate
           changes.push({
-            id: `${latestRecord.state_name}-${latestRecord.service_code}-${latestRecord.rate_effective_date}`,
+            id: `${latestRecord.state_name}-${latestRecord.service_code}-${latestRecord.rate_effective_date}-${changeIndex}`,
             state: latestRecord.state_name,
             serviceCategory: latestRecord.service_category,
             serviceCode: latestRecord.service_code,
@@ -178,6 +180,7 @@ export async function GET(request: NextRequest) {
             changeCount: records.length,
             isChange: false
           });
+          changeIndex++;
         }
       } else {
         // Only one record, show it as the latest rate
@@ -211,6 +214,7 @@ export async function GET(request: NextRequest) {
           changeCount: 1,
           isChange: false
         });
+        changeIndex++;
       }
     }
     
