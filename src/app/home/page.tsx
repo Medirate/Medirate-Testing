@@ -838,11 +838,6 @@ const HomePage = () => {
                       description: "Discover the latest updates and key highlights for the current week."
                     },
                     {
-                      icon: MessageCircle,
-                      title: "Community Space",
-                      description: "Connect with peers and share insights on Medicaid topics."
-                    },
-                    {
                       icon: Bot,
                       title: "Chatbot Assistant",
                       description: "Get instant answers and assistance with common queries."

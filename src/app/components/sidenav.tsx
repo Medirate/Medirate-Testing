@@ -103,7 +103,6 @@ const SideNav = ({
       "/recent-rate-changes": "home",
       "/dashboard": "dashboard",
       "/rate-developments": "rateDevelopments",
-      "/community-board": "communityBoard",
       "/state-rate-comparison": "stateRateComparison",
       "/settings": "settings",
       "/historical-rates": "historicalRates",
@@ -303,12 +302,6 @@ const SideNav = ({
                   icon: <Megaphone size={20} />,
                   label: "Rate Developments",
                   href: "/rate-developments",
-                },
-                {
-                  tab: "communityBoard",
-                  icon: <Users size={20} />,
-                  label: "Community Board",
-                  href: "/community-board",
                 },
                 {
                   tab: "settings",
