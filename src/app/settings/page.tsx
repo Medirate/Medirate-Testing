@@ -28,6 +28,37 @@ function SettingsSubscription() {
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [canceling, setCanceling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelSuccess, setCancelSuccess] = useState(false);
+
+  const fetchSubscriptionData = async (email: string) => {
+    try {
+      const response = await fetch("/api/stripe/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch subscription data");
+      }
+
+      const data = await response.json();
+      if (data.error) {
+        setSubscriptionData(null);
+        setError("No active subscription found");
+      } else {
+        setSubscriptionData(data);
+        setError(null);
+      }
+    } catch (err) {
+      console.error("Error fetching subscription:", err);
+      setError("Failed to load subscription data");
+      setSubscriptionData(null);
+    }
+  };
 
   useEffect(() => {
     const checkSubUserStatusAndFetchSubscription = async () => {
@@ -59,35 +90,44 @@ function SettingsSubscription() {
       }
     };
 
-    const fetchSubscriptionData = async (email: string) => {
-      try {
-        const response = await fetch("/api/stripe/subscription", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email })
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch subscription data");
-        }
-
-        const data = await response.json();
-        if (data.error) {
-          setSubscriptionData(null);
-          setError("No active subscription found");
-        } else {
-          setSubscriptionData(data);
-          setError(null);
-        }
-      } catch (err) {
-        console.error("Error fetching subscription:", err);
-        setError("Failed to load subscription data");
-        setSubscriptionData(null);
-      }
-    };
-
     checkSubUserStatusAndFetchSubscription();
   }, [auth.isAuthenticated, auth.userEmail]);
+
+  const handleCancelSubscription = async () => {
+    if (!auth.userEmail) return;
+    
+    setCanceling(true);
+    setCancelError(null);
+    
+    try {
+      const response = await fetch("/api/stripe/cancel-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          email: auth.userEmail,
+          cancelAtPeriodEnd: true // Cancel at end of billing period
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to cancel subscription");
+      }
+
+      const result = await response.json();
+      setCancelSuccess(true);
+      setShowCancelModal(false);
+      
+      // Refresh subscription data to show updated status
+      await fetchSubscriptionData(auth.userEmail);
+      
+    } catch (err) {
+      console.error("Error canceling subscription:", err);
+      setCancelError(err instanceof Error ? err.message : "Failed to cancel subscription");
+    } finally {
+      setCanceling(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -467,8 +507,115 @@ function SettingsSubscription() {
                     </div>
                   </div>
                 </div>
+
+                {/* Subscription Cancellation Section */}
+                <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <h4 className="text-sm font-medium text-red-800">Cancel Subscription</h4>
+                      <p className="mt-1 text-sm text-red-700">
+                        If you need to cancel your subscription, you can do so here. You'll retain access until the end of your current billing period.
+                      </p>
+                      <div className="mt-4">
+                        <button
+                          onClick={() => setShowCancelModal(true)}
+                          className="inline-flex items-center px-4 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          Cancel Subscription
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* Cancellation Modal */}
+            {showCancelModal && (
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                  <div className="mt-3">
+                    <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                      <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <div className="mt-2 text-center">
+                      <h3 className="text-lg font-medium text-gray-900">Cancel Subscription</h3>
+                      <div className="mt-2 px-7 py-3">
+                        <p className="text-sm text-gray-500">
+                          Are you sure you want to cancel your subscription? You'll retain access to all features until the end of your current billing period ({subscriptionData?.endDate}).
+                        </p>
+                        <p className="text-sm text-gray-500 mt-2">
+                          This action cannot be undone. You can resubscribe at any time.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="items-center px-4 py-3">
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={() => setShowCancelModal(false)}
+                          className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                        >
+                          Keep Subscription
+                        </button>
+                        <button
+                          onClick={handleCancelSubscription}
+                          disabled={canceling}
+                          className="flex-1 px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {canceling ? "Canceling..." : "Yes, Cancel"}
+                        </button>
+                      </div>
+                    </div>
+                    {cancelError && (
+                      <div className="mt-2 px-4 py-2 bg-red-50 border border-red-200 rounded-md">
+                        <p className="text-sm text-red-600">{cancelError}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {cancelSuccess && (
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                  <div className="mt-3">
+                    <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
+                      <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div className="mt-2 text-center">
+                      <h3 className="text-lg font-medium text-gray-900">Subscription Canceled</h3>
+                      <div className="mt-2 px-7 py-3">
+                        <p className="text-sm text-gray-500">
+                          Your subscription has been successfully canceled. You'll retain access until the end of your current billing period.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="items-center px-4 py-3">
+                      <button
+                        onClick={() => setCancelSuccess(false)}
+                        className="w-full px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        OK
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="bg-white border border-gray-200 rounded-xl shadow-lg p-8 max-w-2xl mx-auto text-center">
