@@ -24,7 +24,8 @@ import {
 interface Document {
   id: string;
   title: string;
-  type: 'state_note' | 'policy' | 'guideline' | 'form' | 'report';
+  type: string; // Now shows actual file extension
+  folder: string; // Actual folder path in storage
   state?: string;
   category: string;
   description: string;
@@ -34,6 +35,7 @@ interface Document {
   downloadUrl: string;
   tags: string[];
   isPublic: boolean;
+  filePath: string; // Full path in storage
 }
 
 export default function Documents() {
