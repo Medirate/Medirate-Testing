@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { put, del, list } from '@vercel/blob';
+import { list } from '@vercel/blob';
 import { auth } from '@kinde-oss/kinde-auth-nextjs/server';
 
 export async function GET(request: NextRequest) {
@@ -36,71 +36,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const { isAuthenticated } = await auth();
-    
-    if (!isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const title = formData.get('title') as string;
-    const type = formData.get('type') as string;
-    const state = formData.get('state') as string;
-    const category = formData.get('category') as string;
-    const description = formData.get('description') as string;
-    const tags = formData.get('tags') as string;
-
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-
-    // Create a structured path for the file
-    const fileName = `${title.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.${file.name.split('.').pop()}`;
-    const path = `documents/${type}/${state ? `${state}/` : ''}${fileName}`;
-
-    // Upload to Vercel Blob
-    const blob = await put(path, file, {
-      access: 'public',
-      addRandomSuffix: false
-    });
-
-    return NextResponse.json({ 
-      success: true, 
-      url: blob.url,
-      path: blob.pathname 
-    });
-  } catch (error) {
-    console.error('Error uploading document:', error);
-    return NextResponse.json({ error: 'Failed to upload document' }, { status: 500 });
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const { isAuthenticated } = await auth();
-    
-    if (!isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { searchParams } = new URL(request.url);
-    const url = searchParams.get('url');
-
-    if (!url) {
-      return NextResponse.json({ error: 'No URL provided' }, { status: 400 });
-    }
-
-    await del(url);
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting document:', error);
-    return NextResponse.json({ error: 'Failed to delete document' }, { status: 500 });
-  }
-}
 
 // Helper functions
 function getDocumentTypeFromPath(pathname: string): string {

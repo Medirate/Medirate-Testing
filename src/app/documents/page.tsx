@@ -47,8 +47,6 @@ export default function Documents() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedState, setSelectedState] = useState<string>('all');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['state_notes', 'policies']));
-  const [showUploadForm, setShowUploadForm] = useState(false);
-  const [uploading, setUploading] = useState(false);
 
   // Fetch documents from API
 
@@ -127,36 +125,6 @@ export default function Documents() {
     });
   };
 
-  const handleFileUpload = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setUploading(true);
-    
-    try {
-      const formData = new FormData(event.currentTarget);
-      
-      const response = await fetch('/api/documents', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (response.ok) {
-        // Refresh documents list
-        const fetchResponse = await fetch('/api/documents');
-        const data = await fetchResponse.json();
-        setDocuments(data.documents || []);
-        setShowUploadForm(false);
-        // Reset form
-        (event.target as HTMLFormElement).reset();
-      } else {
-        setError('Upload failed');
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      setError('Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -261,119 +229,6 @@ export default function Documents() {
             </CardContent>
           </Card>
 
-          {/* Upload Section */}
-          <Card className="mb-6">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg">Upload Documents</CardTitle>
-                  <CardDescription>Upload new documents to the repository</CardDescription>
-                </div>
-                <button
-                  onClick={() => setShowUploadForm(!showUploadForm)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  {showUploadForm ? 'Cancel' : 'Upload Document'}
-                </button>
-              </div>
-            </CardHeader>
-            {showUploadForm && (
-              <CardContent>
-                <form onSubmit={handleFileUpload} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                      <input
-                        type="text"
-                        name="title"
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Document title"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                      <select
-                        name="type"
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="state_note">State Note</option>
-                        <option value="policy">Policy</option>
-                        <option value="guideline">Guideline</option>
-                        <option value="form">Form</option>
-                        <option value="report">Report</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">State (Optional)</label>
-                      <input
-                        type="text"
-                        name="state"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="e.g., Texas, California"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                      <input
-                        type="text"
-                        name="category"
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="e.g., Rate Information"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                    <textarea
-                      name="description"
-                      required
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Document description"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Tags (comma-separated)</label>
-                    <input
-                      type="text"
-                      name="tags"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="e.g., rates, texas, medicaid"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">File</label>
-                    <input
-                      type="file"
-                      name="file"
-                      required
-                      accept=".pdf,.doc,.docx,.txt,.xlsx,.xls"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      type="button"
-                      onClick={() => setShowUploadForm(false)}
-                      className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={uploading}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-                    >
-                      {uploading ? 'Uploading...' : 'Upload'}
-                    </button>
-                  </div>
-                </form>
-              </CardContent>
-            )}
-          </Card>
 
           {/* Loading State */}
           {isLoading && (
