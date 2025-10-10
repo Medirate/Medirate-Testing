@@ -123,6 +123,35 @@ const parseRate = (rate: string | number | undefined): number => {
   return 0;
 };
 
+// Helper function to detect non-numeric rates
+const isNonNumericRate = (rate: string | number | undefined): boolean => {
+  if (typeof rate === 'number') return false;
+  if (typeof rate === 'string') {
+    const cleanedRate = rate.replace(/[$,]/g, '').trim();
+    // Check if it's a valid number
+    const numericValue = parseFloat(cleanedRate);
+    if (isNaN(numericValue)) return true;
+    // Check for common non-numeric indicators
+    const lowerRate = rate.toLowerCase();
+    return lowerRate.includes('manual') || 
+           lowerRate.includes('cost-based') || 
+           lowerRate.includes('billed') || 
+           lowerRate.includes('charges') ||
+           lowerRate.includes('negotiated') ||
+           lowerRate.includes('varies') ||
+           lowerRate.includes('n/a') ||
+           lowerRate.includes('tbd') ||
+           lowerRate.includes('contact') ||
+           lowerRate.includes('call');
+  }
+  return true;
+};
+
+// Helper function to get non-numeric rate message
+const getNonNumericRateMessage = (rate: string | number | undefined, state: string, serviceCode: string): string => {
+  return `No numerical amounts are available for this selection. Alternative rate methodologies may include manual pricing, cost-based reimbursement, billed charges, or other mechanisms. State: ${state}, Service Code: ${serviceCode}`;
+};
+
 // Helper function to convert rate to hourly based on duration unit
 const convertToHourlyRate = (rate: string | number | undefined, durationUnit: string | undefined): number => {
   const rateValue = parseRate(rate);
@@ -3370,6 +3399,37 @@ export default function StatePaymentComparison() {
                       </div>
                     </div>
                     
+                    {/* Check for non-numeric rates and display message */}
+                    {(() => {
+                      const nonNumericEntries = Object.values(selectedEntries).flat().filter(entry => isNonNumericRate(entry.rate));
+                      
+                      if (nonNumericEntries.length > 0) {
+                        return (
+                          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <div className="flex items-start">
+                              <FaExclamationCircle className="h-5 w-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <h3 className="text-sm font-medium text-yellow-800 mb-2">
+                                  Non-Numeric Rates Detected
+                                </h3>
+                                <div className="text-sm text-yellow-700">
+                                  {nonNumericEntries.map((entry, index) => (
+                                    <div key={index} className="mb-2">
+                                      <p className="font-medium">{entry.state_name} - Service Code: {entry.service_code}</p>
+                                      <p className="text-xs text-yellow-600 mt-1">
+                                        {getNonNumericRateMessage(entry.rate, entry.state_name, entry.service_code)}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
                     {/* Chart component */}
             <ReactECharts
                       key={`${isAllStatesSelected ? 'all-states-' : 'selected-'}${JSON.stringify(Object.keys(selectedEntries).sort())}-${chartRefreshKey}-${searchTimestamp}-${sortOrder}`}
@@ -3430,6 +3490,37 @@ export default function StatePaymentComparison() {
                           </div>
                         </div>
                         
+                        {/* Check for non-numeric rates and display message */}
+                        {(() => {
+                          const nonNumericEntries = Object.values(selectedEntries).flat().filter(entry => isNonNumericRate(entry.rate));
+                          
+                          if (nonNumericEntries.length > 0) {
+                            return (
+                              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <div className="flex items-start">
+                                  <FaExclamationCircle className="h-5 w-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
+                                  <div>
+                                    <h3 className="text-sm font-medium text-yellow-800 mb-2">
+                                      Non-Numeric Rates Detected
+                                    </h3>
+                                    <div className="text-sm text-yellow-700">
+                                      {nonNumericEntries.map((entry, index) => (
+                                        <div key={index} className="mb-2">
+                                          <p className="font-medium">{entry.state_name} - Service Code: {entry.service_code}</p>
+                                          <p className="text-xs text-yellow-600 mt-1">
+                                            {getNonNumericRateMessage(entry.rate, entry.state_name, entry.service_code)}
+                                          </p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+
                         {/* Chart component */}
                         <ReactECharts
                           key={`${isAllStatesSelected ? 'all-states-' : 'selected-'}${JSON.stringify(Object.keys(selectedEntries).sort())}-${chartRefreshKey}-${searchTimestamp}-${sortOrder}`}

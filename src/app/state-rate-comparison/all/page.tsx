@@ -130,6 +130,35 @@ const parseRate = (rate: string | number | undefined): number => {
   return 0;
 };
 
+// Helper function to detect non-numeric rates
+const isNonNumericRate = (rate: string | number | undefined): boolean => {
+  if (typeof rate === 'number') return false;
+  if (typeof rate === 'string') {
+    const cleanedRate = rate.replace(/[$,]/g, '').trim();
+    // Check if it's a valid number
+    const numericValue = parseFloat(cleanedRate);
+    if (isNaN(numericValue)) return true;
+    // Check for common non-numeric indicators
+    const lowerRate = rate.toLowerCase();
+    return lowerRate.includes('manual') || 
+           lowerRate.includes('cost-based') || 
+           lowerRate.includes('billed') || 
+           lowerRate.includes('charges') ||
+           lowerRate.includes('negotiated') ||
+           lowerRate.includes('varies') ||
+           lowerRate.includes('n/a') ||
+           lowerRate.includes('tbd') ||
+           lowerRate.includes('contact') ||
+           lowerRate.includes('call');
+  }
+  return true;
+};
+
+// Helper function to get non-numeric rate message
+const getNonNumericRateMessage = (rate: string | number | undefined, state: string, serviceCode: string): string => {
+  return `No numerical amounts are available for this selection. Alternative rate methodologies may include manual pricing, cost-based reimbursement, billed charges, or other mechanisms. State: ${state}, Service Code: ${serviceCode}`;
+};
+
 // Helper function to convert rate to hourly based on duration unit
 const convertToHourlyRate = (rate: string | number | undefined, durationUnit: string | undefined): number => {
   const rateValue = parseRate(rate);
@@ -2263,6 +2292,18 @@ export default function StatePaymentComparison() {
       const code = filterSets[0].serviceCode;
       // Only include states with a value (bar) - use states from unified data instead of filterOptions
       const allDataStates = [...new Set(data.map(item => item.state_name).filter(Boolean))];
+      
+      // Check for non-numeric rates first
+      const nonNumericStates: string[] = [];
+      const statesWithNonNumericRates = allDataStates.filter((state: any) => {
+        const stateData = data.filter(item => item.state_name === state && item.service_code === code);
+        const hasNonNumericRate = stateData.some(item => isNonNumericRate(item.rate));
+        if (hasNonNumericRate) {
+          nonNumericStates.push(state);
+        }
+        return hasNonNumericRate;
+      });
+      
       const statesWithData = allDataStates.filter((state: any) => {
         const avg = calculateStateAverage(state);
         
@@ -4091,30 +4132,66 @@ export default function StatePaymentComparison() {
                         );
                       }
                       
-                      return (
-            <div style={{ overflowX: 'auto', width: '100%' }}>
-              <ReactECharts
-                ref={chartRef}
-                key={`all-states-${filterSets[0]?.serviceCategory || ''}-${filterSets[0]?.serviceCode || ''}-${searchTimestamp}`}
-                option={echartOptions}
-                        style={{ height: '400px', width: '100%' }}
-                onEvents={{
-                  click: (params: any) => {
-                    // Try to handle all click events first
-                    if (params.componentType === 'series' && params.seriesType === 'bar') {
-                      const stateName = params.name;
-                      // Toggle the state in the array
-                      setClickedStates(prev => {
-                        const newState = prev.includes(stateName) 
-                          ? prev.filter(s => s !== stateName)
-                          : [...prev, stateName];
-                        return newState;
+                      // Check for non-numeric rates and display message
+                      const nonNumericStates = filterOptions.states.filter((state: any) => {
+                        const stateData = data.filter(item => item.state_name === state && item.service_code === filterSets[0].serviceCode);
+                        return stateData.some(item => isNonNumericRate(item.rate));
                       });
-                    }
-                  }
-                }}
-              />
-            </div>
+
+                      return (
+                        <div>
+                          {/* Non-numeric rate message */}
+                          {nonNumericStates.length > 0 && (
+                            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                              <div className="flex items-start">
+                                <FaExclamationCircle className="h-5 w-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
+                                <div>
+                                  <h3 className="text-sm font-medium text-yellow-800 mb-2">
+                                    Non-Numeric Rates Detected
+                                  </h3>
+                                  <div className="text-sm text-yellow-700">
+                                    {nonNumericStates.map((state: string, index: number) => {
+                                      const stateData = data.filter(item => item.state_name === state && item.service_code === filterSets[0].serviceCode);
+                                      const nonNumericItem = stateData.find(item => isNonNumericRate(item.rate));
+                                      return (
+                                        <div key={index} className="mb-2">
+                                          <p className="font-medium">{state} - Service Code: {filterSets[0].serviceCode}</p>
+                                          <p className="text-xs text-yellow-600 mt-1">
+                                            {getNonNumericRateMessage(nonNumericItem?.rate, state, filterSets[0].serviceCode)}
+                                          </p>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          <div style={{ overflowX: 'auto', width: '100%' }}>
+                            <ReactECharts
+                              ref={chartRef}
+                              key={`all-states-${filterSets[0]?.serviceCategory || ''}-${filterSets[0]?.serviceCode || ''}-${searchTimestamp}`}
+                              option={echartOptions}
+                              style={{ height: '400px', width: '100%' }}
+                              onEvents={{
+                                click: (params: any) => {
+                                  // Try to handle all click events first
+                                  if (params.componentType === 'series' && params.seriesType === 'bar') {
+                                    const stateName = params.name;
+                                    // Toggle the state in the array
+                                    setClickedStates(prev => {
+                                      const newState = prev.includes(stateName) 
+                                        ? prev.filter(s => s !== stateName)
+                                        : [...prev, stateName];
+                                      return newState;
+                                    });
+                                  }
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
                       );
                     })()}
                   </>
