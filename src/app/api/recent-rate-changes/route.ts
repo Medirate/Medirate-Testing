@@ -1,85 +1,171 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
-import { gunzip } from 'zlib';
-import { promisify } from 'util';
-
-const gunzipAsync = promisify(gunzip);
+import { supabase } from '@/lib/supabase';
 
 export async function GET(request: NextRequest) {
   try {
-    // Path to the enhanced metrics file
-    const filePath = path.join(process.cwd(), 'public', 'enhanced_metrics_detailed.json.gz');
+    // Get query parameters
+    const { searchParams } = new URL(request.url);
+    const days = parseInt(searchParams.get('days') || '30'); // Default to last 30 days
+    const limit = parseInt(searchParams.get('limit') || '100'); // Default to 100 records
     
-    // Check if the enhanced file exists
-    if (!fs.existsSync(filePath)) {
-      // Fallback to the original metrics file
-      const fallbackPath = path.join(process.cwd(), 'public', 'state_metrics_detailed.json.gz');
-      
-      if (!fs.existsSync(fallbackPath)) {
-        return NextResponse.json(
-          { error: 'No metrics data available' },
-          { status: 404 }
-        );
-      }
-      
-      // Read and decompress the fallback file
-      const compressedData = fs.readFileSync(fallbackPath);
-      const decompressedData = await gunzipAsync(compressedData);
-      const data = JSON.parse(decompressedData.toString());
-      
-      // Transform the data to match the recent rate changes format
-      const transformedData = {
-        m: data.m || {},
-        v: data.v || {},
-        total_records: data.t || 0,
-        date_range: {
-          earliest: data.earliest_date || '',
-          latest: data.latest_date || ''
-        },
-        rate_range: {
-          min: data.min_rate || 0,
-          max: data.max_rate || 0
-        },
-        states: data.s || [],
-        service_categories: data.service_categories || []
-      };
-      
-      return NextResponse.json(transformedData);
+    // Calculate date range
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    console.log(`🔍 Fetching recent rate changes from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    
+    // Query the database for recent rate changes
+    // We'll get all records and then process them to find actual changes
+    const { data: allData, error: allError } = await supabase
+      .from('master_data_sept_2')
+      .select('*')
+      .gte('rate_effective_date', startDate.toISOString().split('T')[0])
+      .lte('rate_effective_date', endDate.toISOString().split('T')[0])
+      .order('rate_effective_date', { ascending: false })
+      .limit(1000); // Get more data to process changes
+    
+    if (allError) {
+      console.error('Error fetching data:', allError);
+      return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 });
     }
     
-    // Read and decompress the enhanced metrics file
-    const compressedData = fs.readFileSync(filePath);
-    const decompressedData = await gunzipAsync(compressedData);
-    const jsonString = decompressedData.toString();
-    const enhancedData = JSON.parse(jsonString);
+    if (!allData || allData.length === 0) {
+      return NextResponse.json({
+        changes: [],
+        totalChanges: 0,
+        dateRange: {
+          start: startDate.toISOString().split('T')[0],
+          end: endDate.toISOString().split('T')[0]
+        },
+        summary: {
+          totalStates: 0,
+          totalServiceCategories: 0,
+          averagePercentageChange: 0
+        }
+      });
+    }
     
-    // Extract recent rate changes data from the enhanced metrics
-    // This assumes the enhanced metrics includes recent rate changes data
-    const recentRateChangesData = {
-      m: enhancedData.recent_rate_changes?.m || {},
-      v: enhancedData.recent_rate_changes?.v || {},
-      total_records: enhancedData.recent_rate_changes?.total_records || 0,
-      date_range: {
-        earliest: enhancedData.recent_rate_changes?.date_range?.earliest || '',
-        latest: enhancedData.recent_rate_changes?.date_range?.latest || ''
-      },
-      rate_range: {
-        min: enhancedData.recent_rate_changes?.rate_range?.min || 0,
-        max: enhancedData.recent_rate_changes?.rate_range?.max || 0
-      },
-      states: enhancedData.recent_rate_changes?.states || [],
-      service_categories: enhancedData.recent_rate_changes?.service_categories || []
-    };
+    console.log(`📊 Found ${allData.length} records in date range`);
     
-    return NextResponse.json(recentRateChangesData);
+    // Group by service details (everything except rate and date)
+    const serviceGroups = new Map();
+    
+    allData.forEach(record => {
+      const key = JSON.stringify({
+        state_name: record.state_name,
+        service_category: record.service_category,
+        service_code: record.service_code,
+        service_description: record.service_description,
+        program: record.program,
+        location_region: record.location_region,
+        provider_type: record.provider_type,
+        duration_unit: record.duration_unit,
+        modifier_1: record.modifier_1,
+        modifier_1_details: record.modifier_1_details,
+        modifier_2: record.modifier_2,
+        modifier_2_details: record.modifier_2_details,
+        modifier_3: record.modifier_3,
+        modifier_3_details: record.modifier_3_details,
+        modifier_4: record.modifier_4,
+        modifier_4_details: record.modifier_4_details
+      });
+      
+      if (!serviceGroups.has(key)) {
+        serviceGroups.set(key, []);
+      }
+      serviceGroups.get(key).push(record);
+    });
+    
+    console.log(`📊 Grouped into ${serviceGroups.size} unique service combinations`);
+    
+    // Find actual changes (services with multiple rate/date combinations)
+    const changes = [];
+    let totalPercentageChange = 0;
+    let changeCount = 0;
+    
+    for (const [key, records] of serviceGroups) {
+      if (records.length < 2) continue; // Need at least 2 records to show a change
+      
+      // Sort by date to get chronological order
+      const sortedRecords = records.sort((a, b) => 
+        new Date(a.rate_effective_date).getTime() - new Date(b.rate_effective_date).getTime()
+      );
+      
+      // Find the most recent change
+      const latestRecord = sortedRecords[sortedRecords.length - 1];
+      const previousRecord = sortedRecords[sortedRecords.length - 2];
+      
+      const latestRate = parseFloat(latestRecord.rate?.replace(/[$,]/g, '') || '0');
+      const previousRate = parseFloat(previousRecord.rate?.replace(/[$,]/g, '') || '0');
+      
+      if (latestRate !== previousRate) {
+        const percentageChange = previousRate > 0 ? ((latestRate - previousRate) / previousRate) * 100 : 0;
+        
+        changes.push({
+          id: `${latestRecord.state_name}-${latestRecord.service_code}-${latestRecord.rate_effective_date}`,
+          state: latestRecord.state_name,
+          serviceCategory: latestRecord.service_category,
+          serviceCode: latestRecord.service_code,
+          serviceDescription: latestRecord.service_description,
+          program: latestRecord.program,
+          locationRegion: latestRecord.location_region,
+          providerType: latestRecord.provider_type,
+          durationUnit: latestRecord.duration_unit,
+          modifier1: latestRecord.modifier_1,
+          modifier1Details: latestRecord.modifier_1_details,
+          modifier2: latestRecord.modifier_2,
+          modifier2Details: latestRecord.modifier_2_details,
+          modifier3: latestRecord.modifier_3,
+          modifier3Details: latestRecord.modifier_3_details,
+          modifier4: latestRecord.modifier_4,
+          modifier4Details: latestRecord.modifier_4_details,
+          oldRate: previousRecord.rate,
+          newRate: latestRecord.rate,
+          oldRateNumeric: previousRate,
+          newRateNumeric: latestRate,
+          percentageChange: percentageChange,
+          effectiveDate: latestRecord.rate_effective_date,
+          previousDate: previousRecord.rate_effective_date,
+          changeCount: records.length
+        });
+        
+        totalPercentageChange += percentageChange;
+        changeCount++;
+      }
+    }
+    
+    // Sort by most recent changes first
+    changes.sort((a, b) => new Date(b.effectiveDate).getTime() - new Date(a.effectiveDate).getTime());
+    
+    // Limit results
+    const limitedChanges = changes.slice(0, limit);
+    
+    // Calculate summary statistics
+    const uniqueStates = new Set(limitedChanges.map(c => c.state));
+    const uniqueServiceCategories = new Set(limitedChanges.map(c => c.serviceCategory));
+    const averagePercentageChange = changeCount > 0 ? totalPercentageChange / changeCount : 0;
+    
+    console.log(`📊 Found ${changes.length} actual rate changes`);
+    
+    return NextResponse.json({
+      changes: limitedChanges,
+      totalChanges: changes.length,
+      dateRange: {
+        start: startDate.toISOString().split('T')[0],
+        end: endDate.toISOString().split('T')[0]
+      },
+      summary: {
+        totalStates: uniqueStates.size,
+        totalServiceCategories: uniqueServiceCategories.size,
+        averagePercentageChange: Math.round(averagePercentageChange * 100) / 100
+      }
+    });
     
   } catch (error) {
-    console.error('Error serving recent rate changes data:', error);
-    console.error('Error details:', error instanceof Error ? error.message : String(error));
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('Error fetching recent rate changes:', error);
     return NextResponse.json(
-      { error: 'Failed to load recent rate changes data', details: error instanceof Error ? error.message : String(error) },
+      { error: 'Failed to fetch recent rate changes', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

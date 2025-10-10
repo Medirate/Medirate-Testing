@@ -117,7 +117,7 @@ const HomePage = () => {
   const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
   
   // Recent rate changes state
-  const [recentRateData, setRecentRateData] = useState<RecentRateChangesData | null>(null);
+  const [recentRateData, setRecentRateData] = useState<any>(null);
   const [isLoadingRateChanges, setIsLoadingRateChanges] = useState(false);
   const [rateChangesError, setRateChangesError] = useState<string | null>(null);
   
@@ -173,10 +173,10 @@ const HomePage = () => {
       setRateChangesError(null);
       
       try {
-        const data = await fetchRecentRateChanges();
+        const data = await fetchRecentRateChanges(30, 50); // Last 30 days, limit to 50 changes
         if (data) {
           setRecentRateData(data);
-          console.log('✅ Recent rate changes loaded successfully');
+          console.log('✅ Recent rate changes loaded successfully:', data);
         } else {
           setRateChangesError('Failed to load recent rate changes');
         }
@@ -427,17 +427,43 @@ const HomePage = () => {
 
   // Get filtered rate changes based on selected state and filters
   const filteredRateChanges = useMemo(() => {
-    if (!recentRateData) return [];
+    if (!recentRateData || !recentRateData.changes) return [];
     
-    const filters = {
-      state: selectedState || undefined,
-      serviceCategory: rateChangeFilters.serviceCategory || undefined,
-      serviceCode: rateChangeFilters.serviceCode || undefined,
-      providerType: rateChangeFilters.providerType || undefined,
-      program: rateChangeFilters.program || undefined
-    };
+    let changes = recentRateData.changes;
     
-    return filterRecentRateChanges(recentRateData, filters);
+    // Filter by selected state if one is selected
+    if (selectedState) {
+      changes = changes.filter((change: any) => 
+        change.state?.toLowerCase() === selectedState.toLowerCase()
+      );
+    }
+    
+    // Apply additional filters if they exist
+    if (rateChangeFilters.serviceCategory) {
+      changes = changes.filter((change: any) => 
+        change.serviceCategory === rateChangeFilters.serviceCategory
+      );
+    }
+    
+    if (rateChangeFilters.serviceCode) {
+      changes = changes.filter((change: any) => 
+        change.serviceCode === rateChangeFilters.serviceCode
+      );
+    }
+    
+    if (rateChangeFilters.providerType) {
+      changes = changes.filter((change: any) => 
+        change.providerType === rateChangeFilters.providerType
+      );
+    }
+    
+    if (rateChangeFilters.program) {
+      changes = changes.filter((change: any) => 
+        change.program === rateChangeFilters.program
+      );
+    }
+    
+    return changes;
   }, [recentRateData, selectedState, rateChangeFilters]);
 
   // Get paginated rate changes
@@ -448,7 +474,7 @@ const HomePage = () => {
 
   // Get summary statistics for rate changes
   const rateChangesSummary = useMemo(() => {
-    if (!recentRateData) {
+    if (!recentRateData || !recentRateData.summary) {
       return {
         totalChanges: 0,
         averagePercentageChange: 0,
@@ -459,19 +485,26 @@ const HomePage = () => {
       };
     }
     
-    return getRecentRateChangesSummary(recentRateData);
+    return {
+      totalChanges: recentRateData.totalChanges || 0,
+      averagePercentageChange: recentRateData.summary.averagePercentageChange || 0,
+      statesWithChanges: recentRateData.summary.totalStates || 0,
+      categoriesWithChanges: recentRateData.summary.totalServiceCategories || 0,
+      topStates: [],
+      topCategories: []
+    };
   }, [recentRateData]);
 
   // Get filter options
   const filterOptions = useMemo(() => {
-    if (!recentRateData) return { serviceCategories: [], serviceCodes: [], providerTypes: [], programs: [] };
+    if (!recentRateData || !recentRateData.changes) return { serviceCategories: [], serviceCodes: [], providerTypes: [], programs: [] };
     
-    const allChanges = getRecentRateChanges(recentRateData);
+    const allChanges = recentRateData.changes;
     
-    const serviceCategories = Array.from(new Set(allChanges.map(c => c.serviceCategory))).sort();
-    const serviceCodes = Array.from(new Set(allChanges.map(c => c.serviceCode))).sort();
-    const providerTypes = Array.from(new Set(allChanges.map(c => c.providerType))).sort();
-    const programs = Array.from(new Set(allChanges.map(c => c.program))).sort();
+    const serviceCategories = Array.from(new Set(allChanges.map((c: any) => c.serviceCategory).filter(Boolean))).sort();
+    const serviceCodes = Array.from(new Set(allChanges.map((c: any) => c.serviceCode).filter(Boolean))).sort();
+    const providerTypes = Array.from(new Set(allChanges.map((c: any) => c.providerType).filter(Boolean))).sort();
+    const programs = Array.from(new Set(allChanges.map((c: any) => c.program).filter(Boolean))).sort();
     
     return {
       serviceCategories,
@@ -1067,7 +1100,7 @@ const HomePage = () => {
                         paginatedRateChanges.map((change) => (
                           <tr key={change.id} className="hover:bg-gray-50">
                             <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{change.serviceCode}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title={change.description}>{change.description}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title={change.serviceDescription}>{change.serviceDescription}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{change.state}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{change.serviceCategory}</td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{formatRate(change.oldRate)}</td>
