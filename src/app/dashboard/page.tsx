@@ -288,18 +288,6 @@ const ProfessionalDatePicker = ({
                 day_range_middle: 'aria-selected:bg-accent aria-selected:text-accent-foreground',
                 day_hidden: 'invisible',
               }}
-              components={{
-                IconLeft: () => (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                ),
-                IconRight: () => (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                ),
-              }}
             />
             <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
               <button
