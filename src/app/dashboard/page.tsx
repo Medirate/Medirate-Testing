@@ -170,8 +170,8 @@ const customFilterOption = (option: any, inputValue: string) => {
   return label.includes(searchTerm);
 };
 
-// Professional Date Picker Component
-const ProfessionalDatePicker = ({ 
+  // Professional Date Picker Component - Enhanced
+  const ProfessionalDatePicker = ({
   selected, 
   onChange, 
   placeholder, 
