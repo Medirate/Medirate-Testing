@@ -466,7 +466,9 @@ export default function Dashboard() {
   const [totalCount, setTotalCount] = useState(0);
   const [isLoadingFilters, setIsLoadingFilters] = useState(false);
   const [isUpdatingFilters, setIsUpdatingFilters] = useState(false);
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }[]>([]);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }[]>([
+    { key: 'rate_effective_date', direction: 'desc' }
+  ]);
   const [pendingFilters, setPendingFilters] = useState<Set<keyof Selections>>(new Set());
   const [displayedItems, setDisplayedItems] = useState(50); // Adjust this number based on your needs
   const [isExporting, setIsExporting] = useState(false);
@@ -872,10 +874,6 @@ export default function Dashboard() {
       setStartDate(null);
       setEndDate(null);
     }
-    if (field === 'fee_schedule_date' && value) {
-        setStartDate(null);
-        setEndDate(null);
-    }
     setSelections(newSelections);
     setCurrentPage(1);
     // Add to pendingFilters
@@ -1109,7 +1107,7 @@ export default function Dashboard() {
 
   // Add client-side sorting functionality
   const sortedData = useMemo(() => {
-    if (!data || data.length === 0 || sortConfig.length === 0) {
+    if (!data || data.length === 0) {
       return data;
     }
     return [...data].sort((a, b) => {
@@ -1737,21 +1735,32 @@ export default function Dashboard() {
   // Simplified date handlers for client-side filtering
   const handleStartDateChange = (date: Date | null) => {
     setStartDate(date);
-      setCurrentPage(1);
+    // Clear fee schedule date when date range is selected
+    if (date) {
+      setSelections(prev => ({ ...prev, fee_schedule_date: null }));
+    }
+    setCurrentPage(1);
   };
 
   const handleEndDateChange = (date: Date | null) => {
     setEndDate(date);
-      setCurrentPage(1);
+    // Clear fee schedule date when date range is selected
+    if (date) {
+      setSelections(prev => ({ ...prev, fee_schedule_date: null }));
+    }
+    setCurrentPage(1);
   };
 
-  const handleFeeScheduleDateChange = (feeScheduleDate: string) => {
+  const handleFeeScheduleDateChange = (feeScheduleDate: string | null) => {
     setSelections({
       ...selections,
       fee_schedule_date: feeScheduleDate,
     });
+    // Clear date range when fee schedule date is selected
+    if (feeScheduleDate) {
       setStartDate(null);
       setEndDate(null);
+    }
     setCurrentPage(1);
   };
 
@@ -1829,7 +1838,7 @@ export default function Dashboard() {
                 instanceId="fee_schedule_date_select"
                 options={availableDates.map(date => ({ value: date, label: formatDate(date) }))}
                 value={selections.fee_schedule_date ? { value: selections.fee_schedule_date, label: formatDate(selections.fee_schedule_date) } : null}
-                onChange={(option) => handleSelectionChange('fee_schedule_date', option?.value || null)}
+                onChange={(option) => handleFeeScheduleDateChange(option?.value || null)}
                 placeholder="Select Fee Schedule Date"
                 isClearable
                 isDisabled={!selections.service_category || !selections.state_name || availableDates.length === 0}

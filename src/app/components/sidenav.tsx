@@ -297,42 +297,74 @@ const SideNav = ({
                   </span>
                 </Link>
               </li>
-              {[
-                {
-                  tab: "rateDevelopments",
-                  icon: <Megaphone size={20} />,
-                  label: "Rate Developments",
-                  href: "/rate-developments",
-                },
-                {
-                  tab: "settings",
-                  icon: <Settings size={20} />,
-                  label: "Settings",
-                  href: "/settings",
-                },
-              ].map(({ tab, icon, label, href }) => (
-                <li key={tab} className="group">
-                  <Link
-                    href={href}
-                    onClick={() => setActiveTab(tab)}
-                    className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
-                      activeTab === tab ? "bg-gray-200/20" : ""
+              {/* Rate Developments */}
+              <li className="group">
+                <Link
+                  href="/rate-developments"
+                  onClick={() => setActiveTab("rateDevelopments")}
+                  className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                    activeTab === "rateDevelopments" ? "bg-gray-200/20" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-center w-6 h-6">
+                    <Megaphone size={20} />
+                  </div>
+                  <span
+                    className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                      isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
                     }`}
+                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
-                    {/* Icon Section */}
-                    <div className="flex items-center justify-center w-6 h-6">{icon}</div>
-                    {/* Label Section */}
-                    <span
-                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
-                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
-                      }`}
-                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                    >
-                      {label}
-                    </span>
-                  </Link>
-                </li>
-              ))}
+                    Rate Developments
+                  </span>
+                </Link>
+              </li>
+              
+              {/* Documents */}
+              <li className="group">
+                <Link
+                  href="/documents"
+                  onClick={() => setActiveTab("documents")}
+                  className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                    activeTab === "documents" ? "bg-gray-200/20" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-center w-6 h-6">
+                    <FileText size={20} />
+                  </div>
+                  <span
+                    className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                      isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                    }`}
+                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                  >
+                    Documents
+                  </span>
+                </Link>
+              </li>
+              
+              {/* Settings */}
+              <li className="group">
+                <Link
+                  href="/settings"
+                  onClick={() => setActiveTab("settings")}
+                  className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                    activeTab === "settings" ? "bg-gray-200/20" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-center w-6 h-6">
+                    <Settings size={20} />
+                  </div>
+                  <span
+                    className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                      isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                    }`}
+                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                  >
+                    Settings
+                  </span>
+                </Link>
+              </li>
               
               {/* Admin Dashboard - Only show if user is admin */}
               {(() => {
@@ -450,27 +482,6 @@ const SideNav = ({
                     style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
                     Support
-                  </span>
-                </Link>
-              </li>
-              <li className="group">
-                <Link
-                  href="/documents"
-                  onClick={() => setActiveTab("documents")}
-                  className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
-                    activeTab === "documents" ? "bg-gray-200/20" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-center w-6 h-6">
-                    <FileText size={20} />
-                  </div>
-                  <span
-                    className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
-                      isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
-                    }`}
-                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                  >
-                    Documents
                   </span>
                 </Link>
               </li>
