@@ -43,6 +43,9 @@ const StripePricingTableWithFooter = () => {
     interest: "",
     demoRequest: "No",
   });
+  const [selectedRole, setSelectedRole] = useState<'user' | 'subscription_manager' | null>(null);
+  const [showRoleSelection, setShowRoleSelection] = useState(false);
+  const [isTestMode, setIsTestMode] = useState(process.env.NODE_ENV === 'development');
   const [loading, setLoading] = useState(false);
   const [formFilled, setFormFilled] = useState(false);
   const [isFormPreFilled, setIsFormPreFilled] = useState(false);
@@ -262,7 +265,9 @@ const StripePricingTableWithFooter = () => {
         return;
       }
       
-      toast.success("Form submitted! You can now subscribe.");
+      // Show role selection step for authenticated users
+      setShowRoleSelection(true);
+      toast.success("Form submitted! Please select your account role.");
     } catch (err) {
       console.error("Unexpected error during form submission:", err);
       toast.error("An unexpected error occurred. Please try again.");
@@ -626,7 +631,7 @@ const StripePricingTableWithFooter = () => {
               <ul className="space-y-5 w-full max-w-md">
                 <li className="flex items-start gap-3 text-base text-gray-800">
                   <CheckCircle className="text-blue-600 w-5 h-5 flex-shrink-0 mt-0.5" />
-                  <span className="text-left">Three user accounts included</span>
+                  <span className="text-left">Three user accounts included (Subscription Manager role does not count toward this limit)</span>
                 </li>
                 <li className="flex items-start gap-3 text-base text-gray-800">
                   <CheckCircle className="text-blue-600 w-5 h-5 flex-shrink-0 mt-0.5" />
@@ -651,6 +656,31 @@ const StripePricingTableWithFooter = () => {
                     </span>
                 </li>
               </ul>
+              
+              {/* Subscription Manager Role Explanation */}
+              <div className="mt-8 p-6 bg-amber-50 border border-amber-200 rounded-lg">
+                <h4 className="text-lg font-semibold text-amber-800 mb-3">Subscription Manager Role</h4>
+                <p className="text-sm text-amber-700 mb-3">
+                  <strong>Optional:</strong> You can designate one person as a Subscription Manager who can add/remove users but cannot access the application data.
+                </p>
+                <div className="text-sm text-amber-700 space-y-2">
+                  <p><strong>Subscription Manager can:</strong></p>
+                  <ul className="list-disc ml-4 space-y-1">
+                    <li>Add and remove users from the subscription</li>
+                    <li>Manage user roles within the subscription</li>
+                    <li>View subscription details and billing</li>
+                  </ul>
+                  <p className="mt-2"><strong>Subscription Manager cannot:</strong></p>
+                  <ul className="list-disc ml-4 space-y-1">
+                    <li>Access dashboard data or analytics</li>
+                    <li>View rates or use core application features</li>
+                    <li>Count toward the 3-user limit</li>
+                  </ul>
+                </div>
+                <p className="text-xs text-amber-600 mt-3 font-medium">
+                  💡 <strong>Recommendation:</strong> If you want a Subscription Manager, it's best if they purchase the subscription themselves.
+                </p>
+              </div>
             </div>
           </div>
           <div className="mt-12 flex space-x-4 justify-center">
@@ -1081,6 +1111,148 @@ const StripePricingTableWithFooter = () => {
           </div>
         )}
 
+        {/* Role Selection Step */}
+        {showRoleSelection && (
+          <div className="w-full max-w-4xl mb-8 p-8 bg-white rounded-xl shadow-2xl border border-gray-100">
+            <div className="text-center mb-6">
+              <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+                <Shield className="w-8 h-8 text-purple-600" />
+              </div>
+              <h2 className="text-2xl font-bold mb-2 text-[#012C61] font-lemonMilkRegular">Choose Your Account Role</h2>
+              <p className="text-gray-600">
+                Please select the type of account you want to create for this subscription
+              </p>
+            </div>
+            
+            <div className="max-w-2xl mx-auto space-y-6">
+              {/* User Account Option */}
+              <div 
+                className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                  selectedRole === 'user' 
+                    ? 'border-[#012C61] bg-blue-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => setSelectedRole('user')}
+              >
+                <div className="flex items-start gap-4">
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                    selectedRole === 'user' ? 'border-[#012C61] bg-[#012C61]' : 'border-gray-300'
+                  }`}>
+                    {selectedRole === 'user' && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">User Account</h3>
+                    <p className="text-gray-600 mb-3">
+                      Full access to all MediRate features and data
+                    </p>
+                    <div className="text-sm text-gray-700 space-y-1">
+                      <p><strong>You will be able to:</strong></p>
+                      <ul className="list-disc ml-4 space-y-1">
+                        <li>Access dashboard and analytics</li>
+                        <li>View payment rates and data</li>
+                        <li>Use all core application features</li>
+                        <li>Set up email alerts</li>
+                        <li>Export data and reports</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Subscription Manager Option */}
+              <div 
+                className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                  selectedRole === 'subscription_manager' 
+                    ? 'border-[#012C61] bg-blue-50' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => setSelectedRole('subscription_manager')}
+              >
+                <div className="flex items-start gap-4">
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                    selectedRole === 'subscription_manager' ? 'border-[#012C61] bg-[#012C61]' : 'border-gray-300'
+                  }`}>
+                    {selectedRole === 'subscription_manager' && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Subscription Manager Account</h3>
+                    <p className="text-gray-600 mb-3">
+                      Manage users and subscription settings (cannot access application data)
+                    </p>
+                    <div className="text-sm text-gray-700 space-y-1">
+                      <p><strong>You will be able to:</strong></p>
+                      <ul className="list-disc ml-4 space-y-1">
+                        <li>Add and remove users from the subscription</li>
+                        <li>Manage user roles and permissions</li>
+                        <li>View subscription details and billing</li>
+                        <li>Update subscription settings</li>
+                      </ul>
+                      <p className="mt-2 text-amber-600"><strong>You will NOT be able to:</strong></p>
+                      <ul className="list-disc ml-4 space-y-1 text-amber-600">
+                        <li>Access dashboard or analytics</li>
+                        <li>View payment rates or data</li>
+                        <li>Use core application features</li>
+                      </ul>
+                    </div>
+                    <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-xs text-amber-700">
+                        <strong>💡 Recommendation:</strong> If you want a Subscription Manager, it's best if they purchase the subscription themselves to avoid confusion.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Continue Button */}
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={() => {
+                    if (selectedRole) {
+                      setShowRoleSelection(false);
+                      setShowStripeTable(true);
+                      scrollToElementById('pricing-table');
+                    }
+                  }}
+                  disabled={!selectedRole}
+                  className="bg-[#012C61] text-white px-8 py-3 rounded-lg transition-all duration-300 hover:bg-transparent hover:border hover:border-[#012C61] hover:text-[#012C61] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Continue to Subscription
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Test Mode Toggle - Only in Development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="w-full max-w-4xl mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-yellow-800">🧪 Development Test Mode</h3>
+                <p className="text-sm text-yellow-700">
+                  Toggle between test and live pricing tables for testing
+                </p>
+              </div>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={isTestMode}
+                  onChange={(e) => setIsTestMode(e.target.checked)}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <span className="text-sm font-medium text-yellow-800">Test Mode</span>
+              </label>
+            </div>
+            {isTestMode && (
+              <div className="mt-3 p-3 bg-yellow-100 border border-yellow-300 rounded">
+                <p className="text-xs text-yellow-800">
+                  <strong>Test Cards:</strong> 4242 4242 4242 4242 (success) | 4000 0000 0000 0002 (declined)
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Stripe Pricing Table - Always accessible */}
         <div 
           id="pricing-table" 
@@ -1100,8 +1272,12 @@ const StripePricingTableWithFooter = () => {
             MozUserSelect: "auto"
           }}>
           {React.createElement("stripe-pricing-table", {
-            "pricing-table-id": "prctbl_1RBMKo2NeWrBDfGslMwYkTKz",
-            "publishable-key": "pk_live_51QXT6G2NeWrBDfGsjthMPwaWhPV7UIzSJjZ3fpmANYKT58UCVSnoHaHKyozK9EptYNbV3Y1y5SX1QQcuI9dK5pZW00VQH9T3Hh",
+            "pricing-table-id": (process.env.NODE_ENV === 'development' && isTestMode)
+              ? "prctbl_1SKcum2NeWrBDfGsTeavkMMT" // Test pricing table ID
+              : "prctbl_1RBMKo2NeWrBDfGslMwYkTKz",
+            "publishable-key": (process.env.NODE_ENV === 'development' && isTestMode)
+              ? "pk_test_51QXT6G2NeWrBDfGs1x7v1DgpvI2XDgWhGMH3nmSH5njuB69GHp7yGL7251F7X5TDB2VFZbEdVzf95GNqX0sRKrkF007PMhgJXG" // Test publishable key
+              : "pk_live_51QXT6G2NeWrBDfGsjthMPwaWhPV7UIzSJjZ3fpmANYKT58UCVSnoHaHKyozK9EptYNbV3Y1y5SX1QQcuI9dK5pZW00VQH9T3Hh",
           })}
           </div>
         </div>
