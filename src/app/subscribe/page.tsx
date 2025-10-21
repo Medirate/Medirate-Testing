@@ -42,6 +42,7 @@ const StripePricingTableWithFooter = () => {
     howDidYouHear: "",
     interest: "",
     demoRequest: "No",
+    accountRole: "",
   });
   const [selectedRole, setSelectedRole] = useState<'user' | 'subscription_manager' | null>(null);
   const [showRoleSelection, setShowRoleSelection] = useState(false);
@@ -265,9 +266,20 @@ const StripePricingTableWithFooter = () => {
         return;
       }
       
-      // Show role selection step for authenticated users
-      setShowRoleSelection(true);
-      toast.success("Form submitted! Please select your account role.");
+      // Store the selected role and proceed to subscription
+      if (formData.accountRole) {
+        try {
+          localStorage.setItem('mr_selected_role', formData.accountRole);
+          sessionStorage.setItem('mr_selected_role', formData.accountRole);
+        } catch (error) {
+          console.warn('Could not store selected role:', error);
+        }
+        setShowStripeTable(true);
+        scrollToElementById('pricing-table');
+        toast.success("Form submitted! Proceeding to subscription.");
+      } else {
+        toast.error("Please select an account role.");
+      }
     } catch (err) {
       console.error("Unexpected error during form submission:", err);
       toast.error("An unexpected error occurred. Please try again.");
@@ -1099,6 +1111,23 @@ const StripePricingTableWithFooter = () => {
                   <option value="Yes">Yes</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Account Role</label>
+                <select
+                  name="accountRole"
+                  value={formData.accountRole}
+                  onChange={handleFormChange}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  required
+                >
+                  <option value="">Select your account role</option>
+                  <option value="user">User Account - Full access to all features</option>
+                  <option value="subscription_manager">Subscription Manager - Manage users only (no app access)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  <strong>User Account:</strong> Full access to dashboard and data. <strong>Subscription Manager:</strong> Can add/remove users but cannot access application data.
+                </p>
+              </div>
               <div className="flex justify-end">
                 <button
                   type="submit"
@@ -1111,8 +1140,8 @@ const StripePricingTableWithFooter = () => {
           </div>
         )}
 
-        {/* Role Selection Step */}
-        {showRoleSelection && (
+        {/* Role Selection Step - REMOVED - Now handled in form */}
+        {false && showRoleSelection && (
           <div className="w-full max-w-4xl mb-8 p-8 bg-white rounded-xl shadow-2xl border border-gray-100">
             <div className="text-center mb-6">
               <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
