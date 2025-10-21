@@ -1208,6 +1208,14 @@ const StripePricingTableWithFooter = () => {
                 <button
                   onClick={() => {
                     if (selectedRole) {
+                      // Store the selected role for the webhook to use
+                      try {
+                        localStorage.setItem('mr_selected_role', selectedRole);
+                        sessionStorage.setItem('mr_selected_role', selectedRole);
+                      } catch (error) {
+                        console.warn('Could not store selected role:', error);
+                      }
+                      
                       setShowRoleSelection(false);
                       setShowStripeTable(true);
                       scrollToElementById('pricing-table');
@@ -1281,6 +1289,56 @@ const StripePricingTableWithFooter = () => {
           })}
           </div>
         </div>
+
+        {/* Role Update Script - Hidden */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Listen for successful subscription completion
+              document.addEventListener('DOMContentLoaded', function() {
+                // Check if we have a stored role and user is authenticated
+                const checkAndUpdateRole = async () => {
+                  try {
+                    const storedRole = localStorage.getItem('mr_selected_role') || sessionStorage.getItem('mr_selected_role');
+                    if (storedRole && (storedRole === 'user' || storedRole === 'subscription_manager')) {
+                      console.log('🎭 Found stored role:', storedRole);
+                      
+                      // Get current user email (you may need to adjust this based on your auth setup)
+                      const userEmail = window.location.search.includes('email=') 
+                        ? new URLSearchParams(window.location.search).get('email')
+                        : null;
+                        
+                      if (userEmail) {
+                        console.log('📧 Updating role for user:', userEmail);
+                        
+                        const response = await fetch('/api/update-user-role', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ email: userEmail, role: storedRole })
+                        });
+                        
+                        if (response.ok) {
+                          console.log('✅ Role updated successfully');
+                          // Clean up stored role
+                          localStorage.removeItem('mr_selected_role');
+                          sessionStorage.removeItem('mr_selected_role');
+                        } else {
+                          console.error('❌ Failed to update role:', await response.text());
+                        }
+                      }
+                    }
+                  } catch (error) {
+                    console.error('❌ Error updating role:', error);
+                  }
+                };
+                
+                // Check immediately and also set up periodic checking
+                checkAndUpdateRole();
+                setInterval(checkAndUpdateRole, 5000); // Check every 5 seconds
+              });
+            `
+          }}
+        />
 
 
 

@@ -91,20 +91,40 @@ async function handleSubscription(subscription: Stripe.Subscription) {
     return;
   }
 
-  // Update the user's subscription status and plan
+  // Check if there's a stored role for this user (from subscription flow)
+  let selectedRole = null;
+  try {
+    // Try to get role from subscription metadata first
+    if (subscription.metadata && subscription.metadata.selectedRole) {
+      selectedRole = subscription.metadata.selectedRole;
+      console.log(`📋 Found role in subscription metadata: ${selectedRole}`);
+    }
+  } catch (error) {
+    console.log("ℹ️ No role metadata found in subscription");
+  }
+
+  // Update the user's subscription status, plan, and role
+  const updateData: any = {
+    subscriptionStatus: subscription.status,
+    planId: parseInt(planID), // Convert to integer if needed
+    UpdatedAt: new Date().toISOString(),
+  };
+
+  // If we found a selected role, update it
+  if (selectedRole && ['user', 'subscription_manager'].includes(selectedRole)) {
+    updateData.Role = selectedRole;
+    console.log(`🎭 Updating user role to: ${selectedRole}`);
+  }
+
   const { error: updateError } = await supabase
     .from("User")
-    .update({
-      subscriptionStatus: subscription.status,
-      planId: parseInt(planID), // Convert to integer if needed
-      UpdatedAt: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq("UserID", user.UserID);
 
   if (updateError) {
     console.error("❌ Error updating user subscription:", updateError);
   } else {
-    console.log(`✅ User subscription updated: ${subscription.status}`);
+    console.log(`✅ User subscription updated: ${subscription.status}${selectedRole ? ` with role: ${selectedRole}` : ''}`);
   }
 }
 
