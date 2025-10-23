@@ -5,17 +5,23 @@ import { Toaster, toast } from "react-hot-toast";
 import Footer from "@/app/components/footer";
 import { CreditCard, CheckCircle, Mail, Shield, ArrowLeft } from "lucide-react"; // Added new icons
 import SubscriptionTermsModal from '@/app/components/SubscriptionTermsModal';
+import ServiceAgreementModal from '@/app/components/ServiceAgreementModal';
+import MockStripeCard from '@/app/components/MockStripeCard';
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 const StripePricingTableWithFooter = () => {
   const [showTerms, setShowTerms] = useState(false);
+  const [showServiceAgreement, setShowServiceAgreement] = useState(false);
+  const [serviceAgreementAccepted, setServiceAgreementAccepted] = useState(false);
+  const [showRoleConfirmation, setShowRoleConfirmation] = useState(false);
   const auth = useAuth();
   const router = useRouter();
   const [showStripeTable, setShowStripeTable] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [showRedirectBanner, setShowRedirectBanner] = useState(false);
+  const [redirectReason, setRedirectReason] = useState<string | null>(null);
   
   // Email verification states
   const [emailToVerify, setEmailToVerify] = useState("");
@@ -117,6 +123,7 @@ const StripePricingTableWithFooter = () => {
   useEffect(() => {
     if (auth.userEmail) {
       fetchFormData(auth.userEmail);
+      checkRedirectReason();
     }
   }, [auth.userEmail]);
 
@@ -161,6 +168,61 @@ const StripePricingTableWithFooter = () => {
   const toggleModalVisibility = () => {
     console.log('🔴 Terms and Conditions button clicked!');
     setShowTerms(!showTerms); // Toggle modal visibility
+  };
+
+  const handleMockSubscribeClick = () => {
+    toast.error("Please complete the registration form above to proceed with payment", {
+      duration: 4000,
+      position: "top-center",
+    });
+  };
+
+  // Check user subscription status and set redirect reason
+  const checkRedirectReason = async () => {
+    if (!auth.isAuthenticated || !auth.userEmail) return;
+
+    try {
+      // Check if user has active subscription
+      const subscriptionResponse = await fetch("/api/stripe/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: auth.userEmail }),
+      });
+
+      if (subscriptionResponse.ok) {
+        const subscriptionData = await subscriptionResponse.json();
+        if (subscriptionData.status === 'active') {
+          // User has active subscription, no redirect reason
+          return;
+        }
+      }
+
+      // Check user role and subscription status
+      const roleResponse = await fetch("/api/user-role");
+      if (roleResponse.ok) {
+        const { role } = await roleResponse.json();
+        
+        if (role === 'subscription_manager') {
+          setRedirectReason('subscription_manager_no_subscription');
+        } else if (role === 'sub_user') {
+          // Check subscription_users table for primary user info
+          const subUserResponse = await fetch("/api/subscription-users");
+          if (subUserResponse.ok) {
+            const subUserData = await subUserResponse.json();
+            if (subUserData.primaryUser) {
+              setRedirectReason('sub_user_no_primary_subscription');
+              setRedirectReason(`sub_user_no_primary_subscription:${subUserData.primaryUser}`);
+            } else {
+              setRedirectReason('sub_user_no_primary');
+            }
+          }
+        } else {
+          setRedirectReason('primary_user_no_subscription');
+        }
+      }
+    } catch (error) {
+      console.error("Error checking redirect reason:", error);
+    }
   };
 
   const scrollToElementById = (elementId: string) => {
@@ -249,6 +311,18 @@ const StripePricingTableWithFooter = () => {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Show role confirmation dialog for first-time submission
+    if (!formSubmitted && formData.accountRole) {
+      setShowRoleConfirmation(true);
+      return;
+    }
+    
+    // Proceed with actual form submission
+    await submitForm();
+  };
+
+  const submitForm = async () => {
     // Determine which email to use for saving the form
     const targetEmail = auth.isAuthenticated && auth.userEmail
       ? auth.userEmail
@@ -325,6 +399,15 @@ const StripePricingTableWithFooter = () => {
     }
   };
 
+  const handleConfirmRole = () => {
+    setShowRoleConfirmation(false);
+    submitForm();
+  };
+
+  const handleCancelRole = () => {
+    setShowRoleConfirmation(false);
+  };
+
   useEffect(() => {
     const testTableDetection = async () => {
       try {
@@ -352,6 +435,13 @@ const StripePricingTableWithFooter = () => {
   const handleSendVerificationCode = async () => {
     if (!emailToVerify) {
       setVerificationError("Please enter an email address");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailToVerify)) {
+      setVerificationError("Please enter a valid email address");
       return;
     }
 
@@ -552,6 +642,48 @@ const StripePricingTableWithFooter = () => {
             </a>
           </div>
         )}
+
+        {/* Redirect Reason Banner */}
+        {redirectReason && (
+          <div className="w-full max-w-4xl mx-auto mb-8 p-6 bg-amber-50 border border-amber-200 rounded-xl shadow-lg">
+            <div className="flex items-start space-x-4">
+              <div className="flex-shrink-0">
+                <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-amber-800 mb-2">
+                  {redirectReason === 'primary_user_no_subscription' && "No Active Subscription Found"}
+                  {redirectReason === 'subscription_manager_no_subscription' && "Subscription Manager - No Active Subscription"}
+                  {redirectReason.startsWith('sub_user_no_primary_subscription') && "Sub User - Primary User Has No Active Subscription"}
+                  {redirectReason === 'sub_user_no_primary' && "Sub User - No Primary User Associated"}
+                </h3>
+                <div className="text-amber-700 space-y-2">
+                  {redirectReason === 'primary_user_no_subscription' && (
+                    <p>Currently you don't have a subscription for your email address. Please complete the registration form <button onClick={() => scrollToElementById('pricing-table')} className="text-amber-800 underline hover:text-amber-900 font-medium">below</button> to create a new subscription.</p>
+                  )}
+                  {redirectReason === 'subscription_manager_no_subscription' && (
+                    <p>As a Subscription Manager, you currently don't have an active subscription. Please create a new subscription <button onClick={() => scrollToElementById('pricing-table')} className="text-amber-800 underline hover:text-amber-900 font-medium">below</button>.</p>
+                  )}
+                  {redirectReason.startsWith('sub_user_no_primary_subscription') && (
+                    <p>The primary user associated with your account ({redirectReason.split(':')[1]}) doesn't have an active subscription. Please contact them to renew their subscription or create a new subscription <button onClick={() => scrollToElementById('pricing-table')} className="text-amber-800 underline hover:text-amber-900 font-medium">below</button>.</p>
+                  )}
+                  {redirectReason === 'sub_user_no_primary' && (
+                    <p>You are registered as a sub user but no primary user is associated with your account. Please contact support or create a new subscription <button onClick={() => scrollToElementById('pricing-table')} className="text-amber-800 underline hover:text-amber-900 font-medium">below</button>.</p>
+                  )}
+                  <p className="text-sm mt-3">
+                    <strong>Need assistance?</strong> If you have any questions or need support, please email us at{' '}
+                    <a href="mailto:contact@medirate.net" className="text-amber-800 underline hover:text-amber-900">
+                      contact@medirate.net
+                    </a>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {showRedirectBanner && (
           <div className="w-full max-w-4xl mb-6 p-5 bg-yellow-50 border border-yellow-200 rounded-xl">
             <div className="flex items-start justify-between gap-4">
@@ -655,29 +787,47 @@ const StripePricingTableWithFooter = () => {
                 </li>
               </ul>
               
-              {/* Subscription Manager Role Explanation */}
-              <div className="mt-8 p-6 bg-amber-50 border border-amber-200 rounded-lg">
-                <h4 className="text-lg font-semibold text-amber-800 mb-3">Subscription Manager Role</h4>
-                <p className="text-sm text-amber-700 mb-3">
-                  <strong>Optional:</strong> You can designate one person as a Subscription Manager who can add/remove users but cannot access the application data.
-                </p>
-                <div className="text-sm text-amber-700 space-y-2">
-                  <p><strong>Subscription Manager can:</strong></p>
-                  <ul className="list-disc ml-4 space-y-1">
-                    <li>Add and remove users from the subscription</li>
-                    <li>Manage user roles within the subscription</li>
-                    <li>View subscription details and billing</li>
-                  </ul>
-                  <p className="mt-2"><strong>Subscription Manager cannot:</strong></p>
-                  <ul className="list-disc ml-4 space-y-1">
-                    <li>Access dashboard data or analytics</li>
-                    <li>View rates or use core application features</li>
-                    <li>Count toward the 3-user limit</li>
-                  </ul>
+              {/* User Types and Subscription Structure Explanation */}
+              <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="text-lg font-semibold text-blue-800 mb-4">MediRate User Types & Subscription Structure</h4>
+                
+                <div className="text-sm text-blue-700 space-y-4">
+                  <div>
+                    <p className="font-semibold mb-2">MediRate offers three user types:</p>
+                    <ul className="list-disc ml-4 space-y-1">
+                      <li><strong>Subscription Manager:</strong> Manages billing and user access only (cannot use application features)</li>
+                      <li><strong>Primary User:</strong> Full access to application features and can manage users</li>
+                      <li><strong>Secondary User:</strong> Full access to application features (managed by Subscription Manager or Primary User)</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="font-semibold mb-2">Subscription Slot Allocation (3 users maximum per subscription):</p>
+                    <div className="bg-white p-4 rounded-lg border border-blue-200">
+                      <p className="mb-2"><strong>Option 1: With Subscription Manager</strong></p>
+                      <ul className="list-disc ml-4 space-y-1 text-xs">
+                        <li>1 Subscription Manager (does not count toward user limit)</li>
+                        <li>3 Secondary Users (full application access)</li>
+                        <li><strong>Total: 3 application users + 1 manager</strong></li>
+                      </ul>
+                    </div>
+                    
+                    <div className="bg-white p-4 rounded-lg border border-blue-200 mt-3">
+                      <p className="mb-2"><strong>Option 2: With Primary User</strong></p>
+                      <ul className="list-disc ml-4 space-y-1 text-xs">
+                        <li>1 Primary User (uses 1 slot, can manage others)</li>
+                        <li>2 Secondary Users (full application access)</li>
+                        <li><strong>Total: 3 application users</strong></li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+                    <p className="text-xs text-amber-700">
+                      <strong>💡 Recommendation:</strong> If you need a dedicated billing manager who won't use the application, choose Subscription Manager. If you want to use the application yourself and manage others, choose Primary User. And if you want to be a Secondary User under an active subscription, contact your Subscription Manager/Primary User and ask them to add your email in the slot under Settings and then you can directly log into the application.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-amber-600 mt-3 font-medium">
-                  💡 <strong>Recommendation:</strong> If you want a Subscription Manager, it's best if they purchase the subscription themselves.
-                </p>
               </div>
             </div>
           </div>
@@ -728,6 +878,7 @@ const StripePricingTableWithFooter = () => {
                   type="email"
                   value={emailToVerify}
                   onChange={(e) => setEmailToVerify(e.target.value)}
+                  disabled={formSubmitted}
                   placeholder="Enter your email address"
                   className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   autoComplete="email"
@@ -776,6 +927,7 @@ const StripePricingTableWithFooter = () => {
                   type="text"
                   value={verificationCode}
                   onChange={(e) => setVerificationCode(e.target.value)}
+                  disabled={formSubmitted}
                   placeholder="Enter 6-digit code"
                   maxLength={6}
                   className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all text-center text-lg tracking-widest"
@@ -833,7 +985,7 @@ const StripePricingTableWithFooter = () => {
                 <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
               <h2 className="text-2xl font-bold mb-2 text-[#012C61] font-lemonMilkRegular">
-                {isFormPreFilled ? "✅ Form Pre-filled" : "Email Verified!"}
+                {isFormPreFilled ? "✅ Form Previously Submitted" : "Email Verified!"}
               </h2>
               <p className="text-gray-600">
                 {isFormPreFilled 
@@ -846,7 +998,7 @@ const StripePricingTableWithFooter = () => {
             {isFormPreFilled && (
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-700 text-center">
-                  <strong>✓ Form Pre-filled:</strong> Your previous submission has been loaded. You can review and update the information below.
+                  <strong>✓ Form Previously Submitted:</strong> Your previous submission has been loaded. You can review and update the information below.
                 </p>
               </div>
             )}
@@ -860,6 +1012,7 @@ const StripePricingTableWithFooter = () => {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleFormChange}
+                    disabled={formSubmitted}
                     className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                     required
                   />
@@ -871,6 +1024,7 @@ const StripePricingTableWithFooter = () => {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleFormChange}
+                    disabled={formSubmitted}
                     className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                     required
                   />
@@ -882,8 +1036,9 @@ const StripePricingTableWithFooter = () => {
                   type="text"
                   name="companyName"
                   value={formData.companyName}
-                  onChange={handleFormChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    onChange={handleFormChange}
+                    disabled={formSubmitted}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 />
               </div>
@@ -892,8 +1047,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="companyType"
                   value={formData.companyType}
-                  onChange={handleFormChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    onChange={handleFormChange}
+                    disabled={formSubmitted}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="">Select Company Type</option>
@@ -917,6 +1073,7 @@ const StripePricingTableWithFooter = () => {
                     name="providerType"
                     value={formData.providerType}
                     onChange={handleFormChange}
+                    disabled={formSubmitted}
                     className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                     required
                   />
@@ -927,8 +1084,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="howDidYouHear"
                   value={formData.howDidYouHear}
-                  onChange={handleFormChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    onChange={handleFormChange}
+                    disabled={formSubmitted}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="">Select how you heard about MediRate</option>
@@ -943,8 +1101,9 @@ const StripePricingTableWithFooter = () => {
                 <textarea
                   name="interest"
                   value={formData.interest}
-                  onChange={handleFormChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    onChange={handleFormChange}
+                    disabled={formSubmitted}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   rows={4}
                   required
                 />
@@ -954,8 +1113,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="demoRequest"
                   value={formData.demoRequest}
-                  onChange={handleFormChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    onChange={handleFormChange}
+                    disabled={formSubmitted}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="No">No</option>
@@ -967,8 +1127,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="accountRole"
                   value={formData.accountRole}
-                  onChange={handleFormChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    onChange={handleFormChange}
+                    disabled={formSubmitted}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="">Select your account role</option>
@@ -1003,12 +1164,45 @@ const StripePricingTableWithFooter = () => {
                   </p>
                 </div>
               )}
+              {/* Service Agreement Checkbox */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="flex items-start space-x-3">
+                  <input
+                    type="checkbox"
+                    id="serviceAgreement"
+                    checked={serviceAgreementAccepted}
+                    onChange={(e) => setServiceAgreementAccepted(e.target.checked)}
+                    disabled={formSubmitted}
+                    className="mt-1 h-4 w-4 text-[#012C61] border-gray-300 rounded focus:ring-[#012C61]"
+                    required
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="serviceAgreement" className="text-sm text-gray-700 cursor-pointer">
+                      I agree to the{' '}
+                      <button
+                        type="button"
+                        onClick={() => setShowServiceAgreement(true)}
+                        className="text-[#012C61] underline hover:text-blue-800"
+                      >
+                        MediRate Service Agreement
+                      </button>
+                      {' '}and understand the terms of my subscription.
+                    </label>
+                  </div>
+                </div>
+              </div>
+              
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="bg-[#012C61] text-white px-8 py-3 rounded-lg transition-all duration-300 hover:bg-transparent hover:border hover:border-[#012C61] hover:text-[#012C61]"
+                  disabled={!serviceAgreementAccepted || formSubmitted}
+                  className={`px-8 py-3 rounded-lg transition-all duration-300 ${
+                    serviceAgreementAccepted && !formSubmitted
+                      ? 'bg-[#012C61] text-white hover:bg-transparent hover:border hover:border-[#012C61] hover:text-[#012C61]'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
                 >
-                  Submit
+                  {formSubmitted ? "Form Submitted ✓" : "Submit"}
                 </button>
               </div>
             </form>
@@ -1019,13 +1213,13 @@ const StripePricingTableWithFooter = () => {
         {auth.isAuthenticated && (!formFilled || isFormPreFilled) && !showStripeTable && verificationStep !== 'complete' && (
           <div id="registration-form" className="w-full max-w-4xl mb-8 p-8 bg-white rounded-xl shadow-2xl border border-gray-100">
             <h2 className="text-xl font-bold mb-8 text-[#012C61] text-center font-lemonMilkRegular">
-              {isFormPreFilled ? "✅ Form Pre-filled - Review & Submit" : "Please Complete the Form to Proceed"}
+              {isFormPreFilled ? "✅ Form Previously Submitted - Review & Submit" : "Please Complete the Form to Proceed"}
             </h2>
             
             {isFormPreFilled && (
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-700 text-center">
-                  <strong>✓ Form Pre-filled:</strong> Your previous submission has been loaded. You can review and update the information below.
+                  <strong>✓ Form Previously Submitted:</strong> Your previous submission has been loaded. You can review and update the information below.
                 </p>
               </div>
             )}
@@ -1039,6 +1233,7 @@ const StripePricingTableWithFooter = () => {
                     name="firstName"
                     value={formData.firstName}
                     onChange={handleFormChange}
+                    disabled={formSubmitted}
                     className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                     required
                   />
@@ -1050,6 +1245,7 @@ const StripePricingTableWithFooter = () => {
                     name="lastName"
                     value={formData.lastName}
                     onChange={handleFormChange}
+                    disabled={formSubmitted}
                     className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                     required
                   />
@@ -1061,8 +1257,9 @@ const StripePricingTableWithFooter = () => {
                   type="text"
                   name="companyName"
                   value={formData.companyName}
-                  onChange={handleFormChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    onChange={handleFormChange}
+                    disabled={formSubmitted}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 />
               </div>
@@ -1071,8 +1268,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="companyType"
                   value={formData.companyType}
-                  onChange={handleFormChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    onChange={handleFormChange}
+                    disabled={formSubmitted}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="">Select Company Type</option>
@@ -1096,6 +1294,7 @@ const StripePricingTableWithFooter = () => {
                     name="providerType"
                     value={formData.providerType}
                     onChange={handleFormChange}
+                    disabled={formSubmitted}
                     className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                     required
                   />
@@ -1106,8 +1305,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="howDidYouHear"
                   value={formData.howDidYouHear}
-                  onChange={handleFormChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    onChange={handleFormChange}
+                    disabled={formSubmitted}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="">Select how you heard about MediRate</option>
@@ -1122,8 +1322,9 @@ const StripePricingTableWithFooter = () => {
                 <textarea
                   name="interest"
                   value={formData.interest}
-                  onChange={handleFormChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    onChange={handleFormChange}
+                    disabled={formSubmitted}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   rows={4}
                   required
                 />
@@ -1133,8 +1334,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="demoRequest"
                   value={formData.demoRequest}
-                  onChange={handleFormChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    onChange={handleFormChange}
+                    disabled={formSubmitted}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="No">No</option>
@@ -1146,8 +1348,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="accountRole"
                   value={formData.accountRole}
-                  onChange={handleFormChange}
-                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    onChange={handleFormChange}
+                    disabled={formSubmitted}
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="">Select your account role</option>
@@ -1182,12 +1385,44 @@ const StripePricingTableWithFooter = () => {
                   </p>
                 </div>
               )}
+              {/* Service Agreement Checkbox */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="flex items-start space-x-3">
+                  <input
+                    type="checkbox"
+                    id="serviceAgreement2"
+                    checked={serviceAgreementAccepted}
+                    onChange={(e) => setServiceAgreementAccepted(e.target.checked)}
+                    className="mt-1 h-4 w-4 text-[#012C61] border-gray-300 rounded focus:ring-[#012C61]"
+                    required
+                  />
+                  <div className="flex-1">
+                    <label htmlFor="serviceAgreement2" className="text-sm text-gray-700 cursor-pointer">
+                      I agree to the{' '}
+                      <button
+                        type="button"
+                        onClick={() => setShowServiceAgreement(true)}
+                        className="text-[#012C61] underline hover:text-blue-800"
+                      >
+                        MediRate Service Agreement
+                      </button>
+                      {' '}and understand the terms of my subscription.
+                    </label>
+                  </div>
+                </div>
+              </div>
+              
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="bg-[#012C61] text-white px-8 py-3 rounded-lg transition-all duration-300 hover:bg-transparent hover:border hover:border-[#012C61] hover:text-[#012C61]"
+                  disabled={!serviceAgreementAccepted || formSubmitted}
+                  className={`px-8 py-3 rounded-lg transition-all duration-300 ${
+                    serviceAgreementAccepted && !formSubmitted
+                      ? 'bg-[#012C61] text-white hover:bg-transparent hover:border hover:border-[#012C61] hover:text-[#012C61]'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
                 >
-                  Submit
+                  {formSubmitted ? "Form Submitted ✓" : "Submit"}
                 </button>
               </div>
             </form>
@@ -1210,12 +1445,16 @@ const StripePricingTableWithFooter = () => {
             <div className="max-w-2xl mx-auto space-y-6">
               {/* User Account Option */}
               <div 
-                className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                className={`p-6 border-2 rounded-lg transition-all ${
+                  formSubmitted 
+                    ? 'cursor-not-allowed opacity-50' 
+                    : 'cursor-pointer'
+                } ${
                   selectedRole === 'user' 
                     ? 'border-[#012C61] bg-blue-50' 
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
-                onClick={() => setSelectedRole('user')}
+                onClick={formSubmitted ? undefined : () => setSelectedRole('user')}
               >
                 <div className="flex items-start gap-4">
                   <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
@@ -1244,12 +1483,16 @@ const StripePricingTableWithFooter = () => {
 
               {/* Subscription Manager Option */}
               <div 
-                className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                className={`p-6 border-2 rounded-lg transition-all ${
+                  formSubmitted 
+                    ? 'cursor-not-allowed opacity-50' 
+                    : 'cursor-pointer'
+                } ${
                   selectedRole === 'subscription_manager' 
                     ? 'border-[#012C61] bg-blue-50' 
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
-                onClick={() => setSelectedRole('subscription_manager')}
+                onClick={formSubmitted ? undefined : () => setSelectedRole('subscription_manager')}
               >
                 <div className="flex items-start gap-4">
                   <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
@@ -1344,7 +1587,9 @@ const StripePricingTableWithFooter = () => {
           </div>
         )}
 
-        {/* Stripe Pricing Table - Always accessible */}
+        {/* Conditional Pricing Display */}
+        {formSubmitted || (auth.isAuthenticated && formFilled) ? (
+          /* Real Stripe Pricing Table - Only for users who completed the form */
         <div 
           id="pricing-table" 
           className="w-full max-w-4xl transform scale-110 relative"
@@ -1363,15 +1608,19 @@ const StripePricingTableWithFooter = () => {
             MozUserSelect: "auto"
           }}>
           {React.createElement("stripe-pricing-table", {
-            "pricing-table-id": (process.env.NODE_ENV === 'development' && isTestMode)
-              ? "prctbl_1SKcum2NeWrBDfGsTeavkMMT" // Test pricing table ID
-              : "prctbl_1RBMKo2NeWrBDfGslMwYkTKz",
-            "publishable-key": (process.env.NODE_ENV === 'development' && isTestMode)
-              ? "pk_test_51QXT6G2NeWrBDfGs1x7v1DgpvI2XDgWhGMH3nmSH5njuB69GHp7yGL7251F7X5TDB2VFZbEdVzf95GNqX0sRKrkF007PMhgJXG" // Test publishable key
-              : "pk_live_51QXT6G2NeWrBDfGsjthMPwaWhPV7UIzSJjZ3fpmANYKT58UCVSnoHaHKyozK9EptYNbV3Y1y5SX1QQcuI9dK5pZW00VQH9T3Hh",
+              "pricing-table-id": (process.env.NODE_ENV === 'development' && isTestMode)
+                ? "prctbl_1SKcum2NeWrBDfGsTeavkMMT" // Test pricing table ID
+                : "prctbl_1RBMKo2NeWrBDfGslMwYkTKz",
+              "publishable-key": (process.env.NODE_ENV === 'development' && isTestMode)
+                ? "pk_test_51QXT6G2NeWrBDfGs1x7v1DgpvI2XDgWhGMH3nmSH5njuB69GHp7yGL7251F7X5TDB2VFZbEdVzf95GNqX0sRKrkF007PMhgJXG" // Test publishable key
+                : "pk_live_51QXT6G2NeWrBDfGsjthMPwaWhPV7UIzSJjZ3fpmANYKT58UCVSnoHaHKyozK9EptYNbV3Y1y5SX1QQcuI9dK5pZW00VQH9T3Hh",
           })}
           </div>
         </div>
+        ) : (
+          /* Mock Stripe Card - For users who haven't completed the form */
+          <MockStripeCard onSubscribeClick={handleMockSubscribeClick} />
+        )}
 
         {/* Role Update Script - Hidden */}
         <script
@@ -1436,7 +1685,11 @@ const StripePricingTableWithFooter = () => {
 
         {/* Terms and Conditions Link - Always Visible */}
         <div className="mt-6 text-center">
-          <button onClick={toggleModalVisibility} className="text-blue-600 underline">
+          <button 
+            onClick={formSubmitted ? undefined : toggleModalVisibility} 
+            className={`${formSubmitted ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 underline hover:text-blue-800'}`}
+            disabled={formSubmitted}
+          >
             Terms and Conditions
           </button>
         </div>
@@ -1448,6 +1701,94 @@ const StripePricingTableWithFooter = () => {
       <SubscriptionTermsModal 
         isOpen={showTerms} 
         onClose={() => setShowTerms(false)} 
+      />
+
+      <ServiceAgreementModal 
+        isOpen={showServiceAgreement} 
+        onClose={() => setShowServiceAgreement(false)}
+        onAccept={() => setServiceAgreementAccepted(true)}
+        customerName={formData.firstName && formData.lastName ? `${formData.firstName} ${formData.lastName}` : formData.companyName || "[Customer Name]"}
+        subscriptionType="annual" // This could be dynamic based on selected plan
+      />
+
+      {/* Role Confirmation Modal */}
+      {showRoleConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-center mb-4">
+              <div className="flex-shrink-0">
+                <Shield className="w-6 h-6 text-amber-600" />
+              </div>
+              <h3 className="ml-3 text-lg font-semibold text-gray-900">
+                Confirm Your Account Role
+              </h3>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">
+                You have selected <strong>{formData.accountRole === 'subscription_manager' ? 'Subscription Manager' : formData.accountRole === 'user' ? 'User Account' : 'Sub User'}</strong> as your account type.
+              </p>
+              
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="font-semibold text-amber-800 mb-2">Important:</h4>
+                <ul className="text-sm text-amber-700 space-y-1">
+                  {formData.accountRole === 'subscription_manager' && (
+                    <>
+                      <li>• You will only manage billing and user access</li>
+                      <li>• You cannot use application features</li>
+                      <li>• You can add/remove users from your subscription</li>
+                    </>
+                  )}
+                  {formData.accountRole === 'user' && (
+                    <>
+                      <li>• You will have full access to all application features</li>
+                      <li>• You can manage other users in your subscription</li>
+                      <li>• You will use one slot in your subscription</li>
+                    </>
+                  )}
+                  {formData.accountRole === 'sub_user' && (
+                    <>
+                      <li>• You will have full access to application features</li>
+                      <li>• You cannot manage other users</li>
+                      <li>• You must be added by a Subscription Manager or Primary User</li>
+                    </>
+                  )}
+                </ul>
+              </div>
+              
+              <p className="text-sm text-gray-500 mt-3">
+                This choice will affect your login experience and application access. Are you sure you want to proceed?
+              </p>
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleCancelRole}
+                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRole}
+                className="px-4 py-2 bg-[#012C61] text-white rounded-lg hover:bg-blue-800 transition-colors"
+              >
+                Yes, Proceed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notifications */}
+      <Toaster 
+        position="top-center"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+        }}
       />
 
       {/* Footer */}

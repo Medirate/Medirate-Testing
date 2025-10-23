@@ -5,6 +5,7 @@ import AppLayout from "@/app/components/applayout";
 import EmailPreferences from "@/app/email-preferences/page";
 import Profile from "@/app/profile/page";
 import Subscription from "@/app/subscription/page";
+import ServiceAgreementModal from "@/app/components/ServiceAgreementModal";
 import { useRequireSubscription } from "@/hooks/useRequireAuth";
 
 interface SubscriptionData {
@@ -21,7 +22,25 @@ interface SubscriptionData {
 }
 
 // Sub-user aware subscription component for settings
-function SettingsSubscription() {
+function SettingsSubscription({ 
+  subscriptionUsers, 
+  newUserEmail, 
+  setNewUserEmail, 
+  isAddingUser, 
+  isRemovingUser, 
+  addUserToSubscription, 
+  removeUserFromSubscription,
+  userRole
+}: {
+  subscriptionUsers: any[];
+  newUserEmail: string;
+  setNewUserEmail: (email: string) => void;
+  isAddingUser: boolean;
+  isRemovingUser: string | null;
+  addUserToSubscription: () => void;
+  removeUserFromSubscription: (email: string) => void;
+  userRole: string | null;
+}) {
   const auth = useRequireSubscription();
   const [isSubUser, setIsSubUser] = useState(false);
   const [primaryUserEmail, setPrimaryUserEmail] = useState<string | null>(null);
@@ -478,9 +497,9 @@ function SettingsSubscription() {
                   </div>
                 </div>
 
-                {/* Management Notice */}
+                {/* Subscription Management */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                  <div className="flex items-start">
+                  <div className="flex items-start mb-4">
                     <div className="flex-shrink-0">
                       <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
@@ -489,21 +508,142 @@ function SettingsSubscription() {
                     <div className="ml-3">
                       <h4 className="text-sm font-medium text-blue-800">Subscription Management</h4>
                       <p className="mt-1 text-sm text-blue-700">
-                        As the primary account holder, you have full access to manage this subscription, including billing settings, 
-                        adding or removing sub-users, and updating payment methods. Visit the full subscription page for advanced management options.
+                        Manage your subscription users and slots. You can add or remove users from your subscription.
                       </p>
-                      <div className="mt-3">
-                        <a 
-                          href="/subscription" 
-                          className="inline-flex items-center px-3 py-2 border border-blue-300 shadow-sm text-sm leading-4 font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                        >
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          Manage Subscription
-                        </a>
+                    </div>
+                  </div>
+
+                  {/* Subscription Slots Info */}
+                  <div className="mb-6">
+                    <div className="bg-white rounded-lg p-4 border border-blue-200">
+                      <h5 className="font-semibold text-gray-900 mb-2">Subscription Slots</h5>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-600">3</div>
+                          <div className="text-sm text-gray-600">Total Slots</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">
+                            {userRole === 'subscription_manager' 
+                              ? subscriptionUsers.length 
+                              : userRole === 'user' 
+                                ? subscriptionUsers.length + 1 // +1 for themselves
+                                : subscriptionUsers.length + 1 // +1 for primary user
+                            }
+                          </div>
+                          <div className="text-sm text-gray-600">Used Slots</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-600">
+                            {userRole === 'subscription_manager' 
+                              ? 3 - subscriptionUsers.length 
+                              : userRole === 'user' 
+                                ? 3 - (subscriptionUsers.length + 1)
+                                : 3 - (subscriptionUsers.length + 1)
+                            }
+                          </div>
+                          <div className="text-sm text-gray-600">Available Slots</div>
+                        </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Add User Form - Only for managers and primary users */}
+                  {(userRole === 'subscription_manager' || userRole === 'user') && (
+                    <div className="mb-6">
+                      <h5 className="font-semibold text-gray-900 mb-3">Add User to Subscription</h5>
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          value={newUserEmail}
+                          onChange={(e) => setNewUserEmail(e.target.value)}
+                          placeholder="Enter user email address"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          onClick={addUserToSubscription}
+                          disabled={!newUserEmail.trim() || isAddingUser}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isAddingUser ? "Adding..." : "Add User"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Read-only notice for secondary users */}
+                  {userRole === 'sub_user' && (
+                    <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-sm text-gray-600">
+                          As a secondary user, you can view subscription information but cannot add or remove users. 
+                          Contact your subscription manager or primary user for user management.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Current Users List */}
+                  <div>
+                    <h5 className="font-semibold text-gray-900 mb-3">Current Users</h5>
+                    <div className="space-y-2">
+                      {/* Show current user first */}
+                      <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <div className="text-sm font-medium text-gray-900">{auth.userEmail}</div>
+                            <div className="text-xs text-gray-500">
+                              {userRole === 'subscription_manager' ? 'Subscription Manager' : 
+                               userRole === 'user' ? 'Primary User' : 'Secondary User'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-xs text-blue-600 font-medium">You</div>
+                      </div>
+
+                      {/* Show other users */}
+                      {subscriptionUsers.length === 0 ? (
+                        <div className="text-gray-500 text-sm text-center py-4">
+                          {userRole === 'subscription_manager' 
+                            ? "No secondary users added yet." 
+                            : "No other users in this subscription."}
+                        </div>
+                      ) : (
+                        subscriptionUsers.map((user, index) => (
+                          <div key={index} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3">
+                            <div className="flex items-center">
+                              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div className="ml-3">
+                                <div className="text-sm font-medium text-gray-900">{user.email}</div>
+                                <div className="text-xs text-gray-500">Secondary User</div>
+                              </div>
+                            </div>
+                            {(userRole === 'subscription_manager' || userRole === 'user') ? (
+                              <button
+                                onClick={() => removeUserFromSubscription(user.email)}
+                                disabled={isRemovingUser === user.email}
+                                className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md disabled:opacity-50"
+                              >
+                                {isRemovingUser === user.email ? "Removing..." : "Remove"}
+                              </button>
+                            ) : (
+                              <div className="text-xs text-gray-400">View Only</div>
+                            )}
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
@@ -662,6 +802,13 @@ export default function Settings() {
   const [roleCheckComplete, setRoleCheckComplete] = useState(false);
 
   const [activeTab, setActiveTab] = useState("profile");
+  const [showServiceAgreement, setShowServiceAgreement] = useState(false);
+  
+  // Subscription management state
+  const [subscriptionUsers, setSubscriptionUsers] = useState<any[]>([]);
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [isRemovingUser, setIsRemovingUser] = useState<string | null>(null);
 
   // Check user role
   useEffect(() => {
@@ -691,6 +838,77 @@ export default function Settings() {
     checkUserRole();
   }, [auth.userEmail]);
 
+  // Fetch subscription users
+  const fetchSubscriptionUsers = async () => {
+    try {
+      const response = await fetch("/api/subscription-users");
+      if (response.ok) {
+        const data = await response.json();
+        setSubscriptionUsers(data.subUsers || []);
+      }
+    } catch (error) {
+      console.error("Error fetching subscription users:", error);
+    }
+  };
+
+  // Add user to subscription
+  const addUserToSubscription = async () => {
+    if (!newUserEmail.trim()) return;
+    
+    setIsAddingUser(true);
+    try {
+      const response = await fetch("/api/subscription-users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: newUserEmail.trim() })
+      });
+      
+      if (response.ok) {
+        setNewUserEmail("");
+        fetchSubscriptionUsers(); // Refresh the list
+      } else {
+        const error = await response.json();
+        alert(error.error || "Failed to add user");
+      }
+    } catch (error) {
+      console.error("Error adding user:", error);
+      alert("Failed to add user");
+    } finally {
+      setIsAddingUser(false);
+    }
+  };
+
+  // Remove user from subscription
+  const removeUserFromSubscription = async (email: string) => {
+    setIsRemovingUser(email);
+    try {
+      const response = await fetch("/api/subscription-users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      
+      if (response.ok) {
+        fetchSubscriptionUsers(); // Refresh the list
+      } else {
+        const error = await response.json();
+        alert(error.error || "Failed to remove user");
+      }
+    } catch (error) {
+      console.error("Error removing user:", error);
+      alert("Failed to remove user");
+    } finally {
+      setIsRemovingUser(null);
+    }
+  };
+
+  // Fetch users when component mounts
+  useEffect(() => {
+    if (auth.userEmail && (userRole === 'subscription_manager' || userRole === 'user')) {
+      fetchSubscriptionUsers();
+    }
+  }, [auth.userEmail, userRole]);
+
   const renderTabContent = () => {
     switch (activeTab) {
       case "profile":
@@ -698,7 +916,35 @@ export default function Settings() {
       case "email-preferences":
         return <EmailPreferences />;
       case "subscription":
-        return <SettingsSubscription />;
+        return (
+          <SettingsSubscription 
+            subscriptionUsers={subscriptionUsers}
+            newUserEmail={newUserEmail}
+            setNewUserEmail={setNewUserEmail}
+            isAddingUser={isAddingUser}
+            isRemovingUser={isRemovingUser}
+            addUserToSubscription={addUserToSubscription}
+            removeUserFromSubscription={removeUserFromSubscription}
+            userRole={userRole}
+          />
+        );
+      case "service-agreement":
+        return (
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-lg shadow-sm border">
+              <h3 className="text-lg font-semibold text-[#012C61] mb-4">Service Agreement</h3>
+              <p className="text-gray-600 mb-4">
+                View your current Service Agreement and understand the terms of your subscription.
+              </p>
+              <button
+                onClick={() => setShowServiceAgreement(true)}
+                className="bg-[#012C61] text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors"
+              >
+                View Service Agreement
+              </button>
+            </div>
+          </div>
+        );
       default:
         return <Profile />;
     }
@@ -767,16 +1013,6 @@ export default function Settings() {
             Profile
           </button>
           <button
-            onClick={() => setActiveTab("email-preferences")}
-            className={`px-4 py-2 text-sm font-medium ${
-              activeTab === "email-preferences"
-                ? "border-b-2 border-[#012C61] text-[#012C61]"
-                : "text-gray-500 hover:text-[#012C61]"
-            }`}
-          >
-            Email Alerts
-          </button>
-          <button
             onClick={() => setActiveTab("subscription")}
             className={`px-4 py-2 text-sm font-medium ${
               activeTab === "subscription"
@@ -786,6 +1022,16 @@ export default function Settings() {
           >
             Subscription
           </button>
+          <button
+            onClick={() => setActiveTab("service-agreement")}
+            className={`px-4 py-2 text-sm font-medium ${
+              activeTab === "service-agreement"
+                ? "border-b-2 border-[#012C61] text-[#012C61]"
+                : "text-gray-500 hover:text-[#012C61]"
+            }`}
+          >
+            Service Agreement
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -793,6 +1039,15 @@ export default function Settings() {
           {renderTabContent()}
         </div>
       </div>
+
+      {/* Service Agreement Modal */}
+      <ServiceAgreementModal 
+        isOpen={showServiceAgreement} 
+        onClose={() => setShowServiceAgreement(false)}
+        onAccept={() => setShowServiceAgreement(false)}
+        customerName={auth.userEmail || "[Customer Name]"}
+        subscriptionType="annual" // This could be dynamic based on user's actual subscription
+      />
     </AppLayout>
   );
 }

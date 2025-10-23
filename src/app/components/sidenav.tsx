@@ -33,6 +33,7 @@ const adminRateDevLinks: { href: string; label: string; icon: React.ReactNode }[
   { href: "/admin-dashboard/rate-developments/send-email-alerts", label: "Send Email Alerts", icon: <Mail size={16} className="mr-2" /> },
 ];
 
+
 interface SideNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
@@ -134,6 +135,7 @@ const SideNav = ({
       "/recent-rate-changes": "home",
       "/dashboard": "dashboard",
       "/rate-developments": "rateDevelopments",
+      "/email-preferences": "emailPreferences",
       "/state-rate-comparison": "stateRateComparison",
       "/settings": "settings",
       "/historical-rates": "historicalRates",
@@ -428,6 +430,45 @@ const SideNav = ({
                       style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                     >
                       Rate Developments
+                    </span>
+                  </Link>
+                )}
+              </li>
+              
+              {/* Email Preferences */}
+              <li className="group">
+                {userRole === 'subscription_manager' ? (
+                  <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Mail size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Email Preferences
+                    </span>
+                  </div>
+                ) : (
+                  <Link
+                    href="/email-preferences"
+                    onClick={() => setActiveTab("emailPreferences")}
+                    className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                      activeTab === "emailPreferences" ? "bg-gray-200/20" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Mail size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Email Preferences
                     </span>
                   </Link>
                 )}

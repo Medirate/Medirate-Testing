@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import Modal from './modal';
+import PortalModal from './PortalModal';
 import { useKindeBrowserClient } from '@kinde-oss/kinde-auth-nextjs';
 
 interface SubscriptionTermsModalProps {
@@ -18,15 +18,12 @@ export default function SubscriptionTermsModal({ isOpen, onClose }: Subscription
   };
 
   return (
-    <Modal 
+    <PortalModal 
       isOpen={isOpen} 
       onClose={onClose}
-      width="max-w-4xl"
-      className="z-[1002]" // Higher than other modals
+      className="max-h-[90vh]"
     >
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-        <div className="max-w-4xl w-full bg-white rounded-lg overflow-y-auto max-h-[90vh]">
-          <div className="p-6 flex flex-col h-[80vh]">
+      <div className="p-6 flex flex-col h-[80vh]">
             <h2 className="text-xl font-bold text-[#012C61] uppercase font-lemonMilkRegular text-center mb-4">
               Subscription Terms and Conditions
             </h2>
@@ -450,8 +447,6 @@ export default function SubscriptionTermsModal({ isOpen, onClose }: Subscription
               </button>
             </div>
           </div>
-        </div>
-      </div>
-    </Modal>
+    </PortalModal>
   );
 } 
