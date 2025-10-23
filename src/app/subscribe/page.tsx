@@ -474,23 +474,7 @@ const StripePricingTableWithFooter = () => {
     }
   }, [showRoleConfirmation]);
 
-  // Global error handler for DOM manipulation errors
-  useEffect(() => {
-    const handleError = (event: ErrorEvent) => {
-      if (event.message.includes('insertBefore') || event.message.includes('Node')) {
-        console.warn('DOM manipulation error caught and handled:', event.message);
-        // Close all modals to reset state
-        setShowTerms(false);
-        setShowServiceAgreement(false);
-        setShowRoleConfirmation(false);
-        event.preventDefault();
-        return false;
-      }
-    };
-
-    window.addEventListener('error', handleError);
-    return () => window.removeEventListener('error', handleError);
-  }, []);
+  // Removed global error handler to prevent interference with normal page interactions
 
   // Removed subscription checking - allow all users to subscribe
 
