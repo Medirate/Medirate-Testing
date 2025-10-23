@@ -47,9 +47,9 @@ const DebugMode = () => {
       document.removeEventListener('selectstart', enableSelection, { capture: true });
       document.removeEventListener('keydown', enableKeyboard, { capture: true });
       
-      // Restore right-click protection when leaving the page
-      document.body.classList.add('no-right-click');
-      document.body.classList.remove('debug-mode');
+      // Don't restore no-right-click class - keep debug mode enabled
+      // document.body.classList.add('no-right-click');
+      // document.body.classList.remove('debug-mode');
     };
   }, []);
 

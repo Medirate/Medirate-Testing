@@ -63,25 +63,13 @@ export async function GET() {
       .single();
 
     if (primaryError) {
-      // If no entry exists, create one with an empty array for sub_users
+      // If no entry exists, return that user is not in subscription_users table
       if (primaryError.code === "PGRST116") { // PGRST116 is the code for "No rows found"
-        console.log("🟡 No primary user entry found, creating a new one.");
-        const { data: newData, error: newError } = await supabase
-          .from("subscription_users")
-          .upsert({ primary_user: user.email, sub_users: [] })
-          .select("sub_users")
-          .single();
-
-        if (newError) {
-          console.error("❌ Supabase Error (Creating Entry):", newError);
-          return NextResponse.json({ error: "Database update error" }, { status: 500 });
-        }
-
-        console.log("✅ New primary user entry created successfully:", newData?.sub_users || []);
+        console.log("🟡 No primary user entry found - user is not in subscription_users table.");
         return NextResponse.json({ 
           isSubUser: false,
-          primaryUser: user.email,
-          subUsers: newData?.sub_users || [] 
+          primaryUser: null,
+          subUsers: []
         });
       }
 

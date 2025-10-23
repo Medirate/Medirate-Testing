@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const supabaseServiceRole = getSupabaseServiceRole();
     const { data, error } = await supabaseServiceRole
       .from("registrationform")
-      .select("email, firstname, lastname, companyname, companytype, providertype, howdidyouhear, interest, demorequest")
+      .select("email, firstname, lastname, companyname, companytype, providertype, howdidyouhear, interest, demorequest, account_role, primary_user_email")
       .eq("email", email)
       .maybeSingle();
 

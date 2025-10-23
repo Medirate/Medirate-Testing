@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Toaster, toast } from "react-hot-toast";
 import Footer from "@/app/components/footer";
 import { CreditCard, CheckCircle, Mail, Shield, ArrowLeft } from "lucide-react"; // Added new icons
@@ -43,6 +43,7 @@ const StripePricingTableWithFooter = () => {
     interest: "",
     demoRequest: "No",
     accountRole: "",
+    primaryUserEmail: "",
   });
   const [selectedRole, setSelectedRole] = useState<'user' | 'subscription_manager' | null>(null);
   const [showRoleSelection, setShowRoleSelection] = useState(false);
@@ -53,6 +54,7 @@ const StripePricingTableWithFooter = () => {
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [isSubUser, setIsSubUser] = useState(false);
   const [primaryEmail, setPrimaryEmail] = useState<string | null>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
 
   // Authenticated users can proceed with form pre-filling and email verification
   useEffect(() => {
@@ -63,6 +65,35 @@ const StripePricingTableWithFooter = () => {
       setVerificationStep('complete');
     }
   }, [auth.isAuthenticated, auth.userEmail]);
+
+  // Fix - remove blocking classes and React Hot Toast toaster
+  useEffect(() => {
+    // Remove blocking classes from body
+    document.body.classList.remove('no-right-click');
+    document.body.classList.add('debug-mode');
+    
+    // Remove the React Hot Toast toaster that's blocking clicks
+    const removeToaster = () => {
+      const toaster = document.querySelector('[data-rht-toaster]');
+      if (toaster) {
+        console.log('🔥 Removing React Hot Toast toaster that blocks clicks');
+        toaster.remove();
+      }
+    };
+    
+    // Run multiple times to ensure it's removed
+    removeToaster();
+    setTimeout(removeToaster, 100);
+    setTimeout(removeToaster, 500);
+    setTimeout(removeToaster, 1000);
+    
+    // Watch for it being added back
+    const observer = new MutationObserver(removeToaster);
+    observer.observe(document.body, { childList: true, subtree: true });
+    
+    return () => observer.disconnect();
+  }, []);
+
 
   useEffect(() => {
     // Dynamically load the Stripe Pricing Table script
@@ -112,6 +143,8 @@ const StripePricingTableWithFooter = () => {
           howDidYouHear: result.data.howdidyouhear || "",
           interest: result.data.interest || "",
           demoRequest: result.data.demorequest || "No",
+          accountRole: result.data.account_role || "",
+          primaryUserEmail: result.data.primary_user_email || "",
         });
       } else {
         // If no data is found, mark the form as not filled
@@ -198,7 +231,9 @@ const StripePricingTableWithFooter = () => {
           providerType: result.data.providertype || "",
           howDidYouHear: result.data.howdidyouhear || "",
           interest: result.data.interest || "",
-          demoRequest: result.data.demorequest || false,
+          demoRequest: result.data.demorequest || "No",
+          accountRole: result.data.account_role || "",
+          primaryUserEmail: result.data.primary_user_email || "",
         });
         setFormFilled(true); // Mark form as already filled
         setIsFormPreFilled(true); // Mark that form was pre-filled
@@ -239,6 +274,8 @@ const StripePricingTableWithFooter = () => {
           howdidyouhear: formData.howDidYouHear,
           interest: formData.interest,
           demorequest: formData.demoRequest,
+          account_role: formData.accountRole,
+          primary_user_email: formData.primaryUserEmail,
         }),
       });
 
@@ -397,97 +434,33 @@ const StripePricingTableWithFooter = () => {
     scrollToElementById('pricing-table');
   };
 
-  // Add global style overrides to ensure everything is clickable and debug overlays
+  // Clean, targeted CSS to fix only the blocking issues
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
-      .subscribe-page * {
-        pointer-events: auto !important;
-        user-select: auto !important;
-        -webkit-user-select: auto !important;
-        -moz-user-select: auto !important;
-        -ms-user-select: auto !important;
-      }
-      .subscribe-page button, 
-      .subscribe-page a, 
-      .subscribe-page input, 
-      .subscribe-page textarea, 
-      .subscribe-page select {
-        pointer-events: auto !important;
-        cursor: pointer !important;
-      }
-      .subscribe-page button:disabled {
-        pointer-events: none !important;
-        cursor: not-allowed !important;
-      }
-      
-      /* Force hide any loader overlays */
+      /* Hide ONLY loader overlays that block the page */
       .loader-overlay {
         display: none !important;
       }
       
-      /* Override any potential blocking overlays but keep below navbar */
-      .subscribe-page {
-        position: relative !important;
-        z-index: 1 !important;
-      }
-      
-      /* Ensure Stripe table is always clickable */
-      #pricing-table,
-      #pricing-table *,
-      stripe-pricing-table,
-      stripe-pricing-table * {
+      /* Override no-right-click class for interactive elements */
+      .no-right-click button,
+      .no-right-click input,
+      .no-right-click a,
+      .no-right-click select,
+      .no-right-click textarea {
         pointer-events: auto !important;
         user-select: auto !important;
-        -webkit-user-select: auto !important;
-        -moz-user-select: auto !important;
-        -ms-user-select: auto !important;
-        cursor: pointer !important;
-        z-index: 9999 !important;
       }
       
-      /* Override any global CSS that might block Stripe table */
-      stripe-pricing-table {
-        all: unset !important;
-        display: block !important;
+      /* Enable debug mode interactions */
+      .debug-mode button,
+      .debug-mode input,
+      .debug-mode a,
+      .debug-mode select,
+      .debug-mode textarea {
         pointer-events: auto !important;
         user-select: auto !important;
-        -webkit-user-select: auto !important;
-        -moz-user-select: auto !important;
-        -ms-user-select: auto !important;
-        cursor: pointer !important;
-        z-index: 9999 !important;
-        position: relative !important;
-      }
-      
-      /* Ensure Stripe table buttons and links are clickable */
-      stripe-pricing-table button,
-      stripe-pricing-table a,
-      stripe-pricing-table [role="button"] {
-        pointer-events: auto !important;
-        cursor: pointer !important;
-        user-select: auto !important;
-        -webkit-user-select: auto !important;
-        -moz-user-select: auto !important;
-        -ms-user-select: auto !important;
-      }
-      
-      /* Fix React Hot Toast toaster blocking clicks */
-      #_rht_toaster {
-        pointer-events: none !important;
-        z-index: -1 !important;
-      }
-      
-      /* Fix toaster children to allow clicks */
-      #_rht_toaster > * {
-        pointer-events: auto !important;
-      }
-      
-      /* Keep toast notifications clickable but not the container */
-      [data-testid="toast"] {
-        pointer-events: auto !important;
-        z-index: 9999 !important;
-        position: relative !important;
       }
     `;
     document.head.appendChild(style);
@@ -566,6 +539,19 @@ const StripePricingTableWithFooter = () => {
         position: "relative"
       } as React.CSSProperties}>
         <Toaster position="top-center" />
+        
+        {/* Logout Button - Only visible when authenticated */}
+        {auth.isAuthenticated && (
+          <div className="w-full max-w-4xl mb-4 flex justify-end">
+            <a
+              href="/api/auth/logout"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors duration-200 border border-gray-300"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Log Out
+            </a>
+          </div>
+        )}
         {showRedirectBanner && (
           <div className="w-full max-w-4xl mb-6 p-5 bg-yellow-50 border border-yellow-200 rounded-xl">
             <div className="flex items-start justify-between gap-4">
@@ -738,11 +724,14 @@ const StripePricingTableWithFooter = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
                 <input
+                  ref={emailInputRef}
                   type="email"
                   value={emailToVerify}
                   onChange={(e) => setEmailToVerify(e.target.value)}
                   placeholder="Enter your email address"
                   className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  autoComplete="email"
+                  autoFocus
                   required
                 />
               </div>
@@ -973,6 +962,47 @@ const StripePricingTableWithFooter = () => {
                   <option value="Yes">Yes</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Account Role</label>
+                <select
+                  name="accountRole"
+                  value={formData.accountRole}
+                  onChange={handleFormChange}
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  required
+                >
+                  <option value="">Select your account role</option>
+                  <option value="subscription_manager">Subscription Manager - Manage subscription and users only</option>
+                  <option value="user">User Account - Full access to application and subscription</option>
+                  <option value="sub_user">Sub User - Join someone else's subscription</option>
+                </select>
+                <div className="text-xs text-gray-600 mt-2 space-y-1">
+                  <p><strong>Subscription Manager:</strong> Choose this if you only wish to manage the subscription and be able to add/delete users while giving your company members access to the application itself. You will not have access to application data.</p>
+                  <p><strong>User Account:</strong> Choose this if you don't wish for a subscription manager to be tied to a subscription. You will be able to add/delete users and also use the application, but one of the slots in the subscription will be used by you.</p>
+                  <p><strong>Sub User:</strong> Choose this if you just wish to use someone else's subscription and they have added you as a sub user.</p>
+                </div>
+              </div>
+              
+              {/* Primary User Email Input - Only show for Sub User role */}
+              {formData.accountRole === 'sub_user' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Primary User Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    name="primaryUserEmail"
+                    value={formData.primaryUserEmail}
+                    onChange={handleFormChange}
+                    placeholder="Enter the email of the subscription manager or primary user"
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter the email address of the main user or subscription manager of the subscription you wish to join.
+                  </p>
+                </div>
+              )}
               <div className="flex justify-end">
                 <button
                   type="submit"
@@ -985,8 +1015,8 @@ const StripePricingTableWithFooter = () => {
           </div>
         )}
 
-        {/* Registration Form - Show for authenticated users who haven't filled form */}
-        {auth.isAuthenticated && !formFilled && !showStripeTable && (
+        {/* Registration Form - Show for authenticated users who haven't filled form OR when form is pre-filled (but not if already shown above) */}
+        {auth.isAuthenticated && (!formFilled || isFormPreFilled) && !showStripeTable && verificationStep !== 'complete' && (
           <div id="registration-form" className="w-full max-w-4xl mb-8 p-8 bg-white rounded-xl shadow-2xl border border-gray-100">
             <h2 className="text-xl font-bold mb-8 text-[#012C61] text-center font-lemonMilkRegular">
               {isFormPreFilled ? "✅ Form Pre-filled - Review & Submit" : "Please Complete the Form to Proceed"}
@@ -1121,13 +1151,37 @@ const StripePricingTableWithFooter = () => {
                   required
                 >
                   <option value="">Select your account role</option>
-                  <option value="user">User Account - Full access to all features</option>
-                  <option value="subscription_manager">Subscription Manager - Manage users only (no app access)</option>
+                  <option value="subscription_manager">Subscription Manager - Manage subscription and users only</option>
+                  <option value="user">User Account - Full access to application and subscription</option>
+                  <option value="sub_user">Sub User - Join someone else's subscription</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  <strong>User Account:</strong> Full access to dashboard and data. <strong>Subscription Manager:</strong> Can add/remove users but cannot access application data.
-                </p>
+                <div className="text-xs text-gray-600 mt-2 space-y-1">
+                  <p><strong>Subscription Manager:</strong> Choose this if you only wish to manage the subscription and be able to add/delete users while giving your company members access to the application itself. You will not have access to application data.</p>
+                  <p><strong>User Account:</strong> Choose this if you don't wish for a subscription manager to be tied to a subscription. You will be able to add/delete users and also use the application, but one of the slots in the subscription will be used by you.</p>
+                  <p><strong>Sub User:</strong> Choose this if you just wish to use someone else's subscription and they have added you as a sub user.</p>
+                </div>
               </div>
+              
+              {/* Primary User Email Input - Only show for Sub User role */}
+              {formData.accountRole === 'sub_user' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Primary User Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    name="primaryUserEmail"
+                    value={formData.primaryUserEmail}
+                    onChange={handleFormChange}
+                    placeholder="Enter the email of the subscription manager or primary user"
+                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter the email address of the main user or subscription manager of the subscription you wish to join.
+                  </p>
+                </div>
+              )}
               <div className="flex justify-end">
                 <button
                   type="submit"

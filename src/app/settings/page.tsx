@@ -658,8 +658,38 @@ function SettingsSubscription() {
 
 export default function Settings() {
   const auth = useRequireSubscription();
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [roleCheckComplete, setRoleCheckComplete] = useState(false);
 
   const [activeTab, setActiveTab] = useState("profile");
+
+  // Check user role
+  useEffect(() => {
+    const checkUserRole = async () => {
+      if (!auth.userEmail) {
+        setRoleCheckComplete(true);
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/user-role");
+        const result = await response.json();
+        
+        if (response.ok) {
+          setUserRole(result.role);
+        } else {
+          setUserRole(null);
+        }
+      } catch (error) {
+        console.error("Error checking user role:", error);
+        setUserRole(null);
+      } finally {
+        setRoleCheckComplete(true);
+      }
+    };
+
+    checkUserRole();
+  }, [auth.userEmail]);
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -680,9 +710,48 @@ export default function Settings() {
 
   return (
     <AppLayout activeTab="settings">
-              <h1 className="text-3xl md:text-4xl text-[#012C61] font-lemonMilkRegular uppercase mb-8 text-center">
+      <h1 className="text-3xl md:text-4xl text-[#012C61] font-lemonMilkRegular uppercase mb-8 text-center">
         Settings
       </h1>
+
+      {/* Subscription Manager Notice */}
+      {roleCheckComplete && userRole === 'subscription_manager' && (
+        <div className="max-w-4xl mx-auto mb-8">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-6 w-6 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-lg font-medium text-amber-800 mb-2">
+                  Subscription Manager Access
+                </h3>
+                <p className="text-amber-700">
+                  Since you are logged in as a <strong>Subscription Manager</strong>, you can only have access to the settings page of the application. 
+                  You have been redirected here because subscription managers are restricted to account management functions only.
+                </p>
+                <div className="mt-3 text-sm text-amber-600">
+                  <p><strong>What you can do:</strong></p>
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    <li>Manage user accounts and permissions</li>
+                    <li>View subscription details and billing</li>
+                    <li>Add or remove users from the subscription</li>
+                    <li>Update account settings</li>
+                  </ul>
+                  <p className="mt-2"><strong>What you cannot access:</strong></p>
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    <li>Dashboard data and analytics</li>
+                    <li>Rate information and reports</li>
+                    <li>Application features and tools</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto">
         {/* Tab Navigation */}

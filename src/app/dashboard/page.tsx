@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import clsx from 'clsx';
 import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
+import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
 
 // --- NEW: Types for client-side filtering ---
 interface FilterOptionsData {
@@ -436,6 +437,7 @@ const jumpToLetterFilterOption = (option: any, inputValue: string) => {
 export default function Dashboard() {
   const auth = useProtectedPage();
   const router = useRouter();
+  const { isSubscriptionManager, isChecking } = useSubscriptionManagerRedirect();
 
   // Add local state for data, loading, and error
   const [data, setData] = useState<ServiceData[]>([]);
@@ -1777,7 +1779,23 @@ export default function Dashboard() {
   // 4. Table rendering: just use sortedData (which is the current page's data)
   // ... existing code ...
 
+  // Show loading while checking role
+  if (isChecking) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid"></div>
+      </div>
+    );
+  }
 
+  // If subscription manager, they'll be redirected by the hook
+  if (isSubscriptionManager) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid"></div>
+      </div>
+    );
+  }
 
   return (
     <AppLayout activeTab="dashboard">

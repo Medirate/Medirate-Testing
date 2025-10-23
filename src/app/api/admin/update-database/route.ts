@@ -398,7 +398,7 @@ export async function POST(req: NextRequest) {
       });
     }
     if (type === 'provider_alerts') {
-      // 1. Reset is_new flags in provider_alerts and bill_track_50
+      // 1. Reset is_new flags ONLY in provider_alerts (NOT bill_track_50)
       log('Resetting is_new flags in provider_alerts...', 'info', 'reset');
       const { error: resetError } = await supabase.from('provider_alerts').update({ is_new: 'no' }).neq('id', null);
       if (resetError) {
@@ -406,9 +406,7 @@ export async function POST(req: NextRequest) {
       } else {
         log(`Reset is_new flags in provider_alerts. Update attempted for all rows.`, 'success', 'reset');
       }
-      log('Resetting is_new flags in bill_track_50...', 'info', 'reset');
-      await supabase.from('bill_track_50').update({ is_new: 'no' }).neq('is_new', 'no');
-      log('is_new flags reset in both tables.', 'success', 'reset');
+      log('✅ Provider alerts update will NOT affect bill_track_50 is_new flags', 'info', 'reset');
 
       // 2. Download the provider alerts file (separate from bill track file)
       log('Downloading provider alerts file...', 'info', 'download');

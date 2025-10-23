@@ -34,13 +34,14 @@ export async function POST(req: Request) {
     if (existingUser) {
       // Update existing user
       console.log("🔄 Updating existing user:", email);
+      const now = new Date().toISOString();
       const { data: updatedUser, error: updateError } = await supabase
         .from("User")
         .update({
           FirstName: firstName,
           LastName: lastName,
           KindeUserID: kindeId,
-          CreatedOn: new Date().toISOString()
+          UpdatedAt: now
         })
         .eq("Email", email)
         .select("*")
@@ -48,13 +49,18 @@ export async function POST(req: Request) {
 
       if (updateError) {
         console.error("❌ Error updating user:", updateError);
-        return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
+        console.error("❌ Update error details:", JSON.stringify(updateError, null, 2));
+        return NextResponse.json({ 
+          error: "Failed to update user", 
+          details: updateError.message 
+        }, { status: 500 });
       }
       
       userData = updatedUser;
     } else {
       // Create new user
       console.log("✅ Creating new user:", email);
+      const now = new Date().toISOString();
       const { data: newUser, error: insertError } = await supabase
         .from("User")
         .insert({
@@ -62,7 +68,9 @@ export async function POST(req: Request) {
           FirstName: firstName,
           LastName: lastName,
           KindeUserID: kindeId,
-          CreatedOn: new Date().toISOString(),
+          CreatedOn: now,
+          CreatedAt: now,
+          UpdatedAt: now,
           Role: "user"
         })
         .select("*")
@@ -70,7 +78,11 @@ export async function POST(req: Request) {
 
       if (insertError) {
         console.error("❌ Error creating user:", insertError);
-        return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+        console.error("❌ Insert error details:", JSON.stringify(insertError, null, 2));
+        return NextResponse.json({ 
+          error: "Failed to create user", 
+          details: insertError.message 
+        }, { status: 500 });
       }
       
       userData = newUser;

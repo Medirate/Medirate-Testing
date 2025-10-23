@@ -48,77 +48,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    console.log("🔍 AuthContext: Starting comprehensive auth check for:", userEmail);
+    console.log("🔍 AuthContext: Checking Stripe subscription for:", userEmail);
 
     try {
-      // Check sub-user status using the API endpoint
-      console.log("🔍 AuthContext: Calling /api/subscription-users for email:", userEmail);
-      const subUserResponse = await fetch("/api/subscription-users");
-      let isPrimaryUser = false;
-      let isSubUser = false;
-
-      console.log("🔍 AuthContext: subscription-users API response status:", subUserResponse.status);
-      
-      if (subUserResponse.ok) {
-        const subUserData = await subUserResponse.json();
-        // Fix: API returns isSubUser and primaryUser, not isPrimaryUser
-        isSubUser = subUserData.isSubUser || false;
-        isPrimaryUser = !isSubUser && subUserData.primaryUser === userEmail; // Primary if not sub-user and email matches
-        console.log("✅ AuthContext: Sub-user check complete:", { 
-          isPrimaryUser, 
-          isSubUser, 
-          userEmail,
-          apiPrimaryUser: subUserData.primaryUser,
-          rawData: subUserData 
-        });
-      } else {
-        const errorText = await subUserResponse.text();
-        console.log("⚠️ AuthContext: Sub-user check failed:", subUserResponse.status, errorText);
-      }
-
-      // If user is primary or sub-user, they have access
-      if (isPrimaryUser || isSubUser) {
-        console.log("✅ AuthContext: User has access via subscription_users table");
-        setAuthState({
-          isPrimaryUser,
-          isSubUser,
-          hasActiveSubscription: true, // They have access through subscription_users
-          hasFormData: true, // Assume they have form data if they're in subscription_users
-          isCheckComplete: true,
-          subscriptionData: { status: 'active', userType: isPrimaryUser ? 'primary' : 'sub' }
-        });
-        return;
-      }
-
-      // Check Stripe subscription status
-      console.log("🔍 AuthContext: Checking Stripe subscription for:", userEmail);
+      // SIMPLIFIED: Only check Stripe subscription status for the logged-in email
+      console.log("🔍 AuthContext: Making Stripe API call to /api/stripe/subscription");
       const stripeResponse = await fetch("/api/stripe/subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: userEmail }),
       });
 
+      console.log("🔍 AuthContext: Stripe API response status:", stripeResponse.status);
+      console.log("🔍 AuthContext: Stripe API response headers:", stripeResponse.headers);
+      
       const stripeData = await stripeResponse.json();
       console.log("🔍 AuthContext: Stripe response:", stripeData);
+      console.log("🔍 AuthContext: Stripe response type:", typeof stripeData);
+      console.log("🔍 AuthContext: Stripe response keys:", Object.keys(stripeData));
 
       const hasActiveSubscription = stripeData.status === 'active';
 
-      // Check form data
-      console.log("🔍 AuthContext: Checking form data for:", userEmail);
+      if (hasActiveSubscription) {
+        console.log("✅ AuthContext: User has active Stripe subscription - GRANTED ACCESS");
+        setAuthState({
+          isPrimaryUser: true, // Treat as primary user if they have active subscription
+          isSubUser: false,
+          hasActiveSubscription: true,
+          hasFormData: true,
+          isCheckComplete: true,
+          subscriptionData: stripeData
+        });
+        return;
+      }
+
+      // No active subscription found
+      console.log("❌ AuthContext: No active Stripe subscription found");
+      
+      // Check if they have form data (for better redirect UX)
       const formResponse = await fetch(`/api/registrationform?email=${encodeURIComponent(userEmail)}`);
       const hasFormData = formResponse.ok && (await formResponse.json()).data;
 
-      console.log("✅ AuthContext: Check complete:", {
-        isPrimaryUser,
-        isSubUser,
-        hasActiveSubscription,
-        hasFormData: !!hasFormData
-      });
-
       setAuthState({
-        isPrimaryUser: !!isPrimaryUser,
-        isSubUser: !!isSubUser,
-        hasActiveSubscription: !!hasActiveSubscription,
+        isPrimaryUser: false,
+        isSubUser: false,
+        hasActiveSubscription: false,
         hasFormData: !!hasFormData,
         isCheckComplete: true,
         subscriptionData: stripeData
@@ -180,8 +154,6 @@ export function useProtectedPage() {
     if (!auth.isLoading && auth.isCheckComplete) {
       console.log("🔍 ProtectedPage: Auth check complete:", {
         isAuthenticated: auth.isAuthenticated,
-        isPrimaryUser: auth.isPrimaryUser,
-        isSubUser: auth.isSubUser,
         hasActiveSubscription: auth.hasActiveSubscription,
         hasFormData: auth.hasFormData
       });
@@ -192,11 +164,9 @@ export function useProtectedPage() {
         return;
       }
 
-      // Check if user has access (either subscription or is sub-user)
-      const hasAccess = auth.isPrimaryUser || auth.isSubUser || auth.hasActiveSubscription;
-
-      if (!hasAccess) {
-        console.log("❌ ProtectedPage: No subscription access, checking form data");
+      // SIMPLIFIED: Only check if they have active Stripe subscription
+      if (!auth.hasActiveSubscription) {
+        console.log("❌ ProtectedPage: No active Stripe subscription");
         if (!auth.hasFormData) {
           console.log("❌ ProtectedPage: No form data, redirecting to subscribe");
           router.push("/subscribe");
@@ -205,6 +175,8 @@ export function useProtectedPage() {
           router.push("/subscribe?form_completed=1");
         }
         setShouldRedirect(true);
+      } else {
+        console.log("✅ ProtectedPage: Active subscription found - ACCESS GRANTED");
       }
     }
   }, [auth, router]);

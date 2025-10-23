@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import AppLayout from "@/app/components/applayout";
 import { useProtectedPage } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import USMap from "@/app/components/us-map";
 import { 
@@ -108,8 +109,12 @@ const reverseStateMap = Object.fromEntries(
 );
 
 const HomePage = () => {
+  // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
   const auth = useProtectedPage();
   const router = useRouter();
+  const { isSubscriptionManager, isChecking } = useSubscriptionManagerRedirect();
+  
+  // All useState hooks
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [stateMetricsData, setStateMetricsData] = useState<any>(null);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
@@ -144,93 +149,7 @@ const HomePage = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
 
-  // CSV Export utility function
-  const exportToCSV = (data: any[], filename: string = 'recent_rate_changes.csv') => {
-    if (!data || data.length === 0) {
-      alert('No data to export');
-      return;
-    }
-
-    // Define CSV headers
-    const headers = [
-      'Service Code',
-      'Service Description',
-      'State',
-      'Service Category',
-      'Old Rate',
-      'New Rate',
-      'Percentage Change',
-      'Effective Date',
-      'Provider Type',
-      'Change Type'
-    ];
-
-    // Convert data to CSV format
-    const csvContent = [
-      headers.join(','),
-      ...data.map(item => [
-        `"${item.serviceCode || ''}"`,
-        `"${(item.serviceDescription || '').replace(/"/g, '""')}"`, // Escape quotes
-        `"${item.state || ''}"`,
-        `"${item.serviceCategory || ''}"`,
-        `"${item.oldRate || ''}"`,
-        `"${item.newRate || ''}"`,
-        `"${item.percentageChange || 0}"`,
-        `"${item.effectiveDate || ''}"`,
-        `"${item.providerType || ''}"`,
-        `"${item.isChange ? 'Rate Change' : 'Latest Rate'}"`
-      ].join(','))
-    ].join('\n');
-
-    // Create and download the file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // CSV Download handler
-  const handleDownloadCSV = () => {
-    if (!filteredRateChanges || filteredRateChanges.length === 0) {
-      alert('No data to export. Please select a state first.');
-      return;
-    }
-
-    setIsExporting(true);
-    setExportProgress(0);
-
-    // Simulate progress
-    const progressInterval = setInterval(() => {
-      setExportProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + 10;
-      });
-    }, 100);
-
-    // Export the data
-    setTimeout(() => {
-      const filename = selectedState 
-        ? `recent_rate_changes_${selectedState.replace(/\s+/g, '_')}.csv`
-        : 'recent_rate_changes.csv';
-      
-      exportToCSV(filteredRateChanges, filename);
-      
-      setExportProgress(100);
-      setTimeout(() => {
-        setIsExporting(false);
-        setExportProgress(0);
-      }, 500);
-    }, 1000);
-  };
-
+  // ALL useEffect hooks
   // Fetch state metrics data on component mount
   useEffect(() => {
     const fetchStateMetrics = async () => {
@@ -317,208 +236,7 @@ const HomePage = () => {
     }
   }, [auth.isAuthenticated, router]);
 
-  // Show loading or return null while redirecting
-  if (!auth.isAuthenticated) {
-    return null;
-  }
-
-  const handleStateSelect = (stateName: string | null) => {
-    // If clicking the same state, deselect it
-    if (selectedState === stateName) {
-      setSelectedState(null);
-      setAlertData(null);
-    } else {
-      // Select the new state (this will automatically deselect the previous one)
-      setSelectedState(stateName);
-      if (stateName) {
-        fetchAlertData(stateName);
-      }
-    }
-    // Reset pagination when state changes
-    setCurrentPage(1);
-  };
-
-  // Fetch alert data for a specific state
-  const fetchAlertData = async (stateName: string) => {
-    setIsLoadingAlerts(true);
-    try {
-      const response = await fetch(`/api/state-alerts?state=${encodeURIComponent(stateName)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setAlertData(data);
-        console.log('✅ Alert data loaded for', stateName, ':', data);
-      } else {
-        console.error('Failed to fetch alert data for', stateName);
-        setAlertData(null);
-      }
-    } catch (error) {
-      console.error('Error fetching alert data:', error);
-      setAlertData(null);
-    } finally {
-      setIsLoadingAlerts(false);
-    }
-  };
-
-  // Get state statistics using compressed metrics data
-  const getStateStatistics = (stateName: string | null) => {
-    if (!stateName) {
-      return {
-        totalServices: "15,234",
-        latestDate: "2024-07-01",
-        changes30Days: "142",
-        changes90Days: "389",
-        openAlerts: "0"
-      };
-    }
-    
-    if (!stateMetricsData || isLoadingMetrics) {
-      return {
-        totalServices: "Loading...",
-        latestDate: "Loading...",
-        changes30Days: "Loading...",
-        changes90Days: "Loading...",
-        openAlerts: isLoadingAlerts ? "Loading..." : "0"
-      };
-    }
-    
-    // Extract state data from compressed metrics using the correct decompression pattern
-    let stateData: any = null;
-    
-    // Handle the compressed format with proper mapping reversal
-    if (stateMetricsData.m && stateMetricsData.d && stateMetricsData.s) {
-      // Find state index
-      const stateIndex = stateMetricsData.s.findIndex((s: string) => 
-        s.toUpperCase() === stateName.toUpperCase()
-      );
-      
-      if (stateIndex !== -1) {
-        const { m: mappings, d: stateDataArrays } = stateMetricsData;
-        
-        // Helper function to reverse mapping lookup
-        const getRealValue = (metricType: string, compressedValue: number) => {
-          if (!mappings[metricType] || compressedValue === undefined) return null;
-          
-          // Find the real value by reversing the mapping
-          const realValue = Object.keys(mappings[metricType]).find(
-            key => mappings[metricType][key] === compressedValue
-          );
-          
-          return realValue || null;
-        };
-        
-        // Get compressed values for this state
-        const uniqueServiceCodesCompressed = stateDataArrays.unique_service_codes?.[stateIndex];
-        const latestDateCompressed = stateDataArrays.latest_rate_effective_date?.[stateIndex];
-        const allRateDatesCompressed = stateDataArrays.all_rate_dates?.[stateIndex];
-        const rateChangesCompressed = stateDataArrays.rate_changes_by_date?.[stateIndex];
-        
-        // Decompress using correct mapping reversal
-        const uniqueServiceCodesRaw = getRealValue('unique_service_codes', uniqueServiceCodesCompressed);
-        const uniqueServiceCodes = uniqueServiceCodesRaw ? parseInt(uniqueServiceCodesRaw) : 0;
-        const latestRateEffectiveDate = getRealValue('latest_rate_effective_date', latestDateCompressed);
-        
-        // Handle all_rate_dates (array of dates)
-        let allRateDates: string[] = [];
-        if (allRateDatesCompressed !== undefined && mappings.all_rate_dates) {
-          // This should be an array of compressed indices that need to be decompressed
-          if (Array.isArray(allRateDatesCompressed)) {
-            allRateDates = allRateDatesCompressed
-              .map(compressedIndex => getRealValue('all_rate_dates', compressedIndex))
-              .filter(date => date !== null) as string[];
-          }
-        }
-        
-        // Handle rate_changes_by_date (array of change objects)
-        let rateChangesByDate: Array<{date: string, count: number}> = [];
-        if (rateChangesCompressed !== undefined && Array.isArray(rateChangesCompressed)) {
-          rateChangesByDate = rateChangesCompressed
-            .map(change => {
-              if (typeof change === 'object' && change.date !== undefined && change.count !== undefined) {
-                // Decompress the date using the rate_changes_by_date_dates mapping
-                const realDate = getRealValue('rate_changes_by_date_dates', change.date);
-                const realCount = change.count; // Count is already a number
-                return realDate ? { date: realDate, count: realCount } : null;
-              }
-              return null;
-            })
-            .filter(change => change !== null) as Array<{date: string, count: number}>;
-        }
-        
-        stateData = {
-          unique_service_codes: uniqueServiceCodes || 0,
-          latest_rate_effective_date: latestRateEffectiveDate || '',
-          all_rate_dates: allRateDates,
-          rate_changes_by_date: rateChangesByDate
-        };
-      }
-    } else if (stateMetricsData[stateName.toUpperCase()]) {
-      // Direct object format (fallback)
-      stateData = stateMetricsData[stateName.toUpperCase()];
-    }
-    
-    if (!stateData) {
-      // Fallback to dummy data if state not found
-      const stateSeed = stateName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      const random = (min: number, max: number) => {
-        const x = Math.sin(stateSeed) * 10000;
-        return Math.floor((x - Math.floor(x)) * (max - min + 1)) + min;
-      };
-      
-      return {
-        totalServices: random(50, 500).toString(),
-        latestDate: "2024-07-01",
-        changes30Days: random(20, 200).toString(),
-        changes90Days: random(100, 500).toString(),
-        openAlerts: "0" // Use 0 instead of random for openAlerts
-      };
-    }
-    
-    // Calculate 90-day changes
-    const currentDate = new Date();
-    const cutoffDate = new Date(currentDate);
-    cutoffDate.setDate(cutoffDate.getDate() - 90);
-    
-    const changes90Days = stateData.rate_changes_by_date
-      ?.filter((change: any) => {
-        const changeDate = new Date(change.date);
-        return changeDate >= cutoffDate && changeDate <= currentDate;
-      })
-      ?.reduce((total: number, change: any) => total + (change.count || 0), 0) || 0;
-    
-    // Calculate 30-day changes
-    const cutoffDate30 = new Date(currentDate);
-    cutoffDate30.setDate(cutoffDate30.getDate() - 30);
-    
-    const changes30Days = stateData.rate_changes_by_date
-      ?.filter((change: any) => {
-        const changeDate = new Date(change.date);
-        return changeDate >= cutoffDate30 && changeDate <= currentDate;
-      })
-      ?.reduce((total: number, change: any) => total + (change.count || 0), 0) || 0;
-    
-    // Get alert count from real data
-    let openAlertsCount = 0;
-    if (alertData && !isLoadingAlerts) {
-      openAlertsCount = alertData.totalNewAlerts || 0;
-    } else if (isLoadingAlerts) {
-      return {
-        totalServices: (stateData.unique_service_codes || 0).toLocaleString(),
-        latestDate: stateData.latest_rate_effective_date || "2024-07-01",
-        changes30Days: changes30Days.toString(),
-        changes90Days: changes90Days.toString(),
-        openAlerts: "Loading..."
-      };
-    }
-
-    return {
-      totalServices: (stateData.unique_service_codes || 0).toLocaleString(),
-      latestDate: stateData.latest_rate_effective_date || "2024-07-01",
-      changes30Days: changes30Days.toString(),
-      changes90Days: changes90Days.toString(),
-      openAlerts: openAlertsCount.toString()
-    };
-  };
-
+  // ALL useMemo hooks
   // Get filtered rate changes based on selected state and filters
   const filteredRateChanges = useMemo(() => {
     if (!recentRateData || !recentRateData.changes) return [];
@@ -842,6 +560,316 @@ const HomePage = () => {
     
     return combined;
   }, [filteredRateDevelopments]);
+
+
+  // NOW ALL CONDITIONAL RETURNS AFTER ALL HOOKS
+  // Early return for authentication
+  if (!auth.isAuthenticated) {
+    return null;
+  }
+
+  // Show loading while checking role
+  if (isChecking) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid"></div>
+      </div>
+    );
+  }
+
+  // If subscription manager, they'll be redirected by the hook
+  if (isSubscriptionManager) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid"></div>
+      </div>
+    );
+  }
+
+  // CSV Export utility function
+  const exportToCSV = (data: any[], filename: string = 'recent_rate_changes.csv') => {
+    if (!data || data.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    // Define CSV headers
+    const headers = [
+      'Service Code',
+      'Service Description',
+      'State',
+      'Service Category',
+      'Old Rate',
+      'New Rate',
+      'Percentage Change',
+      'Effective Date',
+      'Provider Type',
+      'Change Type'
+    ];
+
+    // Convert data to CSV format
+    const csvContent = [
+      headers.join(','),
+      ...data.map(item => [
+        `"${item.serviceCode || ''}"`,
+        `"${(item.serviceDescription || '').replace(/"/g, '""')}"`, // Escape quotes
+        `"${item.state || ''}"`,
+        `"${item.serviceCategory || ''}"`,
+        `"${item.oldRate || ''}"`,
+        `"${item.newRate || ''}"`,
+        `"${item.percentageChange || 0}"`,
+        `"${item.effectiveDate || ''}"`,
+        `"${item.providerType || ''}"`,
+        `"${item.isChange ? 'Rate Change' : 'Latest Rate'}"`
+      ].join(','))
+    ].join('\n');
+
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // CSV Download handler
+  const handleDownloadCSV = () => {
+    if (!filteredRateChanges || filteredRateChanges.length === 0) {
+      alert('No data to export. Please select a state first.');
+      return;
+    }
+
+    setIsExporting(true);
+    setExportProgress(0);
+
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setExportProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 100);
+
+    // Export the data
+    setTimeout(() => {
+      const filename = selectedState 
+        ? `recent_rate_changes_${selectedState.replace(/\s+/g, '_')}.csv`
+        : 'recent_rate_changes.csv';
+      
+      exportToCSV(filteredRateChanges, filename);
+      
+      setExportProgress(100);
+      setTimeout(() => {
+        setIsExporting(false);
+        setExportProgress(0);
+      }, 500);
+    }, 1000);
+  };
+
+  const handleStateSelect = (stateName: string | null) => {
+    // If clicking the same state, deselect it
+    if (selectedState === stateName) {
+      setSelectedState(null);
+      setAlertData(null);
+    } else {
+      // Select the new state (this will automatically deselect the previous one)
+      setSelectedState(stateName);
+      if (stateName) {
+        fetchAlertData(stateName);
+      }
+    }
+    // Reset pagination when state changes
+    setCurrentPage(1);
+  };
+
+  // Fetch alert data for a specific state
+  const fetchAlertData = async (stateName: string) => {
+    setIsLoadingAlerts(true);
+    try {
+      const response = await fetch(`/api/state-alerts?state=${encodeURIComponent(stateName)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAlertData(data);
+        console.log('✅ Alert data loaded for', stateName, ':', data);
+      } else {
+        console.error('Failed to fetch alert data for', stateName);
+        setAlertData(null);
+      }
+    } catch (error) {
+      console.error('Error fetching alert data:', error);
+      setAlertData(null);
+    } finally {
+      setIsLoadingAlerts(false);
+    }
+  };
+
+  // Get state statistics using compressed metrics data
+  const getStateStatistics = (stateName: string | null) => {
+    if (!stateName) {
+      return {
+        totalServices: "15,234",
+        latestDate: "2024-07-01",
+        changes30Days: "142",
+        changes90Days: "389",
+        openAlerts: "0"
+      };
+    }
+    
+    if (!stateMetricsData || isLoadingMetrics) {
+      return {
+        totalServices: "Loading...",
+        latestDate: "Loading...",
+        changes30Days: "Loading...",
+        changes90Days: "Loading...",
+        openAlerts: isLoadingAlerts ? "Loading..." : "0"
+      };
+    }
+    
+    // Extract state data from compressed metrics using the correct decompression pattern
+    let stateData: any = null;
+    
+    // Handle the compressed format with proper mapping reversal
+    if (stateMetricsData.m && stateMetricsData.d && stateMetricsData.s) {
+      // Find state index
+      const stateIndex = stateMetricsData.s.findIndex((s: string) => 
+        s.toUpperCase() === stateName.toUpperCase()
+      );
+      
+      if (stateIndex !== -1) {
+        const { m: mappings, d: stateDataArrays } = stateMetricsData;
+        
+        // Helper function to reverse mapping lookup
+        const getRealValue = (metricType: string, compressedValue: number) => {
+          if (!mappings[metricType] || compressedValue === undefined) return null;
+          
+          // Find the real value by reversing the mapping
+          const realValue = Object.keys(mappings[metricType]).find(
+            key => mappings[metricType][key] === compressedValue
+          );
+          
+          return realValue || null;
+        };
+        
+        // Get compressed values for this state
+        const uniqueServiceCodesCompressed = stateDataArrays.unique_service_codes?.[stateIndex];
+        const latestDateCompressed = stateDataArrays.latest_rate_effective_date?.[stateIndex];
+        const allRateDatesCompressed = stateDataArrays.all_rate_dates?.[stateIndex];
+        const rateChangesCompressed = stateDataArrays.rate_changes_by_date?.[stateIndex];
+        
+        // Decompress using correct mapping reversal
+        const uniqueServiceCodesRaw = getRealValue('unique_service_codes', uniqueServiceCodesCompressed);
+        const uniqueServiceCodes = uniqueServiceCodesRaw ? parseInt(uniqueServiceCodesRaw) : 0;
+        const latestRateEffectiveDate = getRealValue('latest_rate_effective_date', latestDateCompressed);
+        
+        // Handle all_rate_dates (array of dates)
+        let allRateDates: string[] = [];
+        if (allRateDatesCompressed !== undefined && mappings.all_rate_dates) {
+          // This should be an array of compressed indices that need to be decompressed
+          if (Array.isArray(allRateDatesCompressed)) {
+            allRateDates = allRateDatesCompressed
+              .map(compressedIndex => getRealValue('all_rate_dates', compressedIndex))
+              .filter(date => date !== null) as string[];
+          }
+        }
+        
+        // Handle rate_changes_by_date (array of change objects)
+        let rateChangesByDate: Array<{date: string, count: number}> = [];
+        if (rateChangesCompressed !== undefined && Array.isArray(rateChangesCompressed)) {
+          rateChangesByDate = rateChangesCompressed
+            .map(change => {
+              if (typeof change === 'object' && change.date !== undefined && change.count !== undefined) {
+                // Decompress the date using the rate_changes_by_date_dates mapping
+                const realDate = getRealValue('rate_changes_by_date_dates', change.date);
+                const realCount = change.count; // Count is already a number
+                return realDate ? { date: realDate, count: realCount } : null;
+              }
+              return null;
+            })
+            .filter(change => change !== null) as Array<{date: string, count: number}>;
+        }
+        
+        stateData = {
+          unique_service_codes: uniqueServiceCodes || 0,
+          latest_rate_effective_date: latestRateEffectiveDate || '',
+          all_rate_dates: allRateDates,
+          rate_changes_by_date: rateChangesByDate
+        };
+      }
+    } else if (stateMetricsData[stateName.toUpperCase()]) {
+      // Direct object format (fallback)
+      stateData = stateMetricsData[stateName.toUpperCase()];
+    }
+    
+    if (!stateData) {
+      // Fallback to dummy data if state not found
+      const stateSeed = stateName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const random = (min: number, max: number) => {
+        const x = Math.sin(stateSeed) * 10000;
+        return Math.floor((x - Math.floor(x)) * (max - min + 1)) + min;
+      };
+      
+      return {
+        totalServices: random(50, 500).toString(),
+        latestDate: "2024-07-01",
+        changes30Days: random(20, 200).toString(),
+        changes90Days: random(100, 500).toString(),
+        openAlerts: "0" // Use 0 instead of random for openAlerts
+      };
+    }
+    
+    // Calculate 90-day changes
+    const currentDate = new Date();
+    const cutoffDate = new Date(currentDate);
+    cutoffDate.setDate(cutoffDate.getDate() - 90);
+    
+    const changes90Days = stateData.rate_changes_by_date
+      ?.filter((change: any) => {
+        const changeDate = new Date(change.date);
+        return changeDate >= cutoffDate && changeDate <= currentDate;
+      })
+      ?.reduce((total: number, change: any) => total + (change.count || 0), 0) || 0;
+    
+    // Calculate 30-day changes
+    const cutoffDate30 = new Date(currentDate);
+    cutoffDate30.setDate(cutoffDate30.getDate() - 30);
+    
+    const changes30Days = stateData.rate_changes_by_date
+      ?.filter((change: any) => {
+        const changeDate = new Date(change.date);
+        return changeDate >= cutoffDate30 && changeDate <= currentDate;
+      })
+      ?.reduce((total: number, change: any) => total + (change.count || 0), 0) || 0;
+    
+    // Get alert count from real data
+    let openAlertsCount = 0;
+    if (alertData && !isLoadingAlerts) {
+      openAlertsCount = alertData.totalNewAlerts || 0;
+    } else if (isLoadingAlerts) {
+      return {
+        totalServices: (stateData.unique_service_codes || 0).toLocaleString(),
+        latestDate: stateData.latest_rate_effective_date || "2024-07-01",
+        changes30Days: changes30Days.toString(),
+        changes90Days: changes90Days.toString(),
+        openAlerts: "Loading..."
+      };
+    }
+
+    return {
+      totalServices: (stateData.unique_service_codes || 0).toLocaleString(),
+      latestDate: stateData.latest_rate_effective_date || "2024-07-01",
+      changes30Days: changes30Days.toString(),
+      changes90Days: changes90Days.toString(),
+      openAlerts: openAlertsCount.toString()
+    };
+  };
+
 
   // Format date for rate developments
   const formatRateDevelopmentDate = (dateString: string | undefined) => {

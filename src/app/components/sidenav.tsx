@@ -54,6 +54,8 @@ const SideNav = ({
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const [rateDevMenuOpen, setRateDevMenuOpen] = useState(false);
   const [rateComparisonMenuOpen, setRateComparisonMenuOpen] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [roleCheckComplete, setRoleCheckComplete] = useState(false);
 
   // Check admin access
   const checkAdminAccess = async () => {
@@ -90,10 +92,38 @@ const SideNav = ({
     }
   };
 
+  // Check user role
+  const checkUserRole = async () => {
+    if (!user?.email) {
+      setRoleCheckComplete(true);
+      return;
+    }
+
+    try {
+      console.log("🔍 Checking user role for:", user.email);
+      const response = await fetch("/api/user-role");
+      const result = await response.json();
+      
+      if (response.ok) {
+        console.log("✅ User role retrieved:", result.role);
+        setUserRole(result.role);
+      } else {
+        console.log("❌ Failed to get user role:", result.error);
+        setUserRole(null);
+      }
+    } catch (error) {
+      console.log("❌ Error checking user role:", error);
+      setUserRole(null);
+    } finally {
+      setRoleCheckComplete(true);
+    }
+  };
+
   // Check admin access when user changes
   useEffect(() => {
     if (user?.email) {
       checkAdminAccess();
+      checkUserRole();
     }
   }, [user]);
 
@@ -178,73 +208,124 @@ const SideNav = ({
             <ul className="space-y-2">
               {/* Home */}
               <li className="group">
-                <Link
-                  href="/home"
-                  onClick={() => setActiveTab("home")}
-                  className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
-                    activeTab === "home" ? "bg-gray-200/20" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-center w-6 h-6">
-                    <Home size={20} />
+                {userRole === 'subscription_manager' ? (
+                  <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Home size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Home
+                    </span>
                   </div>
-                  <span
-                    className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
-                      isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                ) : (
+                  <Link
+                    href="/home"
+                    onClick={() => setActiveTab("home")}
+                    className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                      activeTab === "home" ? "bg-gray-200/20" : ""
                     }`}
-                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
-                    Home
-                  </span>
-                </Link>
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Home size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Home
+                    </span>
+                  </Link>
+                )}
               </li>
               <li className="group">
-                <Link
-                  href="/dashboard"
-                  onClick={() => setActiveTab("dashboard")}
-                  className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
-                    activeTab === "dashboard" ? "bg-gray-200/20" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-center w-6 h-6">
-                    <Table2 size={20} />
+                {userRole === 'subscription_manager' ? (
+                  <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Table2 size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Dashboard
+                    </span>
                   </div>
-                  <span
-                    className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
-                      isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                ) : (
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setActiveTab("dashboard")}
+                    className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                      activeTab === "dashboard" ? "bg-gray-200/20" : ""
                     }`}
-                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
-                    Dashboard
-                  </span>
-                </Link>
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Table2 size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Dashboard
+                    </span>
+                  </Link>
+                )}
               </li>
               {/* State Rate Comparison with submenu */}
               <li className="group">
-                <Link
-                  href="/state-rate-comparison"
-                  onClick={() => setRateComparisonMenuOpen(open => !open)}
-                  className={`flex items-center w-full p-4 hover:bg-gray-200/20 transition-colors cursor-pointer focus:outline-none ${
-                    pathname.startsWith("/state-rate-comparison") ? "bg-gray-200/20" : ""
-                  }`}
-                  aria-expanded={rateComparisonMenuOpen}
-                  aria-controls="state-rate-comparison-submenu"
-                >
-                  <div className="flex items-center justify-center w-6 h-6">
-                    <ChartColumnStacked size={20} />
+                {userRole === 'subscription_manager' ? (
+                  <div className="flex items-center w-full p-4 opacity-50 cursor-not-allowed">
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <ChartColumnStacked size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      State Rate Comparison
+                    </span>
+                    <span className="ml-auto">
+                      <ChevronRight size={18} />
+                    </span>
                   </div>
-                  <span
-                    className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
-                      isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                ) : (
+                  <Link
+                    href="/state-rate-comparison"
+                    onClick={() => setRateComparisonMenuOpen(open => !open)}
+                    className={`flex items-center w-full p-4 hover:bg-gray-200/20 transition-colors cursor-pointer focus:outline-none ${
+                      pathname.startsWith("/state-rate-comparison") ? "bg-gray-200/20" : ""
                     }`}
-                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    aria-expanded={rateComparisonMenuOpen}
+                    aria-controls="state-rate-comparison-submenu"
                   >
-                    State Rate Comparison
-                  </span>
-                  <span className="ml-auto">
-                    {rateComparisonMenuOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                  </span>
-                </Link>
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <ChartColumnStacked size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      State Rate Comparison
+                    </span>
+                    <span className="ml-auto">
+                      {rateComparisonMenuOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                    </span>
+                  </Link>
+                )}
                 {rateComparisonMenuOpen && !isSidebarCollapsed && (
                   <ul id="state-rate-comparison-submenu" className="ml-8 mt-1 space-y-1 bg-blue-900/80 rounded-lg py-2 shadow-lg">
                     <li>
@@ -277,70 +358,118 @@ const SideNav = ({
                 )}
               </li>
               <li className="group">
-                <Link
-                  href="/historical-rates"
-                  onClick={() => setActiveTab("historicalRates")}
-                  className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
-                    activeTab === "historicalRates" ? "bg-gray-200/20" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-center w-6 h-6">
-                    <ChartLine size={20} />
+                {userRole === 'subscription_manager' ? (
+                  <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <ChartLine size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Rate History
+                    </span>
                   </div>
-                  <span
-                    className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
-                      isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                ) : (
+                  <Link
+                    href="/historical-rates"
+                    onClick={() => setActiveTab("historicalRates")}
+                    className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                      activeTab === "historicalRates" ? "bg-gray-200/20" : ""
                     }`}
-                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
-                    Rate History
-                  </span>
-                </Link>
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <ChartLine size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Rate History
+                    </span>
+                  </Link>
+                )}
               </li>
               {/* Rate Developments */}
               <li className="group">
-                <Link
-                  href="/rate-developments"
-                  onClick={() => setActiveTab("rateDevelopments")}
-                  className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
-                    activeTab === "rateDevelopments" ? "bg-gray-200/20" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-center w-6 h-6">
-                    <Megaphone size={20} />
+                {userRole === 'subscription_manager' ? (
+                  <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Megaphone size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Rate Developments
+                    </span>
                   </div>
-                  <span
-                    className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
-                      isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                ) : (
+                  <Link
+                    href="/rate-developments"
+                    onClick={() => setActiveTab("rateDevelopments")}
+                    className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                      activeTab === "rateDevelopments" ? "bg-gray-200/20" : ""
                     }`}
-                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
-                    Rate Developments
-                  </span>
-                </Link>
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Megaphone size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Rate Developments
+                    </span>
+                  </Link>
+                )}
               </li>
               
               {/* Documents */}
               <li className="group">
-                <Link
-                  href="/documents"
-                  onClick={() => setActiveTab("documents")}
-                  className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
-                    activeTab === "documents" ? "bg-gray-200/20" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-center w-6 h-6">
-                    <FileText size={20} />
+                {userRole === 'subscription_manager' ? (
+                  <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <FileText size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Documents
+                    </span>
                   </div>
-                  <span
-                    className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
-                      isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                ) : (
+                  <Link
+                    href="/documents"
+                    onClick={() => setActiveTab("documents")}
+                    className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                      activeTab === "documents" ? "bg-gray-200/20" : ""
                     }`}
-                    style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                   >
-                    Documents
-                  </span>
-                </Link>
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <FileText size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Documents
+                    </span>
+                  </Link>
+                )}
               </li>
               
               {/* Settings */}
