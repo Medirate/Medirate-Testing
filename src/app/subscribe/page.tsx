@@ -54,7 +54,7 @@ const StripePricingTableWithFooter = () => {
   });
   const [selectedRole, setSelectedRole] = useState<'user' | 'subscription_manager' | null>(null);
   const [showRoleSelection, setShowRoleSelection] = useState(false);
-  const [isTestMode, setIsTestMode] = useState(process.env.NODE_ENV === 'development');
+  const [isTestMode, setIsTestMode] = useState(true); // Show test mode in production for now
   const [loading, setLoading] = useState(false);
   const [formFilled, setFormFilled] = useState(false);
   const [isFormPreFilled, setIsFormPreFilled] = useState(false);
@@ -1615,8 +1615,8 @@ const StripePricingTableWithFooter = () => {
           </div>
         )}
 
-        {/* Test Mode Toggle - Only in Development */}
-        {process.env.NODE_ENV === 'development' && (
+        {/* Test Mode Toggle - Show in Production for now */}
+        {(
           <div className="w-full max-w-4xl mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
@@ -1666,10 +1666,10 @@ const StripePricingTableWithFooter = () => {
             MozUserSelect: "auto"
           }}>
           {React.createElement("stripe-pricing-table", {
-              "pricing-table-id": (process.env.NODE_ENV === 'development' && isTestMode)
+              "pricing-table-id": isTestMode
                 ? "prctbl_1SKcum2NeWrBDfGsTeavkMMT" // Test pricing table ID
                 : "prctbl_1RBMKo2NeWrBDfGslMwYkTKz",
-              "publishable-key": (process.env.NODE_ENV === 'development' && isTestMode)
+              "publishable-key": isTestMode
                 ? "pk_test_51QXT6G2NeWrBDfGs1x7v1DgpvI2XDgWhGMH3nmSH5njuB69GHp7yGL7251F7X5TDB2VFZbEdVzf95GNqX0sRKrkF007PMhgJXG" // Test publishable key
                 : "pk_live_51QXT6G2NeWrBDfGsjthMPwaWhPV7UIzSJjZ3fpmANYKT58UCVSnoHaHKyozK9EptYNbV3Y1y5SX1QQcuI9dK5pZW00VQH9T3Hh",
           })}
