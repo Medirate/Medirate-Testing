@@ -61,11 +61,11 @@ export async function POST(req: Request) {
         const specificCustomer = await stripe.customers.retrieve("cus_THEBRqdqJDorFN");
         console.log("🔍 Stripe API: Found customer by ID:", { 
           id: specificCustomer.id, 
-          email: specificCustomer.email 
+          email: specificCustomer.deleted ? 'deleted' : specificCustomer.email 
         });
         
         // If we found the customer by ID, use that instead
-        if (specificCustomer.email === email) {
+        if (!specificCustomer.deleted && specificCustomer.email === email) {
           console.log("✅ Stripe API: Customer found by ID, using that customer");
           customer = specificCustomer;
         } else {

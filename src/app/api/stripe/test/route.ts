@@ -25,7 +25,7 @@ export async function GET() {
       const specificCustomer = await stripe.customers.retrieve("cus_THEBRqdqJDorFN");
       console.log("🔍 Stripe Test: Found customer by ID:", { 
         id: specificCustomer.id, 
-        email: specificCustomer.email 
+        email: specificCustomer.deleted ? 'deleted' : specificCustomer.email 
       });
     } catch (idError) {
       console.log("❌ Stripe Test: Could not find customer by ID:", idError);
