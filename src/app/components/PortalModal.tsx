@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface PortalModalProps {
@@ -12,9 +12,15 @@ interface PortalModalProps {
 
 export default function PortalModal({ isOpen, onClose, children, className = '' }: PortalModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return;
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || !mounted) return;
 
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -28,20 +34,27 @@ export default function PortalModal({ isOpen, onClose, children, className = '' 
       }
     };
 
-    document.addEventListener('keydown', handleEscape);
-    document.addEventListener('mousedown', handleClickOutside);
+    // Add a small delay to ensure DOM is ready
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('keydown', handleEscape);
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
 
     // Prevent body scroll
     document.body.style.overflow = 'hidden';
 
     return () => {
+      clearTimeout(timeoutId);
       document.removeEventListener('keydown', handleEscape);
       document.removeEventListener('mousedown', handleClickOutside);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, mounted]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
+
+  // Ensure document.body exists before creating portal
+  if (typeof window === 'undefined' || !document.body) return null;
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">

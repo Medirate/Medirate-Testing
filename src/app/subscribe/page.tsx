@@ -312,14 +312,19 @@ const StripePricingTableWithFooter = () => {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Show role confirmation dialog for first-time submission
-    if (!formSubmitted && formData.accountRole) {
-      setShowRoleConfirmation(true);
-      return;
+    try {
+      // Show role confirmation dialog for first-time submission
+      if (!formSubmitted && formData.accountRole) {
+        setShowRoleConfirmation(true);
+        return;
+      }
+      
+      // Proceed with actual form submission
+      await submitForm();
+    } catch (error) {
+      console.error('Form submission error:', error);
+      // Handle error gracefully
     }
-    
-    // Proceed with actual form submission
-    await submitForm();
   };
 
   const submitForm = async () => {
@@ -399,9 +404,14 @@ const StripePricingTableWithFooter = () => {
     }
   };
 
-  const handleConfirmRole = () => {
-    setShowRoleConfirmation(false);
-    submitForm();
+  const handleConfirmRole = async () => {
+    try {
+      setShowRoleConfirmation(false);
+      await submitForm();
+    } catch (error) {
+      console.error('Error confirming role:', error);
+      setShowRoleConfirmation(false);
+    }
   };
 
   const handleCancelRole = () => {
@@ -425,6 +435,15 @@ const StripePricingTableWithFooter = () => {
     };
 
     testTableDetection();
+  }, []);
+
+  // Cleanup effect to ensure modals are closed on unmount
+  useEffect(() => {
+    return () => {
+      setShowTerms(false);
+      setShowServiceAgreement(false);
+      setShowRoleConfirmation(false);
+    };
   }, []);
 
   // Removed subscription checking - allow all users to subscribe
@@ -1699,11 +1718,13 @@ const StripePricingTableWithFooter = () => {
 
       {/* Subscription Terms and Conditions Modal */}
       <SubscriptionTermsModal 
+        key="terms-modal"
         isOpen={showTerms} 
         onClose={() => setShowTerms(false)} 
       />
 
       <ServiceAgreementModal 
+        key="service-agreement-modal"
         isOpen={showServiceAgreement} 
         onClose={() => setShowServiceAgreement(false)}
         onAccept={() => setServiceAgreementAccepted(true)}
@@ -1713,7 +1734,7 @@ const StripePricingTableWithFooter = () => {
 
       {/* Role Confirmation Modal */}
       {showRoleConfirmation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div key="role-confirmation-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
             <div className="flex items-center mb-4">
               <div className="flex-shrink-0">
