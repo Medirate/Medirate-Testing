@@ -856,7 +856,7 @@ const StripePricingTableWithFooter = () => {
                       <li><strong>Subscription Manager:</strong> Manages billing and user access only (cannot use application features)</li>
                       <li><strong>Primary User:</strong> Full access to application features and can manage users</li>
                       <li><strong>Secondary User:</strong> Full access to application features (managed by Subscription Manager or Primary User)</li>
-                    </ul>
+              </ul>
                   </div>
 
                   <div>
@@ -1094,9 +1094,9 @@ const StripePricingTableWithFooter = () => {
                   type="text"
                   name="companyName"
                   value={formData.companyName}
-                    onChange={handleFormChange}
+                  onChange={handleFormChange}
                     disabled={formSubmitted}
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 />
               </div>
@@ -1105,9 +1105,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="companyType"
                   value={formData.companyType}
-                    onChange={handleFormChange}
+                  onChange={handleFormChange}
                     disabled={formSubmitted}
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="">Select Company Type</option>
@@ -1142,9 +1142,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="howDidYouHear"
                   value={formData.howDidYouHear}
-                    onChange={handleFormChange}
+                  onChange={handleFormChange}
                     disabled={formSubmitted}
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="">Select how you heard about MediRate</option>
@@ -1159,9 +1159,9 @@ const StripePricingTableWithFooter = () => {
                 <textarea
                   name="interest"
                   value={formData.interest}
-                    onChange={handleFormChange}
+                  onChange={handleFormChange}
                     disabled={formSubmitted}
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   rows={4}
                   required
                 />
@@ -1171,9 +1171,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="demoRequest"
                   value={formData.demoRequest}
-                    onChange={handleFormChange}
+                  onChange={handleFormChange}
                     disabled={formSubmitted}
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="No">No</option>
@@ -1315,9 +1315,9 @@ const StripePricingTableWithFooter = () => {
                   type="text"
                   name="companyName"
                   value={formData.companyName}
-                    onChange={handleFormChange}
+                  onChange={handleFormChange}
                     disabled={formSubmitted}
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 />
               </div>
@@ -1326,9 +1326,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="companyType"
                   value={formData.companyType}
-                    onChange={handleFormChange}
+                  onChange={handleFormChange}
                     disabled={formSubmitted}
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="">Select Company Type</option>
@@ -1363,9 +1363,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="howDidYouHear"
                   value={formData.howDidYouHear}
-                    onChange={handleFormChange}
+                  onChange={handleFormChange}
                     disabled={formSubmitted}
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="">Select how you heard about MediRate</option>
@@ -1380,9 +1380,9 @@ const StripePricingTableWithFooter = () => {
                 <textarea
                   name="interest"
                   value={formData.interest}
-                    onChange={handleFormChange}
+                  onChange={handleFormChange}
                     disabled={formSubmitted}
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   rows={4}
                   required
                 />
@@ -1392,9 +1392,9 @@ const StripePricingTableWithFooter = () => {
                 <select
                   name="demoRequest"
                   value={formData.demoRequest}
-                    onChange={handleFormChange}
+                  onChange={handleFormChange}
                     disabled={formSubmitted}
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
                   required
                 >
                   <option value="No">No</option>

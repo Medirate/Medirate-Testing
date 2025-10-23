@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+// Use test key for now since we're in test mode
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY_TEST || process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-02-24.acacia",
 });
 
@@ -15,6 +16,7 @@ export async function POST(req: Request) {
     console.log("🔍 Stripe API: Starting subscription check for email:", email);
     console.log("🔍 Stripe API: Stripe secret key exists:", !!process.env.STRIPE_SECRET_KEY);
     console.log("🔍 Stripe API: Stripe secret key starts with:", process.env.STRIPE_SECRET_KEY?.substring(0, 7));
+    console.log("🔍 Stripe API: Using test mode:", process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_'));
 
     if (!email) {
       return NextResponse.json({ error: "Email is required." }, { status: 400 });
@@ -51,9 +53,13 @@ export async function POST(req: Request) {
       console.log("🔍 Stripe API: Let's check if there are any customers at all...");
       
       // Debug: Check if there are any customers in the account
-      const allCustomers = await stripe.customers.list({ limit: 5 });
+      const allCustomers = await stripe.customers.list({ limit: 10 });
       console.log("🔍 Stripe API: Total customers in account:", allCustomers.data.length);
-      console.log("🔍 Stripe API: Sample customer emails:", allCustomers.data.map(c => c.email));
+      console.log("🔍 Stripe API: Recent customers:", allCustomers.data.map(c => ({ 
+        email: c.email, 
+        created: new Date(c.created * 1000).toISOString(),
+        id: c.id 
+      })));
       
       // Try to find the specific customer by ID from the image (cus_THEBRqdqJDorFN)
       try {
