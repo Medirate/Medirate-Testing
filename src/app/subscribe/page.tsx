@@ -6,6 +6,7 @@ import Footer from "@/app/components/footer";
 import { CreditCard, CheckCircle, Mail, Shield, ArrowLeft } from "lucide-react"; // Added new icons
 import SubscriptionTermsModal from '@/app/components/SubscriptionTermsModal';
 import ServiceAgreementModal from '@/app/components/ServiceAgreementModal';
+import RoleConfirmationModal from '@/app/components/RoleConfirmationModal';
 import MockStripeCard from '@/app/components/MockStripeCard';
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -315,13 +316,16 @@ const StripePricingTableWithFooter = () => {
     try {
       // Show role confirmation dialog for first-time submission
       if (!formSubmitted && formData.accountRole) {
-        // Close any other modals first
+        // Close any other modals first and wait for DOM to settle
         setShowTerms(false);
         setShowServiceAgreement(false);
-        // Small delay to ensure DOM is clean
-        setTimeout(() => {
-          setShowRoleConfirmation(true);
-        }, 50);
+        
+        // Use requestAnimationFrame to ensure DOM is ready
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setShowRoleConfirmation(true);
+          });
+        });
         return;
       }
       
@@ -412,7 +416,12 @@ const StripePricingTableWithFooter = () => {
 
   const handleConfirmRole = async () => {
     try {
+      // Close modal first
       setShowRoleConfirmation(false);
+      
+      // Wait for DOM to settle before form submission
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       await submitForm();
     } catch (error) {
       console.error('Error confirming role:', error);
@@ -1763,72 +1772,12 @@ const StripePricingTableWithFooter = () => {
       />
 
       {/* Role Confirmation Modal */}
-      {showRoleConfirmation && (
-        <div key="role-confirmation-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
-            <div className="flex items-center mb-4">
-              <div className="flex-shrink-0">
-                <Shield className="w-6 h-6 text-amber-600" />
-              </div>
-              <h3 className="ml-3 text-lg font-semibold text-gray-900">
-                Confirm Your Account Role
-              </h3>
-            </div>
-            
-            <div className="mb-6">
-              <p className="text-gray-600 mb-4">
-                You have selected <strong>{formData.accountRole === 'subscription_manager' ? 'Subscription Manager' : formData.accountRole === 'user' ? 'User Account' : 'Sub User'}</strong> as your account type.
-              </p>
-              
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <h4 className="font-semibold text-amber-800 mb-2">Important:</h4>
-                <ul className="text-sm text-amber-700 space-y-1">
-                  {formData.accountRole === 'subscription_manager' && (
-                    <>
-                      <li>• You will only manage billing and user access</li>
-                      <li>• You cannot use application features</li>
-                      <li>• You can add/remove users from your subscription</li>
-                    </>
-                  )}
-                  {formData.accountRole === 'user' && (
-                    <>
-                      <li>• You will have full access to all application features</li>
-                      <li>• You can manage other users in your subscription</li>
-                      <li>• You will use one slot in your subscription</li>
-                    </>
-                  )}
-                  {formData.accountRole === 'sub_user' && (
-                    <>
-                      <li>• You will have full access to application features</li>
-                      <li>• You cannot manage other users</li>
-                      <li>• You must be added by a Subscription Manager or Primary User</li>
-                    </>
-                  )}
-                </ul>
-              </div>
-              
-              <p className="text-sm text-gray-500 mt-3">
-                This choice will affect your login experience and application access. Are you sure you want to proceed?
-              </p>
-            </div>
-            
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={handleCancelRole}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmRole}
-                className="px-4 py-2 bg-[#012C61] text-white rounded-lg hover:bg-blue-800 transition-colors"
-              >
-                Yes, Proceed
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <RoleConfirmationModal
+        isOpen={showRoleConfirmation}
+        onClose={handleCancelRole}
+        onConfirm={handleConfirmRole}
+        accountRole={formData.accountRole || ''}
+      />
 
       {/* Toast Notifications */}
       <Toaster 
