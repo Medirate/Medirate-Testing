@@ -315,7 +315,13 @@ const StripePricingTableWithFooter = () => {
     try {
       // Show role confirmation dialog for first-time submission
       if (!formSubmitted && formData.accountRole) {
-        setShowRoleConfirmation(true);
+        // Close any other modals first
+        setShowTerms(false);
+        setShowServiceAgreement(false);
+        // Small delay to ensure DOM is clean
+        setTimeout(() => {
+          setShowRoleConfirmation(true);
+        }, 50);
         return;
       }
       
@@ -444,6 +450,46 @@ const StripePricingTableWithFooter = () => {
       setShowServiceAgreement(false);
       setShowRoleConfirmation(false);
     };
+  }, []);
+
+  // Prevent multiple modals from being open at the same time
+  useEffect(() => {
+    if (showTerms) {
+      setShowServiceAgreement(false);
+      setShowRoleConfirmation(false);
+    }
+  }, [showTerms]);
+
+  useEffect(() => {
+    if (showServiceAgreement) {
+      setShowTerms(false);
+      setShowRoleConfirmation(false);
+    }
+  }, [showServiceAgreement]);
+
+  useEffect(() => {
+    if (showRoleConfirmation) {
+      setShowTerms(false);
+      setShowServiceAgreement(false);
+    }
+  }, [showRoleConfirmation]);
+
+  // Global error handler for DOM manipulation errors
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      if (event.message.includes('insertBefore') || event.message.includes('Node')) {
+        console.warn('DOM manipulation error caught and handled:', event.message);
+        // Close all modals to reset state
+        setShowTerms(false);
+        setShowServiceAgreement(false);
+        setShowRoleConfirmation(false);
+        event.preventDefault();
+        return false;
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
   }, []);
 
   // Removed subscription checking - allow all users to subscribe
