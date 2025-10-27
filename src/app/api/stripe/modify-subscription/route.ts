@@ -52,17 +52,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No subscription items found' }, { status: 400 });
     }
 
-    // Update the subscription with the new price using Stripe's proration
-    const updatedSubscription = await stripe.subscriptions.update(subscription.id, {
-      items: [{
-        id: currentItem.id,
-        price: newPriceId,
-      }],
-      proration_behavior: 'none' as Stripe.SubscriptionUpdateParams.ProrationBehavior,
-    });
+    // Get the actual amount that was charged (from the latest invoice)
+    let actualChargedAmount = 0;
+    try {
+      const latestInvoice = await stripe.invoices.retrieve(subscription.latest_invoice as string);
+      actualChargedAmount = latestInvoice.amount_paid || 0;
+    } catch (error) {
+      console.error('Could not get latest invoice:', error);
+    }
 
-    // Calculate and process manual refund for unused time
-    const currentPrice = currentItem.price.unit_amount || 0;
+    // Calculate refund amount based on actual charged amount
     const currentPeriodStart = subscription.current_period_start;
     const currentPeriodEnd = subscription.current_period_end;
     const now = Math.floor(Date.now() / 1000);
@@ -71,19 +70,25 @@ export async function POST(request: NextRequest) {
     const totalPeriodSeconds = currentPeriodEnd - currentPeriodStart;
     const unusedSeconds = currentPeriodEnd - now;
     
-    // Calculate refund amount (unused portion of current plan)
-    const refundAmount = Math.floor((currentPrice * unusedSeconds) / totalPeriodSeconds);
+    // Calculate refund amount (unused portion of actual charged amount)
+    const refundAmount = actualChargedAmount > 0 ? Math.floor((actualChargedAmount * unusedSeconds) / totalPeriodSeconds) : 0;
     
-    // Process refund if there's unused amount
+    // Process refund BEFORE updating subscription
     if (refundAmount > 0) {
       try {
-        // Get the latest invoice to find the payment intent
-        const latestInvoice = await stripe.invoices.retrieve(subscription.latest_invoice as string);
+        // Get all invoices for this subscription to find the original payment
+        const invoices = await stripe.invoices.list({
+          subscription: subscription.id,
+          limit: 10,
+        });
         
-        if (latestInvoice.payment_intent && typeof latestInvoice.payment_intent === 'string') {
+        // Find the most recent paid invoice (original subscription payment)
+        const paidInvoice = invoices.data.find(inv => inv.status === 'paid' && inv.amount_paid > 0);
+        
+        if (paidInvoice && paidInvoice.payment_intent && typeof paidInvoice.payment_intent === 'string') {
           // Create refund for unused amount
-          await stripe.refunds.create({
-            payment_intent: latestInvoice.payment_intent,
+          const refund = await stripe.refunds.create({
+            payment_intent: paidInvoice.payment_intent,
             amount: refundAmount,
             reason: 'requested_by_customer',
             metadata: {
@@ -93,12 +98,23 @@ export async function POST(request: NextRequest) {
               unused_days: Math.floor(unusedSeconds / (24 * 60 * 60)),
             },
           });
+          
+          console.log('Refund created:', refund.id, 'Amount:', refundAmount);
         }
       } catch (refundError) {
         console.error('Refund creation failed:', refundError);
         // Continue even if refund fails
       }
     }
+
+    // Update the subscription with the new price (no proration)
+    const updatedSubscription = await stripe.subscriptions.update(subscription.id, {
+      items: [{
+        id: currentItem.id,
+        price: newPriceId,
+      }],
+      proration_behavior: 'none' as Stripe.SubscriptionUpdateParams.ProrationBehavior,
+    });
 
     return NextResponse.json({
       success: true,
