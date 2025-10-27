@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { email, newPriceId, prorationBehavior = 'create_prorations' } = await request.json();
+    const { email, newPriceId } = await request.json();
 
     if (!email || !newPriceId) {
       return NextResponse.json({ error: 'Email and new price ID are required' }, { status: 400 });
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         id: currentItem.id,
         price: newPriceId,
       }],
-      proration_behavior: prorationBehavior as Stripe.SubscriptionUpdateParams.ProrationBehavior,
+      proration_behavior: 'always_invoice' as Stripe.SubscriptionUpdateParams.ProrationBehavior,
     });
 
     return NextResponse.json({

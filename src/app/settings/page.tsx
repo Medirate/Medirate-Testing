@@ -97,8 +97,7 @@ function SettingsSubscription({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           email: auth.userEmail,
-          newPriceId: newPriceId,
-          prorationBehavior: 'create_prorations'
+          newPriceId: newPriceId
         })
       });
 
