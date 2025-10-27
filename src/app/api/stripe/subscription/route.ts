@@ -152,6 +152,8 @@ export async function POST(req: Request) {
           ? subscription.latest_invoice.id
           : subscription.latest_invoice || "N/A",
       paymentMethod: paymentMethod ? paymentMethod.type : "N/A",
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      currentPeriodEnd: subscription.current_period_end,
     });
   } catch (error: unknown) {
     console.error("❌ Stripe API: Subscription Fetch Error:", error);

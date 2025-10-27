@@ -18,6 +18,21 @@ interface SubscriptionData {
   trialEndDate: string | null;
   latestInvoice: string;
   paymentMethod: string;
+  cancelAtPeriodEnd?: boolean;
+  currentPeriodEnd?: number;
+}
+
+interface AvailablePlan {
+  id: string;
+  amount: number;
+  currency: string;
+  interval: string;
+  intervalCount: number;
+  product: {
+    id: string;
+    name: string;
+    description: string | null;
+  };
 }
 
 // Sub-user aware subscription component for settings
@@ -52,6 +67,69 @@ function SettingsSubscription({
   const [canceling, setCanceling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelSuccess, setCancelSuccess] = useState(false);
+  const [availablePlans, setAvailablePlans] = useState<AvailablePlan[]>([]);
+  const [showPlanChangeModal, setShowPlanChangeModal] = useState(false);
+  const [changingPlan, setChangingPlan] = useState(false);
+  const [planChangeError, setPlanChangeError] = useState<string | null>(null);
+  const [planChangeSuccess, setPlanChangeSuccess] = useState(false);
+
+  const fetchAvailablePlans = async () => {
+    try {
+      const response = await fetch("/api/stripe/modify-subscription");
+      if (response.ok) {
+        const data = await response.json();
+        setAvailablePlans(data.plans || []);
+      }
+    } catch (error) {
+      console.error("Error fetching available plans:", error);
+    }
+  };
+
+  const handlePlanChange = async (newPriceId: string) => {
+    if (!auth.userEmail) return;
+    
+    setChangingPlan(true);
+    setPlanChangeError(null);
+    
+    try {
+      const response = await fetch("/api/stripe/modify-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          email: auth.userEmail,
+          newPriceId: newPriceId,
+          prorationBehavior: 'create_prorations'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to change subscription plan");
+      }
+
+      const result = await response.json();
+      setPlanChangeSuccess(true);
+      setShowPlanChangeModal(false);
+      
+      // Refresh subscription data to show updated plan
+      await fetchSubscriptionData(auth.userEmail);
+      
+    } catch (err) {
+      console.error("Error changing plan:", err);
+      setPlanChangeError(err instanceof Error ? err.message : "Failed to change subscription plan");
+    } finally {
+      setChangingPlan(false);
+    }
+  };
+
+  const getDaysRemaining = () => {
+    if (!subscriptionData?.currentPeriodEnd) return null;
+    const now = new Date();
+    const endDate = new Date(subscriptionData.currentPeriodEnd * 1000);
+    const diffTime = endDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(0, diffDays);
+  };
 
   const fetchSubscriptionData = async (email: string) => {
     try {
@@ -112,6 +190,13 @@ function SettingsSubscription({
 
     checkSubUserStatusAndFetchSubscription();
   }, [auth.isAuthenticated, auth.userEmail]);
+
+  // Fetch available plans when component mounts
+  useEffect(() => {
+    if (auth.isAuthenticated && !showUserManagement) {
+      fetchAvailablePlans();
+    }
+  }, [auth.isAuthenticated, showUserManagement]);
 
   const handleCancelSubscription = async () => {
     if (!auth.userEmail) return;
@@ -360,6 +445,17 @@ function SettingsSubscription({
                           <p className="text-sm text-gray-500">End Date</p>
                           <p className="font-medium text-gray-900">{subscriptionData.endDate}</p>
                         </div>
+                        {getDaysRemaining() !== null && (
+                          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-sm text-blue-600 font-medium">
+                              {subscriptionData.cancelAtPeriodEnd ? (
+                                <>⏰ Subscription ends in <span className="font-bold">{getDaysRemaining()} days</span></>
+                              ) : (
+                                <>📅 <span className="font-bold">{getDaysRemaining()} days</span> remaining in current period</>
+                              )}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -888,6 +984,34 @@ function SettingsSubscription({
                   </div>
                 </div>
 
+                {/* Plan Change Section */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <h4 className="text-sm font-medium text-blue-800">Change Subscription Plan</h4>
+                      <p className="mt-1 text-sm text-blue-700">
+                        Switch between monthly and yearly billing or change your plan. Changes take effect immediately with prorated billing.
+                      </p>
+                      <div className="mt-4">
+                        <button
+                          onClick={() => setShowPlanChangeModal(true)}
+                          className="inline-flex items-center px-4 py-2 border border-blue-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                          </svg>
+                          Change Plan
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Subscription Cancellation Section */}
                 <div className="bg-red-50 border border-red-200 rounded-lg p-6">
                   <div className="flex items-start">
@@ -961,6 +1085,82 @@ function SettingsSubscription({
                     {cancelError && (
                       <div className="mt-2 px-4 py-2 bg-red-50 border border-red-200 rounded-md">
                         <p className="text-sm text-red-600">{cancelError}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Plan Change Modal */}
+            {showPlanChangeModal && (
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-medium text-gray-900">Change Subscription Plan</h3>
+                      <button
+                        onClick={() => setShowPlanChangeModal(false)}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <p className="text-sm text-gray-600">
+                        Choose a new subscription plan. Changes take effect immediately with prorated billing.
+                      </p>
+                      
+                      {availablePlans.length > 0 ? (
+                        <div className="grid gap-4">
+                          {availablePlans.map((plan) => (
+                            <div
+                              key={plan.id}
+                              className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                                subscriptionData?.billingInterval === plan.interval
+                                  ? 'border-blue-500 bg-blue-50'
+                                  : 'border-gray-200 hover:border-blue-300'
+                              }`}
+                              onClick={() => handlePlanChange(plan.id)}
+                            >
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <h4 className="font-medium text-gray-900">{plan.product.name}</h4>
+                                  <p className="text-sm text-gray-600">
+                                    ${(plan.amount / 100).toFixed(2)} / {plan.interval}
+                                  </p>
+                                </div>
+                                <div className="text-right">
+                                  {subscriptionData?.billingInterval === plan.interval && (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                      Current Plan
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <p className="text-gray-500">Loading available plans...</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {planChangeError && (
+                      <div className="mt-4 px-4 py-2 bg-red-50 border border-red-200 rounded-md">
+                        <p className="text-sm text-red-600">{planChangeError}</p>
+                      </div>
+                    )}
+                    
+                    {changingPlan && (
+                      <div className="mt-4 flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                        <span className="ml-2 text-sm text-gray-600">Changing plan...</span>
                       </div>
                     )}
                   </div>
