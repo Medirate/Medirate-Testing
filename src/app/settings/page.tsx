@@ -5,7 +5,6 @@ import AppLayout from "@/app/components/applayout";
 import EmailPreferences from "@/app/email-preferences/page";
 import Profile from "@/app/profile/page";
 import Subscription from "@/app/subscription/page";
-import ServiceAgreementModal from "@/app/components/ServiceAgreementModal";
 import { useRequireSubscription } from "@/hooks/useRequireAuth";
 
 interface SubscriptionData {
@@ -1045,7 +1044,7 @@ export default function Settings() {
   const [roleCheckComplete, setRoleCheckComplete] = useState(false);
 
   const [activeTab, setActiveTab] = useState("profile");
-  const [showServiceAgreement, setShowServiceAgreement] = useState(false);
+  const [showServiceAgreement, setShowServiceAgreement] = useState(false); // Removed - ServiceAgreementModal deleted
   
   // Subscription management state
   const [subscriptionUsers, setSubscriptionUsers] = useState<any[]>([]);
@@ -1309,14 +1308,7 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Service Agreement Modal */}
-      <ServiceAgreementModal 
-        isOpen={showServiceAgreement} 
-        onClose={() => setShowServiceAgreement(false)}
-        onAccept={() => setShowServiceAgreement(false)}
-        customerName={auth.userEmail || "[Customer Name]"}
-        subscriptionType="annual" // This could be dynamic based on user's actual subscription
-      />
+      {/* Service Agreement Modal - Removed since ServiceAgreementModal was deleted */}
     </AppLayout>
   );
 }
