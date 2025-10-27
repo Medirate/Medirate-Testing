@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
     try {
       const emailData = {
         to: [{ email: testEmail }],
-        sender: { email: "contact@MediRate.net", name: "MediRate Test" },
+        sender: { email: "contact@medirate.net", name: "MediRate Test" },
         subject: "Test Email from MediRate Admin",
         htmlContent: `
           <html>

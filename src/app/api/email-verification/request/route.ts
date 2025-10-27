@@ -5,11 +5,12 @@ import { createServiceClient } from "@/lib/supabase";
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
-const SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || "contact@MediRate.net";
+const SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || "gnersess@medirate.net";
 const SENDER_NAME = process.env.BREVO_SENDER_NAME || "MediRate";
-const COOLDOWN_SECONDS = parseInt(process.env.EMAIL_VERIFICATION_COOLDOWN || '15');
-const IP_WINDOW_SECONDS = parseInt(process.env.EMAIL_VERIFICATION_IP_WINDOW || '900'); // 15 minutes
-const IP_WINDOW_LIMIT = parseInt(process.env.EMAIL_VERIFICATION_IP_LIMIT || '10');
+const COOLDOWN_SECONDS = parseInt(process.env.EMAIL_VERIFICATION_COOLDOWN || '60'); // Increased to 1 minute
+const IP_WINDOW_SECONDS = parseInt(process.env.EMAIL_VERIFICATION_IP_WINDOW || '3600'); // 1 hour
+const IP_WINDOW_LIMIT = parseInt(process.env.EMAIL_VERIFICATION_IP_LIMIT || '5'); // Reduced to 5 per hour
+const EMAIL_DAILY_LIMIT = parseInt(process.env.EMAIL_DAILY_LIMIT || '10'); // Max 10 emails per day per email
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -79,6 +80,21 @@ export async function POST(req: NextRequest) {
       console.error('IP throttle check failed:', throttleErr);
     }
 
+    // Check daily email limit per email address
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const { data: todayEmails } = await supabase
+      .from('email_verifications')
+      .select('updated_at')
+      .eq('email', email.toLowerCase())
+      .gte('updated_at', `${today}T00:00:00.000Z`)
+      .lt('updated_at', `${today}T23:59:59.999Z`);
+
+    if (todayEmails && todayEmails.length >= EMAIL_DAILY_LIMIT) {
+      return NextResponse.json({ 
+        error: `Daily email limit reached (${EMAIL_DAILY_LIMIT} per day). Try again tomorrow.` 
+      }, { status: 429 });
+    }
+
     // Rate-limit by email using updated_at
     const { data: existing } = await supabase
       .from('email_verifications')
@@ -136,6 +152,10 @@ export async function POST(req: NextRequest) {
       tags: ["email-verification"],
     };
 
+    console.log(`📧 Attempting to send email to ${email} via Brevo...`);
+    console.log(`🔑 Using API key: ${BREVO_API_KEY ? 'Present' : 'Missing'}`);
+    console.log(`📤 Email data:`, JSON.stringify(emailData, null, 2));
+
     const response = await fetch(BREVO_API_URL, {
       method: "POST",
       headers: {
@@ -145,6 +165,8 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(emailData),
     });
 
+    console.log(`📡 Brevo API Response Status: ${response.status}`);
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`❌ Brevo API Error: ${response.status} ${errorText}`);
@@ -153,6 +175,7 @@ export async function POST(req: NextRequest) {
 
     const responseData = await response.json();
     console.log(`✅ Email sent successfully to ${email}, Brevo response:`, responseData);
+    console.log(`📨 Message ID: ${responseData.messageId}`);
     return NextResponse.json({ success: true, messageId: responseData.messageId });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Unknown error" }, { status: 500 });

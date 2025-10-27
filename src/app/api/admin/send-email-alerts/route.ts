@@ -469,7 +469,7 @@ export async function POST(req: NextRequest) {
       try {
         const emailData = {
           to: [{ email }],
-          sender: { email: "contact@MediRate.net", name: "MediRate" },
+          sender: { email: "contact@medirate.net", name: "MediRate" },
           subject: `New Medicaid Alerts Relevant to You - ${relevantAlerts.length} Updates`,
           htmlContent: htmlContent
         };

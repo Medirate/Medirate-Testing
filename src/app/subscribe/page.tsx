@@ -32,7 +32,6 @@ const StripePricingTableWithFooter = () => {
   const [verificationError, setVerificationError] = useState("");
   const [verificationSuccess, setVerificationSuccess] = useState("");
   const [cooldownTimer, setCooldownTimer] = useState<number>(0);
-  const [debugSteps, setDebugSteps] = useState<string[]>([]);
   // resend cooldown UI
   const [resendCooldown, setResendCooldown] = useState<number>(0);
   useEffect(() => {
@@ -497,35 +496,24 @@ const StripePricingTableWithFooter = () => {
 
   // Email verification functions (real via Brevo-backed API)
   const handleSendVerificationCode = async () => {
-    // Clear previous debug steps
-    setDebugSteps([]);
-    const addStep = (step: string) => {
-      setDebugSteps(prev => [...prev, `${new Date().toLocaleTimeString()}: ${step}`]);
-    };
-
     if (!emailToVerify) {
       setVerificationError("Please enter an email address");
       return;
     }
 
-    addStep(`📧 Email entered: ${emailToVerify}`);
-
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailToVerify)) {
       setVerificationError("Please enter a valid email address");
-      addStep("❌ Email validation failed");
       return;
     }
-
-    addStep("✅ Email validation passed");
 
     setIsVerifying(true);
     setVerificationError("");
     setVerificationSuccess("");
 
     try {
-      addStep("🚀 Sending request to API...");
+      console.log("🚀 Sending verification email to:", emailToVerify);
       
       const res = await fetch('/api/email-verification/request', {
         method: 'POST',
@@ -533,32 +521,32 @@ const StripePricingTableWithFooter = () => {
         body: JSON.stringify({ email: emailToVerify })
       });
       
-      addStep(`📡 API Response Status: ${res.status}`);
+      console.log("📡 API Response Status:", res.status);
       
       const data = await res.json();
-      addStep(`📦 API Response Data: ${JSON.stringify(data)}`);
+      console.log("📦 API Response Data:", data);
       
       if (!res.ok || !data.success) {
         // Handle rate limiting with a more user-friendly message
         if (res.status === 429 && data.error?.includes('Please wait')) {
           setVerificationError(data.error);
-          addStep(`⏰ Rate limited: ${data.error}`);
+          console.log("⏰ Rate limited:", data.error);
           // Extract cooldown time from error message
           const match = data.error.match(/(\d+)s/);
           if (match) {
             setCooldownTimer(parseInt(match[1]));
           }
         } else {
-          addStep(`❌ API Error: ${data.error}`);
+          console.log("❌ API Error:", data.error);
           throw new Error(data.error || 'Failed to send verification');
         }
         return;
       }
       
-      addStep("✅ API call successful");
+      console.log("✅ API call successful");
       
       if (data.messageId) {
-        addStep(`📨 Brevo Message ID: ${data.messageId}`);
+        console.log("📨 Brevo Message ID:", data.messageId);
       }
       
       setVerificationStep('code');
@@ -567,7 +555,6 @@ const StripePricingTableWithFooter = () => {
       setResendCooldown(60);
     } catch (error) {
       console.error("Error sending verification code:", error);
-      addStep(`❌ Error: ${error}`);
       setVerificationError("Failed to send verification code. Please try again.");
     } finally {
       setIsVerifying(false);
@@ -741,8 +728,8 @@ const StripePricingTableWithFooter = () => {
                   )}
                   <p className="text-sm mt-3">
                     <strong>Need assistance?</strong> If you have any questions or need support, please email us at{' '}
-                    <a href="mailto:contact@MediRate.net" className="text-amber-800 underline hover:text-amber-900">
-                      contact@MediRate.net
+                    <a href="mailto:contact@medirate.net" className="text-amber-800 underline hover:text-amber-900">
+                      contact@medirate.net
                     </a>
                   </p>
                 </div>
@@ -960,19 +947,6 @@ const StripePricingTableWithFooter = () => {
                 </div>
               )}
 
-              {/* Debug Steps Display */}
-              {debugSteps.length > 0 && (
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">🔍 Email Verification Steps:</h4>
-                  <div className="space-y-1">
-                    {debugSteps.map((step, index) => (
-                      <div key={index} className="text-xs text-gray-600 font-mono">
-                        {step}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
               
               <button
                 onClick={handleSendVerificationCode}

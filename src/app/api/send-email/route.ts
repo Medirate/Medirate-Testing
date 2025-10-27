@@ -3,7 +3,7 @@ import fetch from 'node-fetch';
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
-const CONTACT_EMAIL = 'contact@MediRate.net';
+const CONTACT_EMAIL = 'contact@medirate.net';
 
 // Additional recipients for contact us and support emails
 const ADDITIONAL_RECIPIENTS = [
