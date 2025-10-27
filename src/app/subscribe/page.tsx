@@ -32,6 +32,7 @@ const StripePricingTableWithFooter = () => {
   const [verificationError, setVerificationError] = useState("");
   const [verificationSuccess, setVerificationSuccess] = useState("");
   const [cooldownTimer, setCooldownTimer] = useState<number>(0);
+  const [debugSteps, setDebugSteps] = useState<string[]>([]);
   // resend cooldown UI
   const [resendCooldown, setResendCooldown] = useState<number>(0);
   useEffect(() => {
@@ -496,49 +497,77 @@ const StripePricingTableWithFooter = () => {
 
   // Email verification functions (real via Brevo-backed API)
   const handleSendVerificationCode = async () => {
+    // Clear previous debug steps
+    setDebugSteps([]);
+    const addStep = (step: string) => {
+      setDebugSteps(prev => [...prev, `${new Date().toLocaleTimeString()}: ${step}`]);
+    };
+
     if (!emailToVerify) {
       setVerificationError("Please enter an email address");
       return;
     }
 
+    addStep(`📧 Email entered: ${emailToVerify}`);
+
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailToVerify)) {
       setVerificationError("Please enter a valid email address");
+      addStep("❌ Email validation failed");
       return;
     }
+
+    addStep("✅ Email validation passed");
 
     setIsVerifying(true);
     setVerificationError("");
     setVerificationSuccess("");
 
     try {
+      addStep("🚀 Sending request to API...");
+      
       const res = await fetch('/api/email-verification/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailToVerify })
       });
+      
+      addStep(`📡 API Response Status: ${res.status}`);
+      
       const data = await res.json();
+      addStep(`📦 API Response Data: ${JSON.stringify(data)}`);
+      
       if (!res.ok || !data.success) {
         // Handle rate limiting with a more user-friendly message
         if (res.status === 429 && data.error?.includes('Please wait')) {
           setVerificationError(data.error);
+          addStep(`⏰ Rate limited: ${data.error}`);
           // Extract cooldown time from error message
           const match = data.error.match(/(\d+)s/);
           if (match) {
             setCooldownTimer(parseInt(match[1]));
           }
         } else {
+          addStep(`❌ API Error: ${data.error}`);
           throw new Error(data.error || 'Failed to send verification');
         }
         return;
       }
+      
+      addStep("✅ API call successful");
+      
+      if (data.messageId) {
+        addStep(`📨 Brevo Message ID: ${data.messageId}`);
+      }
+      
       setVerificationStep('code');
       setVerificationSuccess("Verification code sent! Check your email.");
       setTimeout(() => setVerificationSuccess(""), 3000);
       setResendCooldown(60);
     } catch (error) {
       console.error("Error sending verification code:", error);
+      addStep(`❌ Error: ${error}`);
       setVerificationError("Failed to send verification code. Please try again.");
     } finally {
       setIsVerifying(false);
@@ -629,55 +658,19 @@ const StripePricingTableWithFooter = () => {
     `;
     document.head.appendChild(style);
     
-    // Debug: Check for blocking elements and remove them
-    setTimeout(() => {
-      // Remove any loader overlays
-      const loaderOverlays = document.querySelectorAll('.loader-overlay');
-      loaderOverlays.forEach(overlay => {
-        console.log('🔥 Removing loader overlay:', overlay);
-        overlay.remove();
-      });
-      
-      // Check and fix React Hot Toast toaster
-      const toaster = document.getElementById('_rht_toaster');
-      if (toaster) {
-        console.log('🔥 Found React Hot Toast toaster blocking clicks:', toaster);
-        console.log('🔥 Toaster computed style:', window.getComputedStyle(toaster));
+      // Clean up blocking elements silently
+      setTimeout(() => {
+        // Remove any loader overlays
+        const loaderOverlays = document.querySelectorAll('.loader-overlay');
+        loaderOverlays.forEach(overlay => overlay.remove());
         
-        // Force fix the toaster
-        toaster.style.pointerEvents = 'none';
-        toaster.style.zIndex = '-1';
-        console.log('✅ Fixed toaster pointer events');
-      }
-      
-      // Find any modal backgrounds or overlays
-      const overlays = document.querySelectorAll('[style*="position: fixed"], .modal-backdrop, [class*="backdrop"]');
-      console.log('🔍 Found potential overlay elements:', overlays);
-      
-      // Check for elements with high z-index that might be blocking
-      const allElements = document.querySelectorAll('*');
-      const highZElements = Array.from(allElements).filter(el => {
-        const zIndex = window.getComputedStyle(el).zIndex;
-        const position = window.getComputedStyle(el).position;
-        return zIndex !== 'auto' && parseInt(zIndex) > 1000 && (position === 'fixed' || position === 'absolute');
-      });
-      console.log('🔍 Elements with high z-index:', highZElements);
-      
-      // Log high z-index elements for debugging (but don't remove them)
-      if (highZElements.length > 0) {
-        console.log('ℹ️ Found elements with high z-index (this is normal for navbar, etc.):', highZElements);
-      }
-      
-      // Add global click listener to detect any clicks
-      const clickListener = (e: MouseEvent) => {
-        console.log('🖱️ Click detected at:', e.clientX, e.clientY, 'on element:', e.target);
-      };
-      document.addEventListener('click', clickListener, true);
-      
-      return () => {
-        document.removeEventListener('click', clickListener, true);
-      };
-    }, 1000);
+        // Check and fix React Hot Toast toaster
+        const toaster = document.getElementById('_rht_toaster');
+        if (toaster) {
+          toaster.style.pointerEvents = 'none';
+          toaster.style.zIndex = '-1';
+        }
+      }, 1000);
     
     return () => {
       if (document.head.contains(style)) {
@@ -964,6 +957,20 @@ const StripePricingTableWithFooter = () => {
               {verificationError && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-md">
                   <p className="text-red-800 text-sm">{verificationError}</p>
+                </div>
+              )}
+
+              {/* Debug Steps Display */}
+              {debugSteps.length > 0 && (
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-md">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">🔍 Email Verification Steps:</h4>
+                  <div className="space-y-1">
+                    {debugSteps.map((step, index) => (
+                      <div key={index} className="text-xs text-gray-600 font-mono">
+                        {step}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               
