@@ -52,14 +52,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No subscription items found' }, { status: 400 });
     }
 
+    // Calculate proration manually
+    const currentPrice = currentItem.price.unit_amount || 0;
+    const newPrice = await stripe.prices.retrieve(newPriceId);
+    const newPriceAmount = newPrice.unit_amount || 0;
+    
+    // Get current period info
+    const currentPeriodStart = subscription.current_period_start;
+    const currentPeriodEnd = subscription.current_period_end;
+    const now = Math.floor(Date.now() / 1000);
+    
+    // Calculate unused time
+    const totalPeriodSeconds = currentPeriodEnd - currentPeriodStart;
+    const usedSeconds = now - currentPeriodStart;
+    const unusedSeconds = currentPeriodEnd - now;
+    
+    // Calculate refund amount (unused portion of current plan)
+    const refundAmount = Math.floor((currentPrice * unusedSeconds) / totalPeriodSeconds);
+    
     // Update the subscription with the new price
     const updatedSubscription = await stripe.subscriptions.update(subscription.id, {
       items: [{
         id: currentItem.id,
         price: newPriceId,
       }],
-      proration_behavior: 'always_invoice' as Stripe.SubscriptionUpdateParams.ProrationBehavior,
+      proration_behavior: 'none' as Stripe.SubscriptionUpdateParams.ProrationBehavior,
     });
+
+    // Issue manual refund if there's unused amount
+    if (refundAmount > 0) {
+      await stripe.refunds.create({
+        payment_intent: subscription.latest_invoice as string,
+        amount: refundAmount,
+        reason: 'requested_by_customer',
+        metadata: {
+          reason: 'subscription_plan_change',
+          old_plan: currentItem.price.id,
+          new_plan: newPriceId,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,
