@@ -5,7 +5,7 @@ import { createServiceClient } from "@/lib/supabase";
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
-const SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || "contact@medirate.net";
+const SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || "contact@MediRate.net";
 const SENDER_NAME = process.env.BREVO_SENDER_NAME || "MediRate";
 const COOLDOWN_SECONDS = parseInt(process.env.EMAIL_VERIFICATION_COOLDOWN || '60');
 const IP_WINDOW_SECONDS = parseInt(process.env.EMAIL_VERIFICATION_IP_WINDOW || '900'); // 15 minutes
