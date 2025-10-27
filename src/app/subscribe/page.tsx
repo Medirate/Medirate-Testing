@@ -31,6 +31,7 @@ const StripePricingTableWithFooter = () => {
   const [verificationStep, setVerificationStep] = useState<'email' | 'code' | 'complete'>('email');
   const [verificationError, setVerificationError] = useState("");
   const [verificationSuccess, setVerificationSuccess] = useState("");
+  const [cooldownTimer, setCooldownTimer] = useState<number>(0);
   // resend cooldown UI
   const [resendCooldown, setResendCooldown] = useState<number>(0);
   useEffect(() => {
@@ -38,6 +39,12 @@ const StripePricingTableWithFooter = () => {
     const t = setInterval(() => setResendCooldown((s) => (s > 0 ? s - 1 : 0)), 1000);
     return () => clearInterval(t);
   }, [resendCooldown]);
+
+  useEffect(() => {
+    if (cooldownTimer <= 0) return;
+    const t = setInterval(() => setCooldownTimer((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [cooldownTimer]);
   
   const [formData, setFormData] = useState({
     firstName: "",
@@ -513,7 +520,18 @@ const StripePricingTableWithFooter = () => {
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to send verification');
+        // Handle rate limiting with a more user-friendly message
+        if (res.status === 429 && data.error?.includes('Please wait')) {
+          setVerificationError(data.error);
+          // Extract cooldown time from error message
+          const match = data.error.match(/(\d+)s/);
+          if (match) {
+            setCooldownTimer(parseInt(match[1]));
+          }
+        } else {
+          throw new Error(data.error || 'Failed to send verification');
+        }
+        return;
       }
       setVerificationStep('code');
       setVerificationSuccess("Verification code sent! Check your email.");
@@ -951,10 +969,10 @@ const StripePricingTableWithFooter = () => {
               
               <button
                 onClick={handleSendVerificationCode}
-                disabled={isVerifying || !emailToVerify}
+                disabled={isVerifying || !emailToVerify || cooldownTimer > 0}
                 className="w-full bg-[#012C61] text-white px-6 py-3 rounded-lg transition-all duration-300 hover:bg-transparent hover:border hover:border-[#012C61] hover:text-[#012C61] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isVerifying ? "Sending..." : "Send Verification Code"}
+                {isVerifying ? "Sending..." : cooldownTimer > 0 ? `Wait ${cooldownTimer}s` : "Send Verification Code"}
               </button>
             </div>
           </div>
