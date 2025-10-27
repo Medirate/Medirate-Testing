@@ -82,6 +82,7 @@ function SettingsSubscription({
   } | null>(null);
   const [showCalculationModal, setShowCalculationModal] = useState(false);
   const [planChangeSuccess, setPlanChangeSuccess] = useState(false);
+  const [subscriptionReactivated, setSubscriptionReactivated] = useState(false);
 
   const fetchAvailablePlans = async () => {
     try {
@@ -162,6 +163,13 @@ function SettingsSubscription({
       }
 
       const result = await response.json();
+      
+      // Check if subscription was reactivated
+      if (result.reactivated) {
+        console.log('✅ Subscription reactivated and plan changed');
+        setSubscriptionReactivated(true);
+      }
+      
       setPlanChangeSuccess(true);
       setShowPlanChangeModal(false);
       
@@ -1049,7 +1057,10 @@ function SettingsSubscription({
                     <div className="ml-3 flex-1">
                       <h4 className="text-sm font-medium text-blue-800">Change Subscription Plan</h4>
                       <p className="mt-1 text-sm text-blue-700">
-                        Switch between monthly and yearly billing or change your plan. Changes take effect immediately with prorated billing.
+                        {subscriptionData?.cancelAtPeriodEnd 
+                          ? "Switch between monthly and yearly billing to reactivate your subscription. Changes take effect immediately with prorated billing."
+                          : "Switch between monthly and yearly billing or change your plan. Changes take effect immediately with prorated billing."
+                        }
                       </p>
                       <div className="mt-4">
                         <button
@@ -1059,7 +1070,7 @@ function SettingsSubscription({
                           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                           </svg>
-                          Change Plan
+                          {subscriptionData?.cancelAtPeriodEnd ? "Reactivate & Change Plan" : "Change Plan"}
                         </button>
                       </div>
                     </div>
@@ -1077,18 +1088,30 @@ function SettingsSubscription({
                     <div className="ml-3 flex-1">
                       <h4 className="text-sm font-medium text-red-800">Cancel Subscription</h4>
                       <p className="mt-1 text-sm text-red-700">
-                        If you need to cancel your subscription, you can do so here. You'll retain access until the end of your current billing period.
+                        {subscriptionData?.cancelAtPeriodEnd 
+                          ? "Your subscription is already scheduled for cancellation. You'll retain access until the end of your current billing period."
+                          : "If you need to cancel your subscription, you can do so here. You'll retain access until the end of your current billing period."
+                        }
                       </p>
                       <div className="mt-4">
-                        <button
-                          onClick={() => setShowCancelModal(true)}
-                          className="inline-flex items-center px-4 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
-                        >
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                          Cancel Subscription
-                        </button>
+                        {subscriptionData?.cancelAtPeriodEnd ? (
+                          <div className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-500 bg-gray-100 cursor-not-allowed">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Already Cancelled
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setShowCancelModal(true)}
+                            className="inline-flex items-center px-4 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Cancel Subscription
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1697,6 +1720,39 @@ export default function Settings() {
         <div className="bg-white rounded-xl shadow-lg p-6">
           {renderTabContent()}
         </div>
+
+        {/* Plan Change Success Message */}
+        {planChangeSuccess && (
+          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-green-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <h3 className="text-sm font-medium text-green-800">
+                  {subscriptionReactivated ? "Subscription Reactivated & Plan Changed!" : "Plan Changed Successfully!"}
+                </h3>
+                <p className="text-sm text-green-700 mt-1">
+                  {subscriptionReactivated 
+                    ? "Your subscription has been reactivated and your plan has been updated. You'll continue to have access to all features."
+                    : "Your subscription plan has been updated successfully. Changes take effect immediately."
+                  }
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setPlanChangeSuccess(false);
+                  setSubscriptionReactivated(false);
+                }}
+                className="ml-auto text-green-400 hover:text-green-600"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Service Agreement Modal - Removed since ServiceAgreementModal was deleted */}

@@ -108,13 +108,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Update the subscription with the new price (no proration)
-    const updatedSubscription = await stripe.subscriptions.update(subscription.id, {
+    // If subscription is cancelled, reactivate it by setting cancel_at_period_end to false
+    const updateParams: Stripe.SubscriptionUpdateParams = {
       items: [{
         id: currentItem.id,
         price: newPriceId,
       }],
       proration_behavior: 'none' as Stripe.SubscriptionUpdateParams.ProrationBehavior,
-    });
+    };
+
+    // If subscription is cancelled, reactivate it
+    if (subscription.cancel_at_period_end) {
+      updateParams.cancel_at_period_end = false;
+      console.log('🔄 Reactivating cancelled subscription');
+    }
+
+    const updatedSubscription = await stripe.subscriptions.update(subscription.id, updateParams);
 
     return NextResponse.json({
       success: true,
@@ -123,6 +132,7 @@ export async function POST(request: NextRequest) {
         status: updatedSubscription.status,
         current_period_end: updatedSubscription.current_period_end,
         current_period_start: updatedSubscription.current_period_start,
+        cancel_at_period_end: updatedSubscription.cancel_at_period_end,
         items: updatedSubscription.items.data.map(item => ({
           id: item.id,
           price: {
@@ -133,6 +143,7 @@ export async function POST(request: NextRequest) {
           },
         })),
       },
+      reactivated: subscription.cancel_at_period_end && !updatedSubscription.cancel_at_period_end,
     });
 
   } catch (error) {
