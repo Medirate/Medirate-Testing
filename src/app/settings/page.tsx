@@ -1094,75 +1094,96 @@ function SettingsSubscription({
 
             {/* Plan Change Modal */}
             {showPlanChangeModal && (
-              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-medium text-gray-900">Change Subscription Plan</h3>
-                      <button
-                        onClick={() => setShowPlanChangeModal(false)}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
+                  {/* Header */}
+                  <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                    <h3 className="text-xl font-semibold text-gray-900">Change Plan</h3>
+                    <button
+                      onClick={() => setShowPlanChangeModal(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="p-6">
+                    <p className="text-sm text-gray-600 mb-6">
+                      Choose your billing frequency. Changes take effect immediately with prorated billing.
+                    </p>
                     
-                    <div className="space-y-4">
-                      <p className="text-sm text-gray-600">
-                        Choose a new subscription plan. Changes take effect immediately with prorated billing.
-                      </p>
-                      
-                      {availablePlans.length > 0 ? (
-                        <div className="grid gap-4">
-                          {availablePlans.map((plan) => (
-                            <div
-                              key={plan.id}
-                              className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                                subscriptionData?.billingInterval === plan.interval
-                                  ? 'border-blue-500 bg-blue-50'
-                                  : 'border-gray-200 hover:border-blue-300'
-                              }`}
-                              onClick={() => handlePlanChange(plan.id)}
-                            >
-                              <div className="flex justify-between items-center">
-                                <div>
-                                  <h4 className="font-medium text-gray-900">{plan.product.name}</h4>
-                                  <p className="text-sm text-gray-600">
-                                    ${(plan.amount / 100).toFixed(2)} / {plan.interval}
-                                  </p>
-                                </div>
-                                <div className="text-right">
-                                  {subscriptionData?.billingInterval === plan.interval && (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                      Current Plan
-                                    </span>
-                                  )}
+                    {availablePlans.length > 0 ? (
+                      <div className="space-y-3">
+                        {availablePlans.map((plan) => (
+                          <div
+                            key={plan.id}
+                            className={`border-2 rounded-lg p-4 cursor-pointer transition-all duration-200 ${
+                              subscriptionData?.billingInterval === plan.interval
+                                ? 'border-[#012C61] bg-blue-50'
+                                : 'border-gray-200 hover:border-[#012C61] hover:bg-gray-50'
+                            }`}
+                            onClick={() => handlePlanChange(plan.id)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-3">
+                                  <div className={`w-4 h-4 rounded-full border-2 ${
+                                    subscriptionData?.billingInterval === plan.interval
+                                      ? 'border-[#012C61] bg-[#012C61]'
+                                      : 'border-gray-300'
+                                  }`}>
+                                    {subscriptionData?.billingInterval === plan.interval && (
+                                      <div className="w-2 h-2 bg-white rounded-full mx-auto mt-0.5"></div>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <h4 className="font-semibold text-gray-900 capitalize">
+                                      {plan.interval} Billing
+                                    </h4>
+                                    <p className="text-sm text-gray-600">
+                                      ${(plan.amount / 100).toFixed(2)} / {plan.interval}
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
+                              {subscriptionData?.billingInterval === plan.interval && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#012C61] text-white">
+                                  Current
+                                </span>
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8">
-                          <p className="text-gray-500">Loading available plans...</p>
-                        </div>
-                      )}
-                    </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#012C61] mx-auto mb-4"></div>
+                        <p className="text-gray-500">Loading plans...</p>
+                      </div>
+                    )}
                     
                     {planChangeError && (
-                      <div className="mt-4 px-4 py-2 bg-red-50 border border-red-200 rounded-md">
+                      <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
                         <p className="text-sm text-red-600">{planChangeError}</p>
                       </div>
                     )}
                     
                     {changingPlan && (
-                      <div className="mt-4 flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                        <span className="ml-2 text-sm text-gray-600">Changing plan...</span>
+                      <div className="mt-4 flex items-center justify-center space-x-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#012C61]"></div>
+                        <span className="text-sm text-gray-600">Updating plan...</span>
                       </div>
                     )}
+                  </div>
+                  
+                  {/* Footer */}
+                  <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-xl">
+                    <p className="text-xs text-gray-500 text-center">
+                      Changes are processed immediately with automatic proration
+                    </p>
                   </div>
                 </div>
               </div>
