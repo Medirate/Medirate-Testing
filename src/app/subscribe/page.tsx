@@ -5,7 +5,6 @@ import { Toaster, toast } from "react-hot-toast";
 import Footer from "@/app/components/footer";
 import { CreditCard, CheckCircle, Mail, Shield, ArrowLeft } from "lucide-react"; // Added new icons
 import SubscriptionTermsModal from '@/app/components/SubscriptionTermsModal';
-import ServiceAgreementModal from '@/app/components/ServiceAgreementModal';
 import RoleConfirmationModal from '@/app/components/RoleConfirmationModal';
 import MockStripeCard from '@/app/components/MockStripeCard';
 import { useAuth } from "@/context/AuthContext";
@@ -1727,13 +1726,10 @@ const StripePricingTableWithFooter = () => {
         onClose={() => setShowTerms(false)} 
       />
 
-      <ServiceAgreementModal 
+      <SubscriptionTermsModal 
         key="service-agreement-modal"
         isOpen={showServiceAgreement} 
         onClose={() => setShowServiceAgreement(false)}
-        onAccept={() => setServiceAgreementAccepted(true)}
-        customerName={formData.firstName && formData.lastName ? `${formData.firstName} ${formData.lastName}` : formData.companyName || "[Customer Name]"}
-        subscriptionType="annual" // This could be dynamic based on selected plan
       />
 
       {/* Role Confirmation Modal */}
