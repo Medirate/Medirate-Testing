@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({
             sender: {
               name: "MediRate",
-              email: "contact@medirate.net",
+              email: "contact@MediRate.net",
             },
             to: [{ email }],
             subject,

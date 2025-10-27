@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
-// Use appropriate Stripe key based on environment
-const isProduction = process.env.NODE_ENV === 'production';
-const stripeKey = process.env.STRIPE_SECRET_KEY; // Use the key from environment
-
-const stripe = new Stripe(stripeKey!, {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-02-24.acacia",
 });
 
@@ -17,10 +13,6 @@ export async function POST(req: Request) {
     const { email } = await req.json(); // Expect email from frontend
 
     console.log("🔍 Stripe API: Starting subscription check for email:", email);
-    console.log("🔍 Stripe API: Environment:", process.env.NODE_ENV);
-    console.log("🔍 Stripe API: Using production mode:", isProduction);
-    console.log("🔍 Stripe API: Stripe key starts with:", stripeKey?.substring(0, 7));
-    console.log("🔍 Stripe API: Using test key:", stripeKey?.startsWith('sk_test_'));
 
     if (!email) {
       return NextResponse.json({ error: "Email is required." }, { status: 400 });

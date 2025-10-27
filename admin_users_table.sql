@@ -55,9 +55,9 @@ CREATE TRIGGER update_admin_users_updated_at
 
 -- Insert some example admin users (replace with actual admin emails)
 -- INSERT INTO admin_users (email, role, permissions) VALUES 
---     ('admin@medirate.com', 'super_admin', '{"all": true}'),
---     ('support@medirate.com', 'support_admin', '{"user_management": true, "content_management": true}'),
---     ('analytics@medirate.com', 'analytics_admin', '{"analytics": true, "reports": true}');
+--     ('admin@MediRate.com', 'super_admin', '{"all": true}'),
+--     ('support@MediRate.com', 'support_admin', '{"user_management": true, "content_management": true}'),
+--     ('analytics@MediRate.com', 'analytics_admin', '{"analytics": true, "reports": true}');
 
 -- Grant necessary permissions to authenticated users for reading
 GRANT SELECT ON admin_users TO authenticated;

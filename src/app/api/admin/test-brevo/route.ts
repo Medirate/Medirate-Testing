@@ -8,8 +8,8 @@ export async function POST(req: NextRequest) {
     // Test email data
     const emailData = {
       to: [{ email: "test@example.com" }],
-      sender: { email: "contact@medirate.net", name: "Medirate Test" },
-      subject: "Test Email from Medirate Admin",
+      sender: { email: "contact@MediRate.net", name: "MediRate Test" },
+      subject: "Test Email from MediRate Admin",
       htmlContent: `
         <html>
           <body>

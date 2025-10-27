@@ -286,7 +286,7 @@ export default function SubscriptionPage() {
     }
     
     // For all other users, limit to 2 slots regardless of plan
-    if (plan === "Medirate Annual" || plan === "MediRate 3 Months" || plan === "Professional Plan") {
+    if (plan === "MediRate Annual" || plan === "MediRate 3 Months" || plan === "Professional Plan") {
       return 2; // All regular users get 2 slots maximum
     }
     

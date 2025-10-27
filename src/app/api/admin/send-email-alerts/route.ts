@@ -451,7 +451,7 @@ export async function POST(req: NextRequest) {
                   <!-- Dynamic Alert Cards -->
                   ${alertCardsHtml}
                   <div style="text-align:center; margin:30px 0;">
-                    <a href="https://medirate-developement.vercel.app/rate-developments" style="background:#0F3557; color:#fff; text-decoration:none; padding:14px 28px; border-radius:5px; font-weight:bold; font-size:16px; display:inline-block;">View Full Rate Developments</a>
+                    <a href="https://MediRate-developement.vercel.app/rate-developments" style="background:#0F3557; color:#fff; text-decoration:none; padding:14px 28px; border-radius:5px; font-weight:bold; font-size:16px; display:inline-block;">View Full Rate Developments</a>
                     </div>
                 </div>
                 <!-- Footer -->
@@ -469,7 +469,7 @@ export async function POST(req: NextRequest) {
       try {
         const emailData = {
           to: [{ email }],
-          sender: { email: "contact@medirate.net", name: "Medirate" },
+          sender: { email: "contact@MediRate.net", name: "MediRate" },
           subject: `New Medicaid Alerts Relevant to You - ${relevantAlerts.length} Updates`,
           htmlContent: htmlContent
         };

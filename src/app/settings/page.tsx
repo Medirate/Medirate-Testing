@@ -30,7 +30,8 @@ function SettingsSubscription({
   isRemovingUser, 
   addUserToSubscription, 
   removeUserFromSubscription,
-  userRole
+  userRole,
+  showUserManagement = false
 }: {
   subscriptionUsers: any[];
   newUserEmail: string;
@@ -40,6 +41,7 @@ function SettingsSubscription({
   addUserToSubscription: () => void;
   removeUserFromSubscription: (email: string) => void;
   userRole: string | null;
+  showUserManagement?: boolean;
 }) {
   const auth = useRequireSubscription();
   const [isSubUser, setIsSubUser] = useState(false);
@@ -168,9 +170,13 @@ function SettingsSubscription({
               </svg>
               <span className="text-sm font-medium text-blue-700">Sub-User Account</span>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Subscription Overview</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              {showUserManagement ? "Subscription Users" : "Subscription Overview"}
+            </h1>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              You're accessing this subscription through the primary account: <span className="font-semibold text-[#012C61]">{primaryUserEmail}</span>
+              {showUserManagement 
+                ? "View users attached to this subscription" 
+                : `You're accessing this subscription through the primary account: ${primaryUserEmail}`}
             </p>
           </div>
 
@@ -197,8 +203,12 @@ function SettingsSubscription({
               <div className="bg-gradient-to-r from-[#012C61] to-blue-700 px-8 py-6 text-white">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold mb-1">Account Information</h2>
-                    <p className="text-blue-100">Primary subscription details</p>
+                    <h2 className="text-2xl font-bold mb-1">
+                      {showUserManagement ? "Subscription Users" : "Account Information"}
+                    </h2>
+                    <p className="text-blue-100">
+                      {showUserManagement ? "View subscription users" : "Primary subscription details"}
+                    </p>
                   </div>
                   <div className="text-right">
                     <div className="inline-flex items-center px-3 py-1 bg-blue-600 bg-opacity-50 rounded-full">
@@ -209,36 +219,109 @@ function SettingsSubscription({
               </div>
 
               <div className="p-8">
-                {/* User Details Grid */}
-                <div className="grid md:grid-cols-2 gap-6 mb-8">
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Your Information</label>
-                      <div className="mt-2 space-y-2">
-                        <p className="text-lg font-medium text-gray-900">
-                          {auth.user?.given_name && auth.user?.family_name 
-                            ? `${auth.user.given_name} ${auth.user.family_name}` 
-                            : auth.user?.given_name || auth.user?.family_name || "User"}
-                        </p>
-                        <p className="text-gray-600 flex items-center">
-                          <span>{auth.userEmail}</span>
-                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            Sub-User
-                          </span>
+                {showUserManagement ? (
+                  // Sub-user User Management View (Read-only)
+                  <div>
+                    {/* User Management Header */}
+                    <div className="mb-8">
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">Subscription Users</h3>
+                      <p className="text-gray-600">
+                        View users who have access to this subscription. As a sub-user, you can only view this information.
+                      </p>
+                    </div>
+
+                    {/* Read-only notice */}
+                    <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-sm text-gray-600">
+                          As a sub-user, you can view subscription information but cannot add or remove users. 
+                          Contact your subscription manager or primary user for user management.
                         </p>
                       </div>
                     </div>
-                  </div>
-                  <div className="space-y-4">
+
+                    {/* Current Users List */}
                     <div>
-                      <label className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Primary Account</label>
-                      <div className="mt-2">
-                        <p className="text-lg font-medium text-gray-900">{primaryUserEmail}</p>
-                        <p className="text-gray-600">Subscription Manager</p>
+                      <h4 className="font-semibold text-gray-900 mb-3">Current Users</h4>
+                      <div className="space-y-2">
+                        {/* Show current user first */}
+                        <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div className="ml-3">
+                              <div className="text-sm font-medium text-gray-900">{auth.userEmail}</div>
+                              <div className="text-xs text-gray-500">Sub-User</div>
+                            </div>
+                          </div>
+                          <div className="text-xs text-blue-600 font-medium">You</div>
+                        </div>
+
+                        {/* Show other users */}
+                        {subscriptionUsers.length === 0 ? (
+                          <div className="text-gray-500 text-sm text-center py-4">
+                            No other users in this subscription.
+                          </div>
+                        ) : (
+                          subscriptionUsers.map((user, index) => (
+                            <div key={index} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3">
+                              <div className="flex items-center">
+                                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                  <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                                <div className="ml-3">
+                                  <div className="text-sm font-medium text-gray-900">{user.email}</div>
+                                  <div className="text-xs text-gray-500">Secondary User</div>
+                                </div>
+                              </div>
+                              <div className="text-xs text-gray-400">View Only</div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  // Sub-user Subscription Details View
+                  <div>
+                    {/* User Details Grid */}
+                    <div className="grid md:grid-cols-2 gap-6 mb-8">
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Your Information</label>
+                          <div className="mt-2 space-y-2">
+                            <p className="text-lg font-medium text-gray-900">
+                              {auth.user?.given_name && auth.user?.family_name 
+                                ? `${auth.user.given_name} ${auth.user.family_name}` 
+                                : auth.user?.given_name || auth.user?.family_name || "User"}
+                            </p>
+                            <p className="text-gray-600 flex items-center">
+                              <span>{auth.userEmail}</span>
+                              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                Sub-User
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Primary Account</label>
+                          <div className="mt-2">
+                            <p className="text-lg font-medium text-gray-900">{primaryUserEmail}</p>
+                            <p className="text-gray-600">Subscription Manager</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
                 {/* Subscription Details */}
                 <div className="border-t border-gray-200 pt-8">
@@ -315,6 +398,8 @@ function SettingsSubscription({
                     </div>
                   </div>
                 </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -368,9 +453,13 @@ function SettingsSubscription({
             </svg>
             <span className="text-sm font-medium text-green-700">Primary Account</span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Your Subscription</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {showUserManagement ? "Subscription Users" : "Your Subscription"}
+          </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Manage your subscription, billing details, and sub-user accounts
+            {showUserManagement 
+              ? "Manage users attached to your subscription" 
+              : "Manage your subscription, billing details, and sub-user accounts"}
           </p>
         </div>
 
@@ -397,8 +486,12 @@ function SettingsSubscription({
             <div className="bg-gradient-to-r from-[#012C61] to-blue-700 px-8 py-6 text-white">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold mb-1">Account Information</h2>
-                  <p className="text-blue-100">Primary subscription holder</p>
+                  <h2 className="text-2xl font-bold mb-1">
+                    {showUserManagement ? "Subscription Users" : "Account Information"}
+                  </h2>
+                  <p className="text-blue-100">
+                    {showUserManagement ? "Manage subscription users" : "Primary subscription holder"}
+                  </p>
                 </div>
                 <div className="text-right">
                   <div className="inline-flex items-center px-3 py-1 bg-green-600 bg-opacity-50 rounded-full">
@@ -409,36 +502,184 @@ function SettingsSubscription({
             </div>
 
             <div className="p-8">
-              {/* User Details Grid */}
-              <div className="grid md:grid-cols-2 gap-6 mb-8">
-                <div className="space-y-4">
+              {showUserManagement ? (
+                // User Management View
+                <div>
+                  {/* User Management Header */}
+                  <div className="mb-8">
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Subscription Users</h3>
+                    <p className="text-gray-600">
+                      Manage users who have access to your subscription. You can add or remove users as needed.
+                    </p>
+                  </div>
+
+                  {/* Subscription Slots Info */}
+                  <div className="mb-6">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                      <h4 className="font-semibold text-gray-900 mb-4">Subscription Slots</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-600">3</div>
+                          <div className="text-sm text-gray-600">Total Slots</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">
+                            {userRole === 'subscription_manager' 
+                              ? subscriptionUsers.length 
+                              : userRole === 'user' 
+                                ? subscriptionUsers.length + 1 // +1 for themselves
+                                : subscriptionUsers.length + 1 // +1 for primary user
+                            }
+                          </div>
+                          <div className="text-sm text-gray-600">Used Slots</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-600">
+                            {userRole === 'subscription_manager' 
+                              ? 3 - subscriptionUsers.length 
+                              : userRole === 'user' 
+                                ? 3 - (subscriptionUsers.length + 1)
+                                : 3 - (subscriptionUsers.length + 1)
+                            }
+                          </div>
+                          <div className="text-sm text-gray-600">Available Slots</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Add User Form - Only for managers and primary users */}
+                  {(userRole === 'subscription_manager' || userRole === 'user') && (
+                    <div className="mb-6">
+                      <h4 className="font-semibold text-gray-900 mb-3">Add User to Subscription</h4>
+                      <div className="flex gap-2">
+                        <input
+                          type="email"
+                          value={newUserEmail}
+                          onChange={(e) => setNewUserEmail(e.target.value)}
+                          placeholder="Enter user email address"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          onClick={addUserToSubscription}
+                          disabled={!newUserEmail.trim() || isAddingUser}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isAddingUser ? "Adding..." : "Add User"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Read-only notice for secondary users */}
+                  {userRole === 'sub_user' && (
+                    <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 text-gray-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        <p className="text-sm text-gray-600">
+                          As a secondary user, you can view subscription information but cannot add or remove users. 
+                          Contact your subscription manager or primary user for user management.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Current Users List */}
                   <div>
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Account Holder</label>
-                    <div className="mt-2 space-y-2">
-                      <p className="text-lg font-medium text-gray-900">
-                        {auth.user?.given_name && auth.user?.family_name 
-                          ? `${auth.user.given_name} ${auth.user.family_name}` 
-                          : auth.user?.given_name || auth.user?.family_name || "User"}
-                      </p>
-                      <p className="text-gray-600 flex items-center">
-                        <span>{auth.userEmail}</span>
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Primary
-                        </span>
-                      </p>
+                    <h4 className="font-semibold text-gray-900 mb-3">Current Users</h4>
+                    <div className="space-y-2">
+                      {/* Show current user first */}
+                      <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <div className="text-sm font-medium text-gray-900">{auth.userEmail}</div>
+                            <div className="text-xs text-gray-500">
+                              {userRole === 'subscription_manager' ? 'Subscription Manager' : 
+                               userRole === 'user' ? 'Primary User' : 'Secondary User'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-xs text-blue-600 font-medium">You</div>
+                      </div>
+
+                      {/* Show other users */}
+                      {subscriptionUsers.length === 0 ? (
+                        <div className="text-gray-500 text-sm text-center py-4">
+                          {userRole === 'subscription_manager' 
+                            ? "No secondary users added yet." 
+                            : "No other users in this subscription."}
+                        </div>
+                      ) : (
+                        subscriptionUsers.map((user, index) => (
+                          <div key={index} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3">
+                            <div className="flex items-center">
+                              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div className="ml-3">
+                                <div className="text-sm font-medium text-gray-900">{user.email}</div>
+                                <div className="text-xs text-gray-500">Secondary User</div>
+                              </div>
+                            </div>
+                            {(userRole === 'subscription_manager' || userRole === 'user') ? (
+                              <button
+                                onClick={() => removeUserFromSubscription(user.email)}
+                                disabled={isRemovingUser === user.email}
+                                className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md disabled:opacity-50"
+                              >
+                                {isRemovingUser === user.email ? "Removing..." : "Remove"}
+                              </button>
+                            ) : (
+                              <div className="text-xs text-gray-400">View Only</div>
+                            )}
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Account Type</label>
-                    <div className="mt-2">
-                      <p className="text-lg font-medium text-gray-900">Primary Subscription</p>
-                      <p className="text-gray-600">Full management access</p>
+              ) : (
+                // Subscription Details View
+                <div>
+                  {/* User Details Grid */}
+                  <div className="grid md:grid-cols-2 gap-6 mb-8">
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Account Holder</label>
+                        <div className="mt-2 space-y-2">
+                          <p className="text-lg font-medium text-gray-900">
+                            {auth.user?.given_name && auth.user?.family_name 
+                              ? `${auth.user.given_name} ${auth.user.family_name}` 
+                              : auth.user?.given_name || auth.user?.family_name || "User"}
+                          </p>
+                          <p className="text-gray-600 flex items-center">
+                            <span>{auth.userEmail}</span>
+                            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              Primary
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Account Type</label>
+                        <div className="mt-2">
+                          <p className="text-lg font-medium text-gray-900">Primary Subscription</p>
+                          <p className="text-gray-600">Full management access</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
               {/* Subscription Details */}
               <div className="border-t border-gray-200 pt-8">
@@ -676,6 +917,8 @@ function SettingsSubscription({
                   </div>
                 </div>
               </div>
+                </div>
+              )}
             </div>
 
             {/* Cancellation Modal */}
@@ -915,7 +1158,7 @@ export default function Settings() {
         return <Profile />;
       case "email-preferences":
         return <EmailPreferences />;
-      case "subscription":
+      case "manage-subscription":
         return (
           <SettingsSubscription 
             subscriptionUsers={subscriptionUsers}
@@ -926,6 +1169,21 @@ export default function Settings() {
             addUserToSubscription={addUserToSubscription}
             removeUserFromSubscription={removeUserFromSubscription}
             userRole={userRole}
+            showUserManagement={false}
+          />
+        );
+      case "manage-subscription-users":
+        return (
+          <SettingsSubscription 
+            subscriptionUsers={subscriptionUsers}
+            newUserEmail={newUserEmail}
+            setNewUserEmail={setNewUserEmail}
+            isAddingUser={isAddingUser}
+            isRemovingUser={isRemovingUser}
+            addUserToSubscription={addUserToSubscription}
+            removeUserFromSubscription={removeUserFromSubscription}
+            userRole={userRole}
+            showUserManagement={true}
           />
         );
       case "service-agreement":
@@ -975,7 +1233,7 @@ export default function Settings() {
                   Subscription Manager Access
                 </h3>
                 <p className="text-amber-700">
-                  Since you are logged in as a <strong>Subscription Manager</strong>, you can only have access to the settings page of the application. 
+                  Since you are logged in as a <strong>Subscription Manager</strong>, you only have access to the settings page of the application. 
                   You have been redirected here because subscription managers are restricted to account management functions only.
                 </p>
                 <div className="mt-3 text-sm text-amber-600">
@@ -1013,14 +1271,25 @@ export default function Settings() {
             Profile
           </button>
           <button
-            onClick={() => setActiveTab("subscription")}
+            onClick={() => setActiveTab("manage-subscription")}
             className={`px-4 py-2 text-sm font-medium ${
-              activeTab === "subscription"
+              activeTab === "manage-subscription"
                 ? "border-b-2 border-[#012C61] text-[#012C61]"
                 : "text-gray-500 hover:text-[#012C61]"
             }`}
           >
-            Subscription
+            Manage Subscription
+          </button>
+          {/* Show subscription users tab for all users, but with different access levels */}
+          <button
+            onClick={() => setActiveTab("manage-subscription-users")}
+            className={`px-4 py-2 text-sm font-medium ${
+              activeTab === "manage-subscription-users"
+                ? "border-b-2 border-[#012C61] text-[#012C61]"
+                : "text-gray-500 hover:text-[#012C61]"
+            }`}
+          >
+            Manage Subscription Users
           </button>
           <button
             onClick={() => setActiveTab("service-agreement")}

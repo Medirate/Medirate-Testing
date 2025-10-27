@@ -54,7 +54,6 @@ const StripePricingTableWithFooter = () => {
   });
   const [selectedRole, setSelectedRole] = useState<'user' | 'subscription_manager' | null>(null);
   const [showRoleSelection, setShowRoleSelection] = useState(false);
-  const [isTestMode, setIsTestMode] = useState(true); // Show test mode in production for now
   const [loading, setLoading] = useState(false);
   const [formFilled, setFormFilled] = useState(false);
   const [isFormPreFilled, setIsFormPreFilled] = useState(false);
@@ -732,8 +731,8 @@ const StripePricingTableWithFooter = () => {
                   )}
                   <p className="text-sm mt-3">
                     <strong>Need assistance?</strong> If you have any questions or need support, please email us at{' '}
-                    <a href="mailto:contact@medirate.net" className="text-amber-800 underline hover:text-amber-900">
-                      contact@medirate.net
+                    <a href="mailto:contact@MediRate.net" className="text-amber-800 underline hover:text-amber-900">
+                      contact@MediRate.net
                     </a>
                   </p>
                 </div>
@@ -1615,36 +1614,6 @@ const StripePricingTableWithFooter = () => {
           </div>
         )}
 
-        {/* Test Mode Toggle - Show in Production for now */}
-        {(
-          <div className="w-full max-w-4xl mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-yellow-800">🧪 Development Test Mode</h3>
-                <p className="text-sm text-yellow-700">
-                  Toggle between test and live pricing tables for testing
-                </p>
-              </div>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={isTestMode}
-                  onChange={(e) => setIsTestMode(e.target.checked)}
-                  className="w-4 h-4 text-blue-600"
-                />
-                <span className="text-sm font-medium text-yellow-800">Test Mode</span>
-              </label>
-            </div>
-            {isTestMode && (
-              <div className="mt-3 p-3 bg-yellow-100 border border-yellow-300 rounded">
-                <p className="text-xs text-yellow-800">
-                  <strong>Test Cards:</strong> 4242 4242 4242 4242 (success) | 4000 0000 0000 0002 (declined)
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Conditional Pricing Display */}
         {formSubmitted || (auth.isAuthenticated && formFilled) ? (
           /* Real Stripe Pricing Table - Only for users who completed the form */
@@ -1666,12 +1635,8 @@ const StripePricingTableWithFooter = () => {
             MozUserSelect: "auto"
           }}>
           {React.createElement("stripe-pricing-table", {
-              "pricing-table-id": isTestMode
-                ? "prctbl_1SKcum2NeWrBDfGsTeavkMMT" // Test pricing table ID
-                : "prctbl_1RBMKo2NeWrBDfGslMwYkTKz",
-              "publishable-key": isTestMode
-                ? "pk_test_51QXT6G2NeWrBDfGs1x7v1DgpvI2XDgWhGMH3nmSH5njuB69GHp7yGL7251F7X5TDB2VFZbEdVzf95GNqX0sRKrkF007PMhgJXG" // Test publishable key
-                : "pk_live_51QXT6G2NeWrBDfGsjthMPwaWhPV7UIzSJjZ3fpmANYKT58UCVSnoHaHKyozK9EptYNbV3Y1y5SX1QQcuI9dK5pZW00VQH9T3Hh",
+              "pricing-table-id": "prctbl_1RBMKo2NeWrBDfGslMwYkTKz",
+              "publishable-key": "pk_live_51QXT6G2NeWrBDfGsjthMPwaWhPV7UIzSJjZ3fpmANYKT58UCVSnoHaHKyozK9EptYNbV3Y1y5SX1QQcuI9dK5pZW00VQH9T3Hh",
           })}
           </div>
         </div>
