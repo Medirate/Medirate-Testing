@@ -147,10 +147,13 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`❌ Brevo API Error: ${response.status} ${errorText}`);
       return NextResponse.json({ error: `Brevo error: ${response.status} ${errorText}` }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    const responseData = await response.json();
+    console.log(`✅ Email sent successfully to ${email}, Brevo response:`, responseData);
+    return NextResponse.json({ success: true, messageId: responseData.messageId });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || "Unknown error" }, { status: 500 });
   }

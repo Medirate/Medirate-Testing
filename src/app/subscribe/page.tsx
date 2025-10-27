@@ -1674,6 +1674,11 @@ const StripePricingTableWithFooter = () => {
                     const storedRole = localStorage.getItem('mr_selected_role') || sessionStorage.getItem('mr_selected_role');
                     if (storedRole && (storedRole === 'user' || storedRole === 'subscription_manager')) {
                       console.log('🎭 Found stored role:', storedRole);
+                      console.log('ℹ️ This is from previous testing - clearing stored role');
+                      // Clear the stored role to prevent confusion
+                      localStorage.removeItem('mr_selected_role');
+                      sessionStorage.removeItem('mr_selected_role');
+                      return; // Don't proceed with role update
                       
                       // Get current user email (you may need to adjust this based on your auth setup)
                       const userEmail = window.location.search.includes('email=') 
