@@ -71,6 +71,16 @@ function SettingsSubscription({
   const [showPlanChangeModal, setShowPlanChangeModal] = useState(false);
   const [changingPlan, setChangingPlan] = useState(false);
   const [planChangeError, setPlanChangeError] = useState<string | null>(null);
+  const [planChangeCalculation, setPlanChangeCalculation] = useState<{
+    currentPlan: { name: string; amount: number; interval: string };
+    newPlan: { name: string; amount: number; interval: string };
+    refundAmount: number;
+    chargeAmount: number;
+    netAmount: number;
+    daysRemaining: number;
+    effectiveDate: string;
+  } | null>(null);
+  const [showCalculationModal, setShowCalculationModal] = useState(false);
   const [planChangeSuccess, setPlanChangeSuccess] = useState(false);
 
   const fetchAvailablePlans = async () => {
@@ -83,6 +93,51 @@ function SettingsSubscription({
     } catch (error) {
       console.error("Error fetching available plans:", error);
     }
+  };
+
+  const calculatePlanChange = (newPriceId: string) => {
+    if (!subscriptionData || !availablePlans.length) return;
+
+    const currentPlan = availablePlans.find(p => p.interval === subscriptionData.billingInterval);
+    const newPlan = availablePlans.find(p => p.id === newPriceId);
+    
+    if (!currentPlan || !newPlan) return;
+
+    const daysRemaining = getDaysRemaining() || 0;
+    const currentPeriodEnd = subscriptionData.currentPeriodEnd || 0;
+    const now = Math.floor(Date.now() / 1000);
+    const currentPeriodStart = currentPeriodEnd - (subscriptionData.billingInterval === 'year' ? 365 : 30) * 24 * 60 * 60;
+    const totalPeriodSeconds = currentPeriodEnd - currentPeriodStart;
+    const unusedSeconds = currentPeriodEnd - now;
+    
+    // Calculate unused amount (refund) - same logic as API
+    const refundAmount = Math.floor((currentPlan.amount * unusedSeconds) / totalPeriodSeconds);
+    
+    // New plan charge
+    const chargeAmount = newPlan.amount;
+    
+    // Net amount (positive = customer pays more, negative = customer gets refund)
+    const netAmount = chargeAmount - refundAmount;
+    
+    setPlanChangeCalculation({
+      currentPlan: {
+        name: `${currentPlan.interval.charAt(0).toUpperCase() + currentPlan.interval.slice(1)} Billing`,
+        amount: currentPlan.amount,
+        interval: currentPlan.interval
+      },
+      newPlan: {
+        name: `${newPlan.interval.charAt(0).toUpperCase() + newPlan.interval.slice(1)} Billing`,
+        amount: newPlan.amount,
+        interval: newPlan.interval
+      },
+      refundAmount,
+      chargeAmount,
+      netAmount,
+      daysRemaining,
+      effectiveDate: new Date().toLocaleDateString()
+    });
+    
+    setShowCalculationModal(true);
   };
 
   const handlePlanChange = async (newPriceId: string) => {
@@ -1124,7 +1179,7 @@ function SettingsSubscription({
                                 ? 'border-[#012C61] bg-blue-50'
                                 : 'border-gray-200 hover:border-[#012C61] hover:bg-gray-50'
                             }`}
-                            onClick={() => handlePlanChange(plan.id)}
+                            onClick={() => calculatePlanChange(plan.id)}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
@@ -1183,6 +1238,122 @@ function SettingsSubscription({
                     <p className="text-xs text-gray-500 text-center">
                       Changes are processed immediately with automatic proration
                     </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Plan Change Calculation Modal */}
+            {showCalculationModal && planChangeCalculation && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-auto">
+                  {/* Header */}
+                  <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                    <h3 className="text-xl font-semibold text-gray-900">Confirm Plan Change</h3>
+                    <button
+                      onClick={() => setShowCalculationModal(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="p-6">
+                    <div className="space-y-6">
+                      {/* Current Plan */}
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-2">Current Plan</h4>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700">{planChangeCalculation.currentPlan.name}</span>
+                          <span className="font-semibold">${(planChangeCalculation.currentPlan.amount / 100).toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      {/* Arrow */}
+                      <div className="flex justify-center">
+                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                        </svg>
+                      </div>
+
+                      {/* New Plan */}
+                      <div className="bg-blue-50 rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-2">New Plan</h4>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700">{planChangeCalculation.newPlan.name}</span>
+                          <span className="font-semibold">${(planChangeCalculation.newPlan.amount / 100).toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      {/* Calculation Details */}
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-3">Billing Calculation</h4>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Days remaining in current period:</span>
+                            <span className="font-medium">{planChangeCalculation.daysRemaining} days</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Refund for unused time:</span>
+                            <span className="font-medium text-green-600">${(planChangeCalculation.refundAmount / 100).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Charge for new plan:</span>
+                            <span className="font-medium text-red-600">${(planChangeCalculation.chargeAmount / 100).toFixed(2)}</span>
+                          </div>
+                          <hr className="my-2" />
+                          <div className="flex justify-between font-semibold">
+                            <span>Net amount:</span>
+                            <span className={planChangeCalculation.netAmount >= 0 ? 'text-red-600' : 'text-green-600'}>
+                              {planChangeCalculation.netAmount >= 0 ? '+' : ''}${(planChangeCalculation.netAmount / 100).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Summary */}
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h4 className="font-semibold text-gray-900 mb-2">Summary</h4>
+                        <p className="text-sm text-gray-600">
+                          {planChangeCalculation.netAmount >= 0 ? (
+                            <>You will be <strong className="text-red-600">charged ${(planChangeCalculation.netAmount / 100).toFixed(2)}</strong> for the plan change. The refund for unused time will be <strong className="text-green-600">sent back to your payment method</strong> within 3-5 business days.</>
+                          ) : (
+                            <>You will receive a <strong className="text-green-600">refund of ${(Math.abs(planChangeCalculation.netAmount) / 100).toFixed(2)}</strong> for unused time, sent directly to your payment method within 3-5 business days.</>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Changes take effect immediately. Refunds are processed automatically and sent to your original payment method.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Footer */}
+                  <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-xl flex justify-end space-x-3">
+                    <button
+                      onClick={() => setShowCalculationModal(false)}
+                      className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowCalculationModal(false);
+                        // Find the new plan ID from availablePlans
+                        const newPlanId = availablePlans.find(p => 
+                          p.interval === planChangeCalculation.newPlan.interval.toLowerCase()
+                        )?.id;
+                        if (newPlanId) {
+                          handlePlanChange(newPlanId);
+                        }
+                      }}
+                      className="px-6 py-2 bg-[#012C61] text-white rounded-lg hover:bg-[#012C61]/90 transition-colors"
+                    >
+                      Confirm Change
+                    </button>
                   </div>
                 </div>
               </div>

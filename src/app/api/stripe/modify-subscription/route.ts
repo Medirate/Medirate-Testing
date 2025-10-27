@@ -58,8 +58,47 @@ export async function POST(request: NextRequest) {
         id: currentItem.id,
         price: newPriceId,
       }],
-      proration_behavior: 'create_prorations' as Stripe.SubscriptionUpdateParams.ProrationBehavior,
+      proration_behavior: 'none' as Stripe.SubscriptionUpdateParams.ProrationBehavior,
     });
+
+    // Calculate and process manual refund for unused time
+    const currentPrice = currentItem.price.unit_amount || 0;
+    const currentPeriodStart = subscription.current_period_start;
+    const currentPeriodEnd = subscription.current_period_end;
+    const now = Math.floor(Date.now() / 1000);
+    
+    // Calculate unused time in seconds
+    const totalPeriodSeconds = currentPeriodEnd - currentPeriodStart;
+    const unusedSeconds = currentPeriodEnd - now;
+    
+    // Calculate refund amount (unused portion of current plan)
+    const refundAmount = Math.floor((currentPrice * unusedSeconds) / totalPeriodSeconds);
+    
+    // Process refund if there's unused amount
+    if (refundAmount > 0) {
+      try {
+        // Get the latest invoice to find the payment intent
+        const latestInvoice = await stripe.invoices.retrieve(subscription.latest_invoice as string);
+        
+        if (latestInvoice.payment_intent && typeof latestInvoice.payment_intent === 'string') {
+          // Create refund for unused amount
+          await stripe.refunds.create({
+            payment_intent: latestInvoice.payment_intent,
+            amount: refundAmount,
+            reason: 'requested_by_customer',
+            metadata: {
+              reason: 'subscription_plan_change',
+              old_plan: currentItem.price.id,
+              new_plan: newPriceId,
+              unused_days: Math.floor(unusedSeconds / (24 * 60 * 60)),
+            },
+          });
+        }
+      } catch (refundError) {
+        console.error('Refund creation failed:', refundError);
+        // Continue even if refund fails
+      }
+    }
 
     return NextResponse.json({
       success: true,
