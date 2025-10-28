@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import AppLayout from "@/app/components/applayout";
 import { useProtectedPage } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
+// import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   MapPin,
@@ -105,7 +105,7 @@ const StateProfilesPage = () => {
   // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
   const auth = useProtectedPage();
   const router = useRouter();
-  const { isSubscriptionManager, isChecking } = useSubscriptionManagerRedirect();
+  // const { isSubscriptionManager, isChecking } = useSubscriptionManagerRedirect();
   
   // All useState hooks
   const [selectedState, setSelectedState] = useState<string | null>(null);
@@ -418,23 +418,7 @@ const StateProfilesPage = () => {
 
 
   // NOW ALL CONDITIONAL RETURNS AFTER ALL HOOKS
-  // Show loading while checking role
-  if (isChecking) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid"></div>
-      </div>
-    );
-  }
-
-  // If subscription manager, they'll be redirected by the hook
-  if (isSubscriptionManager) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid"></div>
-      </div>
-    );
-  }
+  // Temporarily removed subscription manager checks to test page refresh issue
 
   const handleStateSelect = (stateName: string | null) => {
     // If clicking the same state, deselect it
