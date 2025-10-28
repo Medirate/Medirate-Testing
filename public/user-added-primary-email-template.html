@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Added to Your MediRate Subscription</title>
+    <style>
+        @media only screen and (max-width: 600px) {
+            .main-content {
+                padding: 0 !important;
+            }
+            .content-card {
+                padding: 16px 4% !important;
+                font-size: 15px !important;
+                margin: 16px 2% !important;
+            }
+            .button {
+                padding: 12px 20px !important;
+                font-size: 14px !important;
+            }
+        }
+    </style>
+</head>
+<body style="margin:0; padding:0; background:#f4f4f4; font-family: Arial, sans-serif;">
+    <table width="100%" bgcolor="#f4f4f4" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+            <td>
+                <!-- Header -->
+                <div style="background:#0F3557; padding:30px 0 20px 0; border-radius:0;">
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                            <td align="left" style="padding-left:30px;">
+                                <img src="https://raw.githubusercontent.com/Medirate/Medirate-Developement/main/public/top-black-just-word.png" alt="MediRate Wordmark" style="max-width:200px; width:90%; display:block;">
+                            </td>
+                            <td align="right" style="padding-right:30px;">
+                                <img src="https://raw.githubusercontent.com/Medirate/Medirate-Developement/main/public/top-black-just-logo.png" alt="MediRate Logo" style="max-width:80px; width:80px; display:block;">
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Main Content -->
+                <div class="main-content" style="padding:0; margin:0;">
+                    <h2 style="color:#0F3557; font-size:22px; margin:30px 0 10px 0; text-align:center;">User Added to Your Subscription</h2>
+                    <p style="color:#555; text-align:center; margin:0 0 20px 0;">A new secondary user has been successfully added to your MediRate subscription.</p>
+
+                    <!-- Confirmation Card -->
+                    <div class="content-card" style="background:#f8fafc; border-radius:0; box-shadow:none; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:32px 40px; font-family:Arial,sans-serif; color:#0F3557; box-sizing:border-box; margin:32px 48px;">
+                        <div style="font-size:18px; font-weight:bold; margin-bottom:16px; color:#0F3557;">
+                            ✅ User Successfully Added
+                        </div>
+                        <div style="font-size:14px; margin-bottom:16px; color:#334155; line-height:1.6;">
+                            <strong>Added User:</strong> {{USER_EMAIL}}
+                        </div>
+                        
+                        <div style="font-size:14px; margin-bottom:20px; color:#334155; line-height:1.6;">
+                            <strong>What happens next:</strong>
+                            <ul style="margin:8px 0; padding-left:20px;">
+                                <li>The user will receive a welcome email with login instructions</li>
+                                <li>They can immediately log in and access the application</li>
+                                <li>They'll have full access to all MediRate features</li>
+                                <li>You can manage their access from your Settings page</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- User Management Card -->
+                    <div class="content-card" style="background:#f8fafc; border-radius:0; box-shadow:none; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:32px 40px; font-family:Arial,sans-serif; color:#0F3557; box-sizing:border-box; margin:32px 48px;">
+                        <div style="font-size:16px; font-weight:bold; margin-bottom:12px; color:#0F3557;">
+                            👥 Manage Your Team
+                        </div>
+                        <div style="font-size:14px; margin-bottom:16px; color:#334155; line-height:1.6;">
+                            <strong>Current Subscription Users:</strong> You can view and manage all users from your Settings page.
+                        </div>
+                        
+                        <div style="font-size:14px; margin-bottom:16px; color:#334155; line-height:1.6;">
+                            <strong>User Management Features:</strong>
+                            <ul style="margin:8px 0; padding-left:20px;">
+                                <li>View all active users on your subscription</li>
+                                <li>Add additional users (if slots available)</li>
+                                <li>Remove users when no longer needed</li>
+                                <li>Monitor user activity and access</li>
+                            </ul>
+                        </div>
+
+                        <div style="font-size:14px; color:#334155; line-height:1.6;">
+                            <strong>Need more user slots?</strong> You can purchase additional user slots through your subscription dashboard if you need to add more team members.
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div style="text-align:center; margin:30px 0;">
+                        <a href="https://MediRate.net/settings" style="background:#0F3557; color:#fff; text-decoration:none; padding:14px 28px; border-radius:5px; font-weight:bold; font-size:16px; display:inline-block; margin:0 10px;">Manage Users</a>
+                        <a href="https://MediRate.net/dashboard" style="background:#0F3557; color:#fff; text-decoration:none; padding:14px 28px; border-radius:5px; font-weight:bold; font-size:16px; display:inline-block; margin:0 10px;">View Dashboard</a>
+                    </div>
+
+                    <!-- Support Card -->
+                    <div class="content-card" style="background:#f8fafc; border-radius:0; box-shadow:none; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:32px 40px; font-family:Arial,sans-serif; color:#0F3557; box-sizing:border-box; margin:32px 48px;">
+                        <div style="font-size:16px; font-weight:bold; margin-bottom:12px; color:#0F3557;">
+                            💬 Questions or Issues?
+                        </div>
+                        <div style="font-size:14px; color:#334155; line-height:1.6;">
+                            If you have any questions about user management or need assistance with your subscription, our support team is here to help. Contact us through the support page or reply to this email.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div style="background:#0F3557; color:#fff; font-size:13px; padding:12px; border-radius:0; text-align:center;">
+                    © 2024 MediRate. All rights reserved.
+                </div>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

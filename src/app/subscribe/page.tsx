@@ -16,6 +16,7 @@ const StripePricingTableWithFooter = () => {
   const [showServiceAgreement, setShowServiceAgreement] = useState(false);
   const [serviceAgreementAccepted, setServiceAgreementAccepted] = useState(false);
   const [showRoleConfirmation, setShowRoleConfirmation] = useState(false);
+  const [showSubUserMessage, setShowSubUserMessage] = useState(false);
   const auth = useAuth();
   const router = useRouter();
   const [showStripeTable, setShowStripeTable] = useState(false);
@@ -405,9 +406,18 @@ const StripePricingTableWithFooter = () => {
         } catch (error) {
           console.warn('Could not store selected role:', error);
         }
-        setShowStripeTable(true);
-        scrollToElementById('pricing-table');
-        toast.success("Form submitted! Proceeding to subscription.");
+        
+        // Show different messages based on account role
+        if (formData.accountRole === 'sub_user') {
+          // For sub users, show message about contacting primary user
+          setShowSubUserMessage(true);
+          toast.success("Form submitted! Please contact your primary user to add you to the subscription.");
+        } else {
+          // For primary users and subscription managers, proceed to subscription
+          setShowStripeTable(true);
+          scrollToElementById('pricing-table');
+          toast.success("Form submitted! Proceeding to subscription.");
+        }
       } else {
         toast.error("Please select an account role.");
       }
@@ -1743,6 +1753,78 @@ const StripePricingTableWithFooter = () => {
         onConfirm={handleConfirmRole}
         accountRole={formData.accountRole || ''}
       />
+
+      {/* Sub User Message Modal */}
+      {showSubUserMessage && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">Next Steps</h3>
+              <button
+                onClick={() => setShowSubUserMessage(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="flex items-start mb-4">
+                <div className="flex-shrink-0">
+                  <svg className="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">Sub-User Account Created</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Since you're a sub-user, you'll need to be added to an existing subscription by your primary user or subscription manager.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <h5 className="font-medium text-blue-800 mb-2">What happens next?</h5>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• Contact your primary user or subscription manager</li>
+                  <li>• Ask them to add you as a secondary user</li>
+                  <li>• Once added, you can log in directly to the application</li>
+                </ul>
+              </div>
+
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                <h5 className="font-medium text-green-800 mb-2">Already added?</h5>
+                <p className="text-sm text-green-700">
+                  If you've already been added to a subscription, you can log in directly to access the application.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowSubUserMessage(false)}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSubUserMessage(false);
+                    router.push("/api/auth/login");
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Log In
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast Notifications */}
       <Toaster 

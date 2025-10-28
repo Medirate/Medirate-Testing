@@ -1529,6 +1529,8 @@ export default function Settings() {
   const [newUserEmail, setNewUserEmail] = useState("");
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [isRemovingUser, setIsRemovingUser] = useState<string | null>(null);
+  const [showAddUserConfirmation, setShowAddUserConfirmation] = useState(false);
+  const [userToAdd, setUserToAdd] = useState<string>("");
 
   // Check user role
   useEffect(() => {
@@ -1575,17 +1577,44 @@ export default function Settings() {
   const addUserToSubscription = async () => {
     if (!newUserEmail.trim()) return;
     
+    // Show confirmation dialog first
+    setUserToAdd(newUserEmail.trim());
+    setShowAddUserConfirmation(true);
+  };
+
+  const confirmAddUser = async () => {
+    if (!userToAdd.trim()) return;
+    
     setIsAddingUser(true);
     try {
       const response = await fetch("/api/subscription-users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: newUserEmail.trim() })
+        body: JSON.stringify({ email: userToAdd.trim() })
       });
       
       if (response.ok) {
         setNewUserEmail("");
+        setUserToAdd("");
+        setShowAddUserConfirmation(false);
         fetchSubscriptionUsers(); // Refresh the list
+        
+        // Send email notifications
+        try {
+          await fetch('/api/send-user-addition-emails', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userEmail: userToAdd,
+              primaryUserEmail: auth.userEmail,
+              action: 'user_added'
+            })
+          });
+          console.log('✅ Email notifications sent successfully');
+        } catch (emailError) {
+          console.error('Error sending email notifications:', emailError);
+          // Don't fail the user addition if emails fail
+        }
       } else {
         const error = await response.json();
         alert(error.error || "Failed to add user");
@@ -1596,6 +1625,11 @@ export default function Settings() {
     } finally {
       setIsAddingUser(false);
     }
+  };
+
+  const cancelAddUser = () => {
+    setShowAddUserConfirmation(false);
+    setUserToAdd("");
   };
 
   // Remove user from subscription
@@ -1785,6 +1819,70 @@ export default function Settings() {
           {renderTabContent()}
         </div>
       </div>
+
+      {/* Add User Confirmation Modal */}
+      {showAddUserConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">Add Secondary User</h3>
+              <button
+                onClick={cancelAddUser}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="flex items-start mb-4">
+                <div className="flex-shrink-0">
+                  <svg className="w-8 h-8 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">Confirm User Addition</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Are you sure you want to add <strong>{userToAdd}</strong> as a secondary user for the subscription?
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <h5 className="font-medium text-blue-800 mb-2">What happens next?</h5>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• The user will receive an email notification</li>
+                  <li>• They'll be able to log in and access the application</li>
+                  <li>• They'll have read-only access to subscription information</li>
+                  <li>• You can remove them at any time from the user management section</li>
+                </ul>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={cancelAddUser}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmAddUser}
+                  disabled={isAddingUser}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {isAddingUser ? "Adding..." : "Add User"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Service Agreement Modal - Removed since ServiceAgreementModal was deleted */}
     </AppLayout>
