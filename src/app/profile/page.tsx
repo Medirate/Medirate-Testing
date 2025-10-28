@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Camera, Mail, User } from "lucide-react";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
-import SubscriptionTermsModal from '@/app/components/SubscriptionTermsModal';
+// import SubscriptionTermsModal from '@/app/components/SubscriptionTermsModal';
 import { supabase } from "@/lib/supabase";
 
 export default function Profile() {
@@ -13,7 +13,7 @@ export default function Profile() {
   const [email, setEmail] = useState("");
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  // const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
 
 
 
@@ -212,25 +212,7 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Terms and Conditions Link */}
-      <div className="mt-6 text-center">
-        <button 
-          onClick={() => {
-            setIsTermsModalOpen(true);
-          }} 
-          className="text-blue-600 underline"
-        >
-          View Terms and Conditions
-        </button>
-      </div>
-
-      {/* Subscription Terms Modal */}
-      <SubscriptionTermsModal 
-        isOpen={isTermsModalOpen} 
-        onClose={() => {
-          setIsTermsModalOpen(false);
-        }} 
-      />
+      {/* Terms and Conditions moved to Settings page */}
     </>
   );
 }

@@ -6,6 +6,8 @@ import EmailPreferences from "@/app/email-preferences/page";
 import Profile from "@/app/profile/page";
 import Subscription from "@/app/subscription/page";
 import { useRequireSubscription } from "@/hooks/useRequireAuth";
+import SubscriptionTermsModal from "@/app/components/SubscriptionTermsModal";
+import TermsModal from "@/app/components/TermsModal";
 
 interface SubscriptionData {
   plan: string;
@@ -1524,7 +1526,8 @@ export default function Settings() {
   const [roleCheckComplete, setRoleCheckComplete] = useState(false);
 
   const [activeTab, setActiveTab] = useState("profile");
-  const [showServiceAgreement, setShowServiceAgreement] = useState(false); // Removed - ServiceAgreementModal deleted
+  const [showSubscriptionTermsModal, setShowSubscriptionTermsModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   
   // Subscription management state
   const [subscriptionUsers, setSubscriptionUsers] = useState<any[]>([]);
@@ -1757,20 +1760,42 @@ export default function Settings() {
             showUserManagement={true}
           />
         );
-      case "service-agreement":
+      case "terms-and-conditions":
         return (
           <div className="space-y-6">
             <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h3 className="text-lg font-semibold text-[#012C61] mb-4">Service Agreement</h3>
-              <p className="text-gray-600 mb-4">
-                View your current Service Agreement and understand the terms of your subscription.
+              <h3 className="text-lg font-semibold text-[#012C61] mb-4">Terms and Conditions</h3>
+              <p className="text-gray-600 mb-6">
+                View the Terms and Conditions and Service Agreement for your subscription.
               </p>
-              <button
-                onClick={() => setShowServiceAgreement(true)}
-                className="bg-[#012C61] text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors"
-              >
-                View Service Agreement
-              </button>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <h4 className="text-md font-semibold text-[#012C61] mb-2">Service Agreement</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    View the comprehensive Service Agreement that governs your subscription.
+                  </p>
+                  <button
+                    onClick={() => setShowSubscriptionTermsModal(true)}
+                    className="bg-[#012C61] text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors text-sm"
+                  >
+                    View Service Agreement
+                  </button>
+                </div>
+                
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <h4 className="text-md font-semibold text-[#012C61] mb-2">Terms of Use</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    View the Terms of Use and notifications for the MediRate platform.
+                  </p>
+                  <button
+                    onClick={() => setShowTermsModal(true)}
+                    className="bg-[#012C61] text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors text-sm"
+                  >
+                    View Terms of Use
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -1863,14 +1888,14 @@ export default function Settings() {
             Manage Subscription Users
           </button>
           <button
-            onClick={() => setActiveTab("service-agreement")}
+            onClick={() => setActiveTab("terms-and-conditions")}
             className={`px-4 py-2 text-sm font-medium ${
-              activeTab === "service-agreement"
+              activeTab === "terms-and-conditions"
                 ? "border-b-2 border-[#012C61] text-[#012C61]"
                 : "text-gray-500 hover:text-[#012C61]"
             }`}
           >
-            Service Agreement
+            Terms and Conditions
           </button>
         </div>
 
@@ -2008,7 +2033,16 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Service Agreement Modal - Removed since ServiceAgreementModal was deleted */}
+      {/* Subscription Terms Modal */}
+      <SubscriptionTermsModal 
+        isOpen={showSubscriptionTermsModal} 
+        onClose={() => setShowSubscriptionTermsModal(false)} 
+      />
+
+      {/* Terms Modal */}
+      {showTermsModal && (
+        <TermsModal />
+      )}
     </AppLayout>
   );
 }
