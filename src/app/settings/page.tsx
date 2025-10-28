@@ -1568,7 +1568,9 @@ export default function Settings() {
       const response = await fetch("/api/subscription-users");
       if (response.ok) {
         const data = await response.json();
-        setSubscriptionUsers(data.subUsers || []);
+        // Convert array of email strings to array of objects with email property
+        const users = (data.subUsers || []).map((email: string) => ({ email }));
+        setSubscriptionUsers(users);
       }
     } catch (error) {
       console.error("Error fetching subscription users:", error);
