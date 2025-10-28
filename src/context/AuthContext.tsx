@@ -16,6 +16,7 @@ interface AuthState {
   isCheckComplete: boolean;
   subscriptionData: any;
   primaryUserEmail?: string | null;
+  isTransferredUser?: boolean;
   checkStatus: () => Promise<void>;
 }
 
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isCheckComplete: boolean;
     subscriptionData: any;
     primaryUserEmail?: string | null;
+    isTransferredUser?: boolean;
   }>({
     isPrimaryUser: false,
     isSubUser: false,
@@ -41,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isCheckComplete: false,
     subscriptionData: null,
     primaryUserEmail: null,
+    isTransferredUser: false,
   });
 
   const userEmail = user?.email || "";
@@ -145,6 +148,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // FOURTH: If not a regular sub user, check if user is a transferred subscription user
+      console.log("❌ AuthContext: Not a regular sub user, checking if user is a transferred subscription user...");
+      
+      const transferredResponse = await fetch("/api/transferred-subscriptions");
+      let isTransferredUser = false;
+      let transferredData = null;
+      
+      if (transferredResponse.ok) {
+        const transferredUserData = await transferredResponse.json();
+        isTransferredUser = transferredUserData.isTransferredUser;
+        transferredData = transferredUserData.transferredData;
+        console.log("🔍 AuthContext: Transferred user check result:", { isTransferredUser, transferredData });
+        
+        if (isTransferredUser && transferredData) {
+          console.log("✅ AuthContext: User has access through transferred subscription");
+          setAuthState({
+            isPrimaryUser: false,
+            isSubUser: true, // Treat transferred users as sub users for UI purposes
+            hasActiveSubscription: false, // They don't have their own subscription
+            hasFormData: hasFormData,
+            isCheckComplete: true,
+            subscriptionData: {
+              status: 'active',
+              plan: 'Transferred Subscription',
+              amount: 0,
+              currency: 'USD',
+              billingInterval: 'transferred',
+              startDate: transferredData.subscriptionStartDate,
+              endDate: transferredData.subscriptionEndDate
+            },
+            primaryUserEmail: transferredData.primaryUserEmail,
+            isTransferredUser: true
+          });
+          return;
+        }
+      }
+
       // FINAL: Set state based on findings
       setAuthState({
         isPrimaryUser: false,
@@ -153,7 +193,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hasFormData: hasFormData,
         isCheckComplete: true,
         subscriptionData: stripeData,
-        primaryUserEmail: primaryUserEmail
+        primaryUserEmail: primaryUserEmail,
+        isTransferredUser: false
       });
 
     } catch (error) {
