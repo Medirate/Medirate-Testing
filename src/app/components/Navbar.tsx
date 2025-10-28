@@ -250,8 +250,13 @@ const Navbar = () => {
               Subscribe
             </Link>
 
-            {/* Only show Home if user has subscription access */}
-            {(auth.isPrimaryUser || auth.isSubUser || auth.hasActiveSubscription) ? (
+            {/* Show loading spinner while checking subscription, then Home/Subscribe based on access */}
+            {!auth.isCheckComplete ? (
+              <div className="flex items-center border border-white bg-white px-4 py-2 rounded-md text-[#000000] font-semibold pointer-events-auto">
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#000000] border-t-transparent mr-2"></div>
+                Checking...
+              </div>
+            ) : (auth.isPrimaryUser || auth.isSubUser || auth.hasActiveSubscription) ? (
               <Link href="/home" className="flex items-center border border-white bg-white px-4 py-2 rounded-md text-[#000000] font-semibold transition-colors hover:bg-transparent hover:text-white pointer-events-auto">
                 Home
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -298,8 +303,13 @@ const Navbar = () => {
           </Link>
 
           {auth.isAuthenticated ? (
-            // Only show Home if user has subscription access
-            (auth.isPrimaryUser || auth.isSubUser || auth.hasActiveSubscription) ? (
+            // Show loading spinner while checking subscription, then Home/Subscribe based on access
+            !auth.isCheckComplete ? (
+              <div className="flex items-center border border-white bg-white px-4 py-2 rounded-md text-[#000000] font-semibold pointer-events-auto">
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-[#000000] border-t-transparent mr-2"></div>
+                Checking...
+              </div>
+            ) : (auth.isPrimaryUser || auth.isSubUser || auth.hasActiveSubscription) ? (
               <Link href="/home" className="flex items-center border border-white bg-white px-4 py-2 rounded-md text-[#000000] font-semibold transition-colors hover:bg-transparent hover:text-white">
                 Home
                 <ArrowRight className="ml-2 h-4 w-4" />
