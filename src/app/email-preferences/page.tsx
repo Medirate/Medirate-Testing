@@ -1,215 +1,229 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useProtectedPage } from "@/context/AuthContext";
+import { motion } from "framer-motion";
+import { MoonLoader } from "react-spinners";
 import AppLayout from "@/app/components/applayout";
-import { useAuth } from "@/context/AuthContext";
-import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
 
-export default function EmailPreferencesPage() {
-  const auth = useAuth();
-  const { isSubscriptionManager, isChecking } = useSubscriptionManagerRedirect();
-  const router = useRouter();
+// ✅ Full list of U.S. states
+const STATES = [
+  "ALABAMA", "ALASKA", "ARIZONA", "ARKANSAS", "CALIFORNIA", "COLORADO",
+  "CONNECTICUT", "DELAWARE", "FLORIDA", "GEORGIA", "HAWAII", "IDAHO",
+  "ILLINOIS", "INDIANA", "IOWA", "KANSAS", "KENTUCKY", "LOUISIANA",
+  "MAINE", "MARYLAND", "MASSACHUSETTS", "MICHIGAN", "MINNESOTA",
+  "MISSISSIPPI", "MISSOURI", "MONTANA", "NEBRASKA", "NEVADA",
+  "NEW HAMPSHIRE", "NEW JERSEY", "NEW MEXICO", "NEW YORK",
+  "NORTH CAROLINA", "NORTH DAKOTA", "OHIO", "OKLAHOMA", "OREGON",
+  "PENNSYLVANIA", "RHODE ISLAND", "SOUTH CAROLINA", "SOUTH DAKOTA",
+  "TENNESSEE", "TEXAS", "UTAH", "VERMONT", "VIRGINIA", "WASHINGTON",
+  "WEST VIRGINIA", "WISCONSIN", "WYOMING",
+  "DISTRICT OF COLUMBIA", "PUERTO RICO", "GUAM", "AMERICAN SAMOA", "U.S. VIRGIN ISLANDS", "NORTHERN MARIANA ISLANDS"
+];
 
-  // State for email preferences
-  const [preferences, setPreferences] = useState<{ id: number | null; states: string[]; categories: string[] }>({ 
-    id: null, 
-    states: [], 
-    categories: [] 
-  });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+export default function EmailPreferences() {
+  const auth = useProtectedPage();
+  const [selectedStates, setSelectedStates] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [preferenceId, setPreferenceId] = useState<number | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
 
-  // Show loading while checking authentication
-  if (auth.isLoading || !auth.isCheckComplete) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid"></div>
-      </div>
-    );
-  }
-
-  // Redirect if not authenticated
-  if (!auth.isAuthenticated) {
-    router.push("/api/auth/login");
-    return null;
-  }
-
-  // Check if user has access (either through their own subscription OR as a sub user)
-  const hasAccess = auth.hasActiveSubscription || auth.isSubUser;
-  
-  if (!hasAccess) {
-    router.push("/subscribe");
-    return null;
-  }
-
-  // Show loading while checking role
-  if (isChecking) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid"></div>
-      </div>
-    );
-  }
-
-  // If subscription manager, they'll be redirected by the hook
-  if (isSubscriptionManager) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid"></div>
-      </div>
-    );
-  }
-
-  // Load email preferences
   useEffect(() => {
-    const loadPreferences = async () => {
+    const fetchCategories = async () => {
       try {
-        const response = await fetch(`/api/user/email-preferences?email=${encodeURIComponent(auth.userEmail)}`);
+        const response = await fetch('/api/service-categories');
         if (response.ok) {
           const data = await response.json();
-          setPreferences(data.preferences || { states: [], categories: [] });
+          setCategories(data.categories || []);
         }
       } catch (error) {
-        console.error('Error loading email preferences:', error);
-      } finally {
-        setLoading(false);
+        console.error("Error fetching categories:", error);
       }
     };
+    fetchCategories();
+  }, []);
 
+  useEffect(() => {
     if (auth.userEmail) {
-      loadPreferences();
+      fetchPreferences(auth.userEmail);
     }
   }, [auth.userEmail]);
 
-  const savePreferences = async () => {
-    setSaving(true);
+  const fetchPreferences = async (email: string) => {
+    setLoading(true);
     try {
+      const response = await fetch(`/api/user/email-preferences?email=${encodeURIComponent(email)}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch preferences');
+      }
+
+      const data = await response.json();
+      
+      if (data.id) {
+        setPreferenceId(data.id);
+        setSelectedStates(data.preferences?.states || []);
+        setSelectedCategories(data.preferences?.categories || []);
+      } else {
+        // No preferences found, create new ones
+        const createResponse = await fetch('/api/user/email-preferences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            user_email: email, 
+            preferences: { states: [], categories: [] } 
+          })
+        });
+
+        if (createResponse.ok) {
+          const createData = await createResponse.json();
+          setPreferenceId(createData.id);
+        } else {
+          throw new Error('Failed to create preferences');
+        }
+      }
+    } catch (err) {
+      console.error("❌ Unexpected error fetching preferences:", err);
+      alert("Failed to load preferences. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!auth.userEmail || preferenceId === null) return;
+    setLoading(true);
+    try {
+      const updatedPreferences = { states: selectedStates, categories: selectedCategories };
       const response = await fetch('/api/user/email-preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: preferences.id,
-          preferences: preferences
+          id: preferenceId,
+          preferences: updatedPreferences
         })
       });
 
-      if (response.ok) {
-        alert('Email preferences saved successfully!');
-      } else {
-        alert('Failed to save preferences. Please try again.');
+      if (!response.ok) {
+        throw new Error('Failed to save preferences');
       }
-    } catch (error) {
-      console.error('Error saving preferences:', error);
-      alert('Error saving preferences. Please try again.');
+
+      alert("✅ Preferences saved successfully!");
+    } catch (err) {
+      console.error("❌ Unexpected error saving preferences:", err);
+      alert("Failed to save preferences. Please try again.");
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <AppLayout activeTab="emailPreferences">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid"></div>
-        </div>
-      </AppLayout>
-    );
-  }
+  const selectAllStates = () => {
+    setSelectedStates(STATES);
+  };
+
+  const deselectAllStates = () => {
+    setSelectedStates([]);
+  };
+
+  const selectAllCategories = () => {
+    setSelectedCategories(categories);
+  };
+
+  const deselectAllCategories = () => {
+    setSelectedCategories([]);
+  };
 
   return (
     <AppLayout activeTab="emailPreferences">
       <h1 className="text-3xl md:text-4xl text-[#012C61] font-lemonMilkRegular uppercase mb-8 text-center">
-        Email Preferences
+        Email Alerts
       </h1>
+      <div className="max-w-7xl mx-auto relative">
+        <p className="text-gray-600 mb-6 text-center text-lg">
+          Stay informed of Medicaid provider rate developments by selecting States and Categories for regular email alerts.
+        </p>
 
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Email Alert Preferences</h3>
-              <p className="text-gray-600 mb-6">
-                Configure which states and categories you want to receive email alerts for.
-              </p>
-            </div>
+        {auth.userEmail && (
+          <motion.p
+            className="text-center text-lg font-semibold text-gray-700 mb-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            Logged in as: <span className="text-[#012C61]">{auth.userEmail}</span>
+          </motion.p>
+        )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* States Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  States to Monitor
-                </label>
-                <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                  {['Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'].map(state => (
-                    <label key={state} className="flex items-center">
+        {loading ? (
+          <div className="flex justify-center items-center h-48">
+            <MoonLoader color="#012C61" size={40} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+              <div className="px-6 py-5">
+                <h2 className="text-2xl font-semibold text-[#012C61] mb-4 border-b pb-2">Select States</h2>
+                <button onClick={selectAllStates} className="bg-[#012C61] text-white px-4 py-2 rounded-md mb-4 hover:bg-[#023d85]">Select All</button>
+                <button onClick={deselectAllStates} className="bg-gray-300 text-black px-4 py-2 rounded-md mb-4 ml-2 hover:bg-gray-400">Deselect All</button>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {STATES.map(state => (
+                    <label
+                      key={state}
+                      className="flex items-center space-x-3 py-2 px-3 rounded-lg hover:bg-blue-50 transition-colors duration-200 cursor-pointer"
+                      style={{ minWidth: '200px' }}
+                    >
                       <input
                         type="checkbox"
-                        checked={preferences.states.includes(state)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setPreferences(prev => ({
-                              ...prev,
-                              states: [...prev.states, state]
-                            }));
-                          } else {
-                            setPreferences(prev => ({
-                              ...prev,
-                              states: prev.states.filter(s => s !== state)
-                            }));
-                          }
-                        }}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        checked={selectedStates.includes(state)}
+                        onChange={() => setSelectedStates(prev =>
+                          prev.includes(state) ? prev.filter(s => s !== state) : [...prev, state]
+                        )}
+                        className="form-checkbox h-5 w-5 text-[#012C61] rounded border-gray-300 focus:ring-[#012C61]/50"
                       />
-                      <span className="ml-2 text-sm text-gray-700">{state}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Categories Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Service Categories
-                </label>
-                <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                  {['ABA Services', 'Behavioral Health', 'Billing Manuals', 'IDD Services', 'Provider Alerts', 'Legislative Updates'].map(category => (
-                    <label key={category} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        checked={preferences.categories.includes(category)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setPreferences(prev => ({
-                              ...prev,
-                              categories: [...prev.categories, category]
-                            }));
-                          } else {
-                            setPreferences(prev => ({
-                              ...prev,
-                              categories: prev.categories.filter(c => c !== category)
-                            }));
-                          }
-                        }}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">{category}</span>
+                      <span className="text-gray-700 text-sm flex-1">{state}</span>
                     </label>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Save Button */}
-            <div className="flex justify-end pt-4 border-t border-gray-200">
-              <button
-                onClick={savePreferences}
-                disabled={saving}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {saving ? 'Saving...' : 'Save Preferences'}
-              </button>
+            <div className="bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+              <div className="px-6 py-5">
+                <h2 className="text-2xl font-semibold text-[#012C61] mb-4 border-b pb-2">Select Categories</h2>
+                <button onClick={selectAllCategories} className="bg-[#012C61] text-white px-4 py-2 rounded-md mb-4 hover:bg-[#023d85]">Select All</button>
+                <button onClick={deselectAllCategories} className="bg-gray-300 text-black px-4 py-2 rounded-md mb-4 ml-2 hover:bg-gray-400">Deselect All</button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {Array.from(new Set(categories)).map(category => (
+                    <label
+                      key={category}
+                      className="flex items-center space-x-3 py-2 px-3 rounded-lg hover:bg-blue-50 transition-colors duration-200 cursor-pointer"
+                      style={{ minWidth: '200px' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedCategories.includes(category)}
+                        onChange={() => setSelectedCategories(prev =>
+                          prev.includes(category) ? prev.filter(c => c !== category) : [...prev, category]
+                        )}
+                        className="form-checkbox h-5 w-5 text-[#012C61] rounded border-gray-300 focus:ring-[#012C61]/50"
+                      />
+                      <span className="text-gray-700 text-sm flex-1">{category}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
+        )}
+
+        <div className="mt-8 flex justify-center">
+          <motion.button
+            onClick={handleSave}
+            className="bg-[#012C61] text-white px-8 py-3 rounded-xl font-semibold hover:bg-[#023d85] transition-transform transform hover:scale-105 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            disabled={loading}
+          >
+            {loading ? "Saving..." : "Save Alerts"}
+          </motion.button>
         </div>
       </div>
     </AppLayout>

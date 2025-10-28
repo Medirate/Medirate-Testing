@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import AppLayout from "@/app/components/applayout";
-import { useAuth } from "@/context/AuthContext";
+import { useProtectedPage } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -103,7 +103,7 @@ const reverseStateMap = Object.fromEntries(
 
 const StateProfilesPage = () => {
   // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
-  const auth = useAuth();
+  const auth = useProtectedPage();
   const router = useRouter();
   const { isSubscriptionManager, isChecking } = useSubscriptionManagerRedirect();
   
@@ -418,29 +418,6 @@ const StateProfilesPage = () => {
 
 
   // NOW ALL CONDITIONAL RETURNS AFTER ALL HOOKS
-  // Show loading while checking authentication
-  if (auth.isLoading || !auth.isCheckComplete) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500 border-solid"></div>
-      </div>
-    );
-  }
-
-  // Redirect if not authenticated
-  if (!auth.isAuthenticated) {
-    router.push("/api/auth/login");
-    return null;
-  }
-
-  // Check if user has access (either through their own subscription OR as a sub user)
-  const hasAccess = auth.hasActiveSubscription || auth.isSubUser;
-  
-  if (!hasAccess) {
-    router.push("/subscribe");
-    return null;
-  }
-
   // Show loading while checking role
   if (isChecking) {
     return (
