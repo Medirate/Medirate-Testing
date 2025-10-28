@@ -132,6 +132,45 @@ export async function POST(req: Request) {
         ? subscription.default_payment_method
         : null;
 
+    // Check for scheduled upgrades
+    let scheduledUpgrade = null;
+    try {
+      const schedules = await stripe.subscriptionSchedules.list({
+        customer: customer.id,
+        limit: 10,
+      });
+
+      // Look for active schedules that might indicate a scheduled upgrade
+      const activeSchedule = schedules.data.find(schedule => 
+        schedule.status === 'active' && 
+        schedule.phases.length > 1 &&
+        schedule.phases[0].items.some(item => 
+          item.price === subscription.items.data[0]?.price?.id
+        )
+      );
+
+      if (activeSchedule && activeSchedule.phases.length > 1) {
+        const currentPhase = activeSchedule.phases[0];
+        const nextPhase = activeSchedule.phases[1];
+        
+        // Get the next phase product details
+        const nextPhaseProductId = nextPhase.items[0]?.price;
+        if (nextPhaseProductId) {
+          const nextPhasePrice = await stripe.prices.retrieve(nextPhaseProductId as string);
+          const nextPhaseProduct = await stripe.products.retrieve(nextPhasePrice.product as string);
+          
+          scheduledUpgrade = {
+            upgradeEffectiveDate: new Date(nextPhase.start_date! * 1000).toISOString(),
+            newPlan: nextPhaseProduct.name,
+            newAmount: (nextPhasePrice.unit_amount || 0) / 100,
+            newInterval: nextPhasePrice.recurring?.interval,
+          };
+        }
+      }
+    } catch (scheduleError) {
+      console.log("📅 No scheduled upgrades found or error checking schedules:", scheduleError);
+    }
+
     return NextResponse.json({
       plan: product?.name ?? "Unknown Plan",
       amount: (subscription.items.data[0]?.price?.unit_amount ?? 0) / 100, // Convert cents to dollars
@@ -154,6 +193,7 @@ export async function POST(req: Request) {
       paymentMethod: paymentMethod ? paymentMethod.type : "N/A",
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
       currentPeriodEnd: subscription.current_period_end,
+      scheduledUpgrade: scheduledUpgrade,
     });
   } catch (error: unknown) {
     console.error("❌ Stripe API: Subscription Fetch Error:", error);

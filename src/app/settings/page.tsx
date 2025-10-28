@@ -20,6 +20,12 @@ interface SubscriptionData {
   paymentMethod: string;
   cancelAtPeriodEnd?: boolean;
   currentPeriodEnd?: number;
+  scheduledUpgrade?: {
+    upgradeEffectiveDate: string;
+    newPlan: string;
+    newAmount: number;
+    newInterval: string;
+  } | null;
 }
 
 interface AvailablePlan {
@@ -83,6 +89,12 @@ function SettingsSubscription({
   const [showCalculationModal, setShowCalculationModal] = useState(false);
   const [planChangeSuccess, setPlanChangeSuccess] = useState(false);
   const [subscriptionReactivated, setSubscriptionReactivated] = useState(false);
+  const [scheduledUpgrade, setScheduledUpgrade] = useState<{
+    upgradeEffectiveDate: string;
+    newPlan: string;
+    newAmount: number;
+    newInterval: string;
+  } | null>(null);
 
   const fetchAvailablePlans = async () => {
     try {
@@ -202,8 +214,10 @@ function SettingsSubscription({
       if (data.error) {
         setSubscriptionData(null);
         setError("No active subscription found");
+        setScheduledUpgrade(null);
       } else {
         setSubscriptionData(data);
+        setScheduledUpgrade(data.scheduledUpgrade || null);
         setError(null);
       }
     } catch (err) {
@@ -869,6 +883,23 @@ function SettingsSubscription({
                         <p className="text-sm text-gray-500">End Date</p>
                         <p className="font-medium text-gray-900">{subscriptionData.endDate}</p>
                       </div>
+                      {scheduledUpgrade && (
+                        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="flex items-center mb-2">
+                            <svg className="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                            </svg>
+                            <p className="text-sm font-medium text-blue-800">Scheduled Upgrade</p>
+                          </div>
+                          <p className="text-sm text-blue-700">
+                            <strong>{scheduledUpgrade.newPlan}</strong> will start on{' '}
+                            <strong>{new Date(scheduledUpgrade.upgradeEffectiveDate).toLocaleDateString()}</strong>
+                          </p>
+                          <p className="text-xs text-blue-600 mt-1">
+                            ${scheduledUpgrade.newAmount} / {scheduledUpgrade.newInterval}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1039,33 +1070,24 @@ function SettingsSubscription({
                   </div>
                 </div>
 
-                {/* Plan Change Section */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div className="ml-3 flex-1">
-                      <h4 className="text-sm font-medium text-blue-800">Upgrade to Annual Plan</h4>
-                      <p className="mt-1 text-sm text-blue-700">
-                        {subscriptionData?.cancelAtPeriodEnd 
-                          ? "Reactivate your subscription by upgrading to annual billing. The annual plan will start after your current period ends."
-                          : subscriptionData?.billingInterval === 'month'
-                            ? "Upgrade to annual billing and save 10%. Your annual plan will start after your current monthly period ends."
-                            : "You're already on the annual plan. No upgrade available."
-                        }
-                      </p>
-                      <div className="mt-4">
-                        {subscriptionData?.billingInterval === 'year' ? (
-                          <div className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-500 bg-gray-100 cursor-not-allowed">
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            Already on Annual Plan
-                          </div>
-                        ) : (
+                {/* Plan Change Section - Only show for monthly users */}
+                {subscriptionData?.billingInterval !== 'year' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3 flex-1">
+                        <h4 className="text-sm font-medium text-blue-800">Upgrade to Annual Plan</h4>
+                        <p className="mt-1 text-sm text-blue-700">
+                          {subscriptionData?.cancelAtPeriodEnd 
+                            ? "Reactivate your subscription by upgrading to annual billing. The annual plan will start after your current period ends."
+                            : "Upgrade to annual billing and save 10%. Your annual plan will start after your current monthly period ends."
+                          }
+                        </p>
+                        <div className="mt-4">
                           <button
                             onClick={() => setShowPlanChangeModal(true)}
                             className="inline-flex items-center px-4 py-2 border border-blue-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
@@ -1075,11 +1097,11 @@ function SettingsSubscription({
                             </svg>
                             {subscriptionData?.cancelAtPeriodEnd ? "Reactivate & Upgrade to Annual" : "Upgrade to Annual Plan"}
                           </button>
-                        )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* Subscription Cancellation Section */}
                 <div className="bg-red-50 border border-red-200 rounded-lg p-6">
