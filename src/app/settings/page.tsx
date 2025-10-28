@@ -106,19 +106,12 @@ function SettingsSubscription({
 
     const daysRemaining = getDaysRemaining() || 0;
     const currentPeriodEnd = subscriptionData.currentPeriodEnd || 0;
-    const now = Math.floor(Date.now() / 1000);
-    const currentPeriodStart = currentPeriodEnd - (subscriptionData.billingInterval === 'year' ? 365 : 30) * 24 * 60 * 60;
-    const totalPeriodSeconds = currentPeriodEnd - currentPeriodStart;
-    const unusedSeconds = currentPeriodEnd - now;
+    const effectiveDate = new Date(currentPeriodEnd * 1000).toLocaleDateString();
     
-    // Calculate unused amount (refund) - same logic as API
-    const refundAmount = Math.floor((currentPlan.amount * unusedSeconds) / totalPeriodSeconds);
-    
-    // New plan charge
-    const chargeAmount = newPlan.amount;
-    
-    // Net amount (positive = customer pays more, negative = customer gets refund)
-    const netAmount = chargeAmount - refundAmount;
+    // For scheduled upgrades, no immediate charges or refunds
+    const refundAmount = 0; // No refund for scheduled upgrades
+    const chargeAmount = 0; // No immediate charge for scheduled upgrades
+    const netAmount = 0; // No immediate net change
     
     setPlanChangeCalculation({
       currentPlan: {
@@ -135,7 +128,7 @@ function SettingsSubscription({
       chargeAmount,
       netAmount,
       daysRemaining,
-      effectiveDate: new Date().toLocaleDateString()
+      effectiveDate
     });
     
     setShowCalculationModal(true);
@@ -1055,23 +1048,34 @@ function SettingsSubscription({
                       </svg>
                     </div>
                     <div className="ml-3 flex-1">
-                      <h4 className="text-sm font-medium text-blue-800">Change Subscription Plan</h4>
+                      <h4 className="text-sm font-medium text-blue-800">Upgrade to Annual Plan</h4>
                       <p className="mt-1 text-sm text-blue-700">
                         {subscriptionData?.cancelAtPeriodEnd 
-                          ? "Switch between monthly and yearly billing to reactivate your subscription. Changes take effect immediately with prorated billing."
-                          : "Switch between monthly and yearly billing or change your plan. Changes take effect immediately with prorated billing."
+                          ? "Reactivate your subscription by upgrading to annual billing. The annual plan will start after your current period ends."
+                          : subscriptionData?.billingInterval === 'month'
+                            ? "Upgrade to annual billing and save 10%. Your annual plan will start after your current monthly period ends."
+                            : "You're already on the annual plan. No upgrade available."
                         }
                       </p>
                       <div className="mt-4">
-                        <button
-                          onClick={() => setShowPlanChangeModal(true)}
-                          className="inline-flex items-center px-4 py-2 border border-blue-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                        >
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                          </svg>
-                          {subscriptionData?.cancelAtPeriodEnd ? "Reactivate & Change Plan" : "Change Plan"}
-                        </button>
+                        {subscriptionData?.billingInterval === 'year' ? (
+                          <div className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-500 bg-gray-100 cursor-not-allowed">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Already on Annual Plan
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setShowPlanChangeModal(true)}
+                            className="inline-flex items-center px-4 py-2 border border-blue-300 shadow-sm text-sm font-medium rounded-md text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                            </svg>
+                            {subscriptionData?.cancelAtPeriodEnd ? "Reactivate & Upgrade to Annual" : "Upgrade to Annual Plan"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1175,7 +1179,7 @@ function SettingsSubscription({
                 <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
                   {/* Header */}
                   <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h3 className="text-xl font-semibold text-gray-900">Change Plan</h3>
+                    <h3 className="text-xl font-semibold text-gray-900">Upgrade to Annual Plan</h3>
                     <button
                       onClick={() => setShowPlanChangeModal(false)}
                       className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -1188,52 +1192,62 @@ function SettingsSubscription({
                   
                   {/* Content */}
                   <div className="p-6">
-                    <p className="text-sm text-gray-600 mb-6">
-                      Choose your billing frequency. Changes take effect immediately with prorated billing.
-                    </p>
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-start">
+                        <svg className="w-5 h-5 text-blue-400 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                        </svg>
+                        <div>
+                          <h4 className="text-sm font-medium text-blue-800">Scheduled Upgrade</h4>
+                          <p className="text-sm text-blue-700 mt-1">
+                            Your annual plan will start after your current monthly period ends. You'll continue to have access until then, and no immediate charges will occur.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                     
                     {availablePlans.length > 0 ? (
                       <div className="space-y-3">
-                        {availablePlans.map((plan) => (
+                        {availablePlans
+                          .filter(plan => plan.interval === 'year') // Only show annual plans
+                          .map((plan) => (
                           <div
                             key={plan.id}
-                            className={`border-2 rounded-lg p-4 cursor-pointer transition-all duration-200 ${
-                              subscriptionData?.billingInterval === plan.interval
-                                ? 'border-[#012C61] bg-blue-50'
-                                : 'border-gray-200 hover:border-[#012C61] hover:bg-gray-50'
-                            }`}
+                            className="border-2 border-[#012C61] bg-blue-50 rounded-lg p-4 cursor-pointer hover:bg-blue-100 transition-colors"
                             onClick={() => calculatePlanChange(plan.id)}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center space-x-3">
-                                  <div className={`w-4 h-4 rounded-full border-2 ${
-                                    subscriptionData?.billingInterval === plan.interval
-                                      ? 'border-[#012C61] bg-[#012C61]'
-                                      : 'border-gray-300'
-                                  }`}>
-                                    {subscriptionData?.billingInterval === plan.interval && (
-                                      <div className="w-2 h-2 bg-white rounded-full mx-auto mt-0.5"></div>
-                                    )}
+                                  <div className="w-4 h-4 rounded-full border-2 border-[#012C61] bg-[#012C61]">
+                                    <div className="w-2 h-2 bg-white rounded-full mx-auto mt-0.5"></div>
                                   </div>
                                   <div>
-                                    <h4 className="font-semibold text-gray-900 capitalize">
-                                      {plan.interval} Billing
+                                    <h4 className="font-semibold text-gray-900">
+                                      Annual Billing
                                     </h4>
                                     <p className="text-sm text-gray-600">
-                                      ${(plan.amount / 100).toFixed(2)} / {plan.interval}
+                                      {plan.product.name}
                                     </p>
                                   </div>
                                 </div>
                               </div>
-                              {subscriptionData?.billingInterval === plan.interval && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#012C61] text-white">
-                                  Current
-                                </span>
-                              )}
+                              <div className="text-right">
+                                <div className="text-lg font-semibold text-gray-900">
+                                  ${(plan.amount / 100).toFixed(2)}
+                                </div>
+                                <div className="text-sm text-gray-500">per year</div>
+                                <div className="text-xs text-green-600 font-medium">Save 10%</div>
+                              </div>
                             </div>
                           </div>
                         ))}
+                        
+                        {availablePlans.filter(plan => plan.interval === 'year').length === 0 && (
+                          <div className="text-center py-8 text-gray-500">
+                            <p>No annual plans available</p>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-center py-8">
@@ -1272,7 +1286,7 @@ function SettingsSubscription({
                 <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-auto">
                   {/* Header */}
                   <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                    <h3 className="text-xl font-semibold text-gray-900">Confirm Plan Change</h3>
+                    <h3 className="text-xl font-semibold text-gray-900">Confirm Scheduled Upgrade</h3>
                     <button
                       onClick={() => setShowCalculationModal(false)}
                       className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -1313,26 +1327,23 @@ function SettingsSubscription({
 
                       {/* Calculation Details */}
                       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                        <h4 className="font-semibold text-gray-900 mb-3">Billing Calculation</h4>
+                        <h4 className="font-semibold text-gray-900 mb-3">Scheduled Upgrade Details</h4>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-gray-600">Days remaining in current period:</span>
                             <span className="font-medium">{planChangeCalculation.daysRemaining} days</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Refund for unused time:</span>
-                            <span className="font-medium text-green-600">${(planChangeCalculation.refundAmount / 100).toFixed(2)}</span>
+                            <span className="text-gray-600">Annual plan starts on:</span>
+                            <span className="font-medium">{planChangeCalculation.effectiveDate}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Charge for new plan:</span>
-                            <span className="font-medium text-red-600">${(planChangeCalculation.chargeAmount / 100).toFixed(2)}</span>
+                            <span className="text-gray-600">Immediate charges:</span>
+                            <span className="font-medium text-green-600">$0.00</span>
                           </div>
-                          <hr className="my-2" />
-                          <div className="flex justify-between font-semibold">
-                            <span>Net amount:</span>
-                            <span className={planChangeCalculation.netAmount >= 0 ? 'text-red-600' : 'text-green-600'}>
-                              {planChangeCalculation.netAmount >= 0 ? '+' : ''}${(planChangeCalculation.netAmount / 100).toFixed(2)}
-                            </span>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Immediate refunds:</span>
+                            <span className="font-medium text-green-600">$0.00</span>
                           </div>
                         </div>
                       </div>
@@ -1341,14 +1352,12 @@ function SettingsSubscription({
                       <div className="bg-gray-50 rounded-lg p-4">
                         <h4 className="font-semibold text-gray-900 mb-2">Summary</h4>
                         <p className="text-sm text-gray-600">
-                          {planChangeCalculation.netAmount >= 0 ? (
-                            <>You will be <strong className="text-red-600">charged ${(planChangeCalculation.netAmount / 100).toFixed(2)}</strong> for the plan change. The refund for unused time will be <strong className="text-green-600">sent back to your payment method</strong> within 3-5 business days.</>
-                          ) : (
-                            <>You will receive a <strong className="text-green-600">refund of ${(Math.abs(planChangeCalculation.netAmount) / 100).toFixed(2)}</strong> for unused time, sent directly to your payment method within 3-5 business days.</>
-                          )}
+                          Your annual plan will start automatically on <strong>{planChangeCalculation.effectiveDate}</strong>. 
+                          You'll continue to have access until then with no immediate charges or refunds. 
+                          The annual billing will begin at the end of your current monthly period.
                         </p>
                         <p className="text-xs text-gray-500 mt-2">
-                          Changes take effect immediately. Refunds are processed automatically and sent to your original payment method.
+                          This is a scheduled upgrade - no immediate billing changes occur.
                         </p>
                       </div>
                     </div>
@@ -1375,7 +1384,7 @@ function SettingsSubscription({
                       }}
                       className="px-6 py-2 bg-[#012C61] text-white rounded-lg hover:bg-[#012C61]/90 transition-colors"
                     >
-                      Confirm Change
+                      Schedule Annual Upgrade
                     </button>
                   </div>
                 </div>
@@ -1457,12 +1466,12 @@ function SettingsSubscription({
               </svg>
               <div>
                 <h3 className="text-sm font-medium text-green-800">
-                  {subscriptionReactivated ? "Subscription Reactivated & Plan Changed!" : "Plan Changed Successfully!"}
+                  {subscriptionReactivated ? "Subscription Reactivated & Annual Upgrade Scheduled!" : "Annual Upgrade Scheduled Successfully!"}
                 </h3>
                 <p className="text-sm text-green-700 mt-1">
                   {subscriptionReactivated 
-                    ? "Your subscription has been reactivated and your plan has been updated. You'll continue to have access to all features."
-                    : "Your subscription plan has been updated successfully. Changes take effect immediately."
+                    ? "Your subscription has been reactivated and your annual upgrade has been scheduled. You'll continue to have access to all features."
+                    : "Your annual upgrade has been scheduled successfully. The annual plan will start after your current monthly period ends."
                   }
                 </p>
               </div>
