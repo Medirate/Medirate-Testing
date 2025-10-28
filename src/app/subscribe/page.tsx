@@ -370,7 +370,6 @@ const StripePricingTableWithFooter = () => {
           interest: formData.interest,
           demorequest: formData.demoRequest,
           account_role: formData.accountRole,
-          primary_user_email: formData.primaryUserEmail,
         }),
       });
 
@@ -1209,26 +1208,6 @@ const StripePricingTableWithFooter = () => {
                 </div>
               </div>
               
-              {/* Primary User Email Input - Only show for Sub User role */}
-              {formData.accountRole === 'sub_user' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Primary User Email <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    name="primaryUserEmail"
-                    value={formData.primaryUserEmail}
-                    onChange={handleFormChange}
-                    placeholder="Enter the email of the subscription manager or primary user"
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Enter the email address of the main user or subscription manager of the subscription you wish to join.
-                  </p>
-                </div>
-              )}
               {/* Service Agreement Checkbox */}
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <div className="flex items-start space-x-3">
@@ -1430,26 +1409,6 @@ const StripePricingTableWithFooter = () => {
                 </div>
               </div>
               
-              {/* Primary User Email Input - Only show for Sub User role */}
-              {formData.accountRole === 'sub_user' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Primary User Email <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    name="primaryUserEmail"
-                    value={formData.primaryUserEmail}
-                    onChange={handleFormChange}
-                    placeholder="Enter the email of the subscription manager or primary user"
-                    className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] transition-all"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Enter the email address of the main user or subscription manager of the subscription you wish to join.
-                  </p>
-                </div>
-              )}
               {/* Service Agreement Checkbox */}
               <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <div className="flex items-start space-x-3">

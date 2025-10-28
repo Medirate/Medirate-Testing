@@ -51,25 +51,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    console.log("🔍 AuthContext: Checking Stripe subscription for:", userEmail);
+    console.log("🔍 AuthContext: Checking user status for:", userEmail);
 
     try {
-      // SIMPLIFIED: Only check Stripe subscription status for the logged-in email
-      console.log("🔍 AuthContext: Making Stripe API call to /api/stripe/subscription");
+      // FIRST: Check registration form to get user role
+      console.log("🔍 AuthContext: Checking registration form for role...");
+      const formResponse = await fetch(`/api/registrationform?email=${encodeURIComponent(userEmail)}`);
+      let userRole = null;
+      let hasFormData = false;
+      
+      if (formResponse.ok) {
+        const formData = await formResponse.json();
+        if (formData.data) {
+          userRole = formData.data.account_role;
+          hasFormData = true;
+          console.log("✅ AuthContext: Found user role in registration form:", userRole);
+        }
+      }
+
+      // SECOND: Check Stripe subscription
+      console.log("🔍 AuthContext: Checking Stripe subscription...");
       const stripeResponse = await fetch("/api/stripe/subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: userEmail }),
       });
 
-      console.log("🔍 AuthContext: Stripe API response status:", stripeResponse.status);
-      console.log("🔍 AuthContext: Stripe API response headers:", stripeResponse.headers);
-      
       const stripeData = await stripeResponse.json();
-      console.log("🔍 AuthContext: Stripe response:", stripeData);
-      console.log("🔍 AuthContext: Stripe response type:", typeof stripeData);
-      console.log("🔍 AuthContext: Stripe response keys:", Object.keys(stripeData));
-
       const hasActiveSubscription = stripeData.status === 'active';
 
       if (hasActiveSubscription) {
@@ -79,17 +87,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isPrimaryUser: true, // Treat as primary user if they have active subscription
           isSubUser: false,
           hasActiveSubscription: true,
-          hasFormData: true,
+          hasFormData: hasFormData,
           isCheckComplete: true,
           subscriptionData: stripeData
         });
         return;
       }
 
-      // No active subscription found - check if user is a sub user
+      // THIRD: If no Stripe subscription, check if user is a sub user
       console.log("❌ AuthContext: No active Stripe subscription found, checking if user is a sub user...");
       
-      // Check if they are a sub user in the subscription_users table
       const subUserResponse = await fetch("/api/subscription-users");
       let isSubUser = false;
       let primaryUserEmail = null;
@@ -124,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 isPrimaryUser: false,
                 isSubUser: true,
                 hasActiveSubscription: false, // Sub user doesn't have their own subscription
-                hasFormData: true,
+                hasFormData: hasFormData,
                 isCheckComplete: true,
                 subscriptionData: primaryUserStripeData,
                 primaryUserEmail: primaryUserEmail
@@ -137,16 +144,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       }
-      
-      // Check if they have form data (for better redirect UX)
-      const formResponse = await fetch(`/api/registrationform?email=${encodeURIComponent(userEmail)}`);
-      const hasFormData = formResponse.ok && (await formResponse.json()).data;
 
+      // FINAL: Set state based on findings
       setAuthState({
         isPrimaryUser: false,
         isSubUser: isSubUser,
         hasActiveSubscription: false,
-        hasFormData: !!hasFormData,
+        hasFormData: hasFormData,
         isCheckComplete: true,
         subscriptionData: stripeData,
         primaryUserEmail: primaryUserEmail
