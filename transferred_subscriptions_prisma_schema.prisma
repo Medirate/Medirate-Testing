@@ -4,7 +4,7 @@
 model transferred_subscriptions {
   id                     Int       @id @default(autoincrement())
   primary_user_email     String
-  sub_user_email         String
+  sub_user_email         String?   // Made nullable - only primary_user_email is mandatory
   subscription_start_date DateTime @db.Timestamptz(6)
   subscription_end_date  DateTime? @db.Timestamptz(6)
   transfer_date          DateTime  @default(now()) @db.Timestamptz(6)

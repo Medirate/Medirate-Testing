@@ -4,7 +4,7 @@
 CREATE TABLE transferred_subscriptions (
     id SERIAL PRIMARY KEY,
     primary_user_email VARCHAR(255) NOT NULL,
-    sub_user_email VARCHAR(255) NOT NULL,
+    sub_user_email VARCHAR(255), -- Made nullable - only primary_user_email is mandatory
     subscription_start_date TIMESTAMP WITH TIME ZONE NOT NULL,
     subscription_end_date TIMESTAMP WITH TIME ZONE,
     transfer_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -12,7 +12,7 @@ CREATE TABLE transferred_subscriptions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
-    -- Add unique constraint to prevent duplicate transfers
+    -- Add unique constraint to prevent duplicate transfers (when sub_user_email is present)
     UNIQUE(primary_user_email, sub_user_email)
 );
 

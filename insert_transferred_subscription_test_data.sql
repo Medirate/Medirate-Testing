@@ -10,7 +10,7 @@ INSERT INTO transferred_subscriptions (
     transfer_date
 ) VALUES (
     'dev@metasysconsulting.com',  -- Primary user email
-    'devreddy923@gmail.com',      -- Sub-user email (the transferred user)
+    'devreddy923@gmail.com',      -- Sub-user email (the transferred user) - now optional
     '2024-01-01 00:00:00+00',     -- Subscription start date
     '2025-12-31 23:59:59+00',     -- Subscription end date (active until end of 2025)
     'active',                      -- Status
