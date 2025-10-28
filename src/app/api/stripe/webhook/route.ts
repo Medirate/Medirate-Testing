@@ -75,7 +75,7 @@ async function handleSubscription(subscription: Stripe.Subscription) {
 
   const { data: user, error } = await supabase
     .from("User")
-    .select("UserID")
+    .select("UserID, FirstName, LastName")
     .eq("Email", customerEmail.email)
     .single();
 
@@ -125,6 +125,17 @@ async function handleSubscription(subscription: Stripe.Subscription) {
     console.error("❌ Error updating user subscription:", updateError);
   } else {
     console.log(`✅ User subscription updated: ${subscription.status}${selectedRole ? ` with role: ${selectedRole}` : ''}`);
+    
+    // Send welcome email for new active subscriptions
+    if (subscription.status === 'active') {
+      try {
+        console.log(`📧 Sending welcome email for new subscription to: ${customerEmail.email}`);
+        await sendWelcomeEmailForSubscription(customerEmail.email, user.FirstName, user.LastName);
+      } catch (emailError) {
+        console.error("❌ Error sending welcome email:", emailError);
+        // Don't fail the webhook if email fails
+      }
+    }
   }
 }
 
@@ -208,4 +219,35 @@ async function handleCheckoutSession(session: Stripe.Checkout.Session) {
   await handleSubscription(
     (await stripe.subscriptions.retrieve(session.subscription as string)) as Stripe.Subscription
   );
+}
+
+// ✅ **Send Welcome Email for New Subscription**
+async function sendWelcomeEmailForSubscription(userEmail: string, firstName?: string, lastName?: string) {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/send-welcome-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userEmail,
+        firstName,
+        lastName,
+        subscriptionType: 'Professional Plan',
+        isFirstLogin: false
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Welcome email API error:', errorData);
+      throw new Error(`Welcome email API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ Welcome email sent successfully:', result.messageId);
+    return result;
+
+  } catch (error) {
+    console.error('Error sending welcome email:', error);
+    throw error;
+  }
 }
