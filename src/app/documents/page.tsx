@@ -5,6 +5,7 @@ import AppLayout from "@/app/components/applayout";
 import { useProtectedPage } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DocumentUpload from "@/app/components/DocumentUpload";
 import { 
   FileText,
   Download,
@@ -26,6 +27,7 @@ interface Document {
   title: string;
   type: string; // Now shows actual file extension
   folder: string; // Actual folder path in storage
+  subfolder?: string; // Subfolder like ABA, BH, BILLING_MANUALS, IDD
   state?: string;
   category: string;
   description: string;
@@ -89,22 +91,36 @@ export default function Documents() {
     return matchesSearch && matchesCategory && matchesState;
   });
 
-  // Group documents by folder path (actual storage structure)
-  const groupedDocuments = filteredDocuments.reduce((acc, doc) => {
-    const folder = doc.folder || 'Root';
-    if (!acc[folder]) {
-      acc[folder] = [];
+  // Group documents by state first, then by subfolder
+  const groupedByState = filteredDocuments.reduce((acc, doc) => {
+    const state = doc.state || 'Other';
+    if (!acc[state]) {
+      acc[state] = {};
     }
-    acc[folder].push(doc);
+    
+    // Extract subfolder from folder path (e.g., "ALABAMA/ABA" -> "ABA")
+    const folderParts = doc.folder.split('/');
+    const subfolder = folderParts.length > 1 ? folderParts[folderParts.length - 1] : 'Root';
+    
+    if (!acc[state][subfolder]) {
+      acc[state][subfolder] = [];
+    }
+    acc[state][subfolder].push(doc);
     return acc;
-  }, {} as Record<string, Document[]>);
+  }, {} as Record<string, Record<string, Document[]>>);
 
-  // Generate document types dynamically from actual folders
-  const documentTypes = Object.keys(groupedDocuments).map(folder => ({
-    key: folder,
-    label: folder === 'Root' ? 'Root Directory' : folder,
-    icon: FileText,
-    description: `Files in ${folder}`
+  // Generate document types dynamically from states and their subfolders
+  const documentTypes = Object.entries(groupedByState).map(([state, subfolders]) => ({
+    key: state,
+    label: state,
+    icon: Folder,
+    description: `${Object.keys(subfolders).length} categories • ${Object.values(subfolders).flat().length} documents`,
+    subfolders: Object.entries(subfolders).map(([subfolder, docs]) => ({
+      key: `${state}/${subfolder}`,
+      label: subfolder,
+      count: docs.length,
+      documents: docs
+    }))
   }));
 
   const categories = Array.from(new Set(documents.map(doc => doc.category)));
@@ -255,31 +271,30 @@ export default function Documents() {
             </Card>
           )}
 
-          {/* Documents by Type */}
+          {/* Documents by State */}
           {!isLoading && !error && (
             <div className="space-y-6">
-              {documentTypes.map(typeInfo => {
-                const typeDocs = groupedDocuments[typeInfo.key] || [];
-                const isExpanded = expandedSections.has(typeInfo.key);
+              {documentTypes.map(stateInfo => {
+                const isExpanded = expandedSections.has(stateInfo.key);
                 
-                if (typeDocs.length === 0) return null;
-
                 return (
-                  <Card key={typeInfo.key}>
+                  <Card key={stateInfo.key}>
                     <CardHeader 
                       className="cursor-pointer hover:bg-gray-50 transition-colors"
-                      onClick={() => toggleSection(typeInfo.key)}
+                      onClick={() => toggleSection(stateInfo.key)}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
-                          <typeInfo.icon className="h-5 w-5 mr-3 text-gray-600" />
+                          <stateInfo.icon className="h-5 w-5 mr-3 text-blue-600" />
                           <div>
-                            <CardTitle className="text-lg">{typeInfo.label}</CardTitle>
-                            <CardDescription>{typeInfo.description}</CardDescription>
+                            <CardTitle className="text-lg">{stateInfo.label}</CardTitle>
+                            <CardDescription>{stateInfo.description}</CardDescription>
                           </div>
                         </div>
                         <div className="flex items-center space-x-4">
-                          <span className="text-sm text-gray-500">{typeDocs.length} documents</span>
+                          <span className="text-sm text-gray-500">
+                            {stateInfo.subfolders.reduce((total, sub) => total + sub.count, 0)} documents
+                          </span>
                           {isExpanded ? (
                             <ChevronDown className="h-5 w-5 text-gray-400" />
                           ) : (
@@ -291,81 +306,94 @@ export default function Documents() {
                     
                     {isExpanded && (
                       <CardContent>
-                        <div className="space-y-4">
-                          {typeDocs.map(doc => (
-                            <div key={doc.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center mb-2">
-                                    {getTypeIcon(doc.type)}
-                                    <h3 className="text-lg font-semibold text-gray-900 ml-2">{doc.title}</h3>
-                                    <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(doc.type)}`}>
-                                      .{doc.type}
-                                    </span>
-                                  </div>
-                                  
-                                  <p className="text-gray-600 mb-2">{doc.description}</p>
-                                  <p className="text-sm text-blue-600 mb-3">📁 {doc.filePath}</p>
-                                  
-                                  <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
+                        <div className="space-y-6">
+                          {stateInfo.subfolders.map(subfolderInfo => {
+                            const isSubfolderExpanded = expandedSections.has(subfolderInfo.key);
+                            
+                            return (
+                              <div key={subfolderInfo.key} className="border border-gray-200 rounded-lg">
+                                <div 
+                                  className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                                  onClick={() => toggleSection(subfolderInfo.key)}
+                                >
+                                  <div className="flex items-center justify-between">
                                     <div className="flex items-center">
-                                      <Calendar className="h-4 w-4 mr-1" />
-                                      <span>Uploaded: {formatDate(doc.uploadDate)}</span>
-                                    </div>
-                                    <div className="flex items-center">
-                                      <Clock className="h-4 w-4 mr-1" />
-                                      <span>Modified: {formatDate(doc.lastModified)}</span>
-                                    </div>
-                                    <div className="flex items-center">
-                                      <File className="h-4 w-4 mr-1" />
-                                      <span>{doc.fileSize}</span>
-                                    </div>
-                                    {doc.state && (
-                                      <div className="flex items-center">
-                                        <span className="font-medium">{doc.state}</span>
+                                      <FileText className="h-4 w-4 mr-3 text-gray-600" />
+                                      <div>
+                                        <h3 className="text-md font-semibold text-gray-900">{subfolderInfo.label}</h3>
+                                        <p className="text-sm text-gray-500">{subfolderInfo.count} documents</p>
                                       </div>
+                                    </div>
+                                    {isSubfolderExpanded ? (
+                                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4 text-gray-400" />
                                     )}
-                                  </div>
-                                  
-                                  <div className="flex flex-wrap gap-2">
-                                    {doc.tags.map(tag => (
-                                      <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
-                                        #{tag}
-                                      </span>
-                                    ))}
                                   </div>
                                 </div>
                                 
-                                <div className="ml-4">
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        // Use the download API route
-                                        const response = await fetch(`/api/documents/download?url=${encodeURIComponent(doc.downloadUrl)}`);
-                                        if (response.ok) {
-                                          const blob = await response.blob();
-                                          const url = window.URL.createObjectURL(blob);
-                                          const link = document.createElement('a');
-                                          link.href = url;
-                                          link.download = doc.title;
-                                          link.click();
-                                          window.URL.revokeObjectURL(url);
-                                        } else {
-                                          console.error('Download failed');
-                                        }
-                                      } catch (error) {
-                                        console.error('Download error:', error);
-                                      }
-                                    }}
-                                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                  >
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Download
-                                  </button>
-                                </div>
+                                {isSubfolderExpanded && (
+                                  <div className="px-4 pb-4">
+                                    <div className="space-y-3">
+                                      {subfolderInfo.documents.map(doc => (
+                                        <div key={doc.id} className="border border-gray-100 rounded-lg p-3 hover:shadow-sm transition-shadow bg-gray-50">
+                                          <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                              <div className="flex items-center mb-2">
+                                                {getTypeIcon(doc.type)}
+                                                <h4 className="text-sm font-medium text-gray-900 ml-2">{doc.title}</h4>
+                                                <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(doc.type)}`}>
+                                                  .{doc.type}
+                                                </span>
+                                              </div>
+                                              
+                                              <div className="flex items-center space-x-3 text-xs text-gray-500 mb-2">
+                                                <div className="flex items-center">
+                                                  <Calendar className="h-3 w-3 mr-1" />
+                                                  <span>{formatDate(doc.uploadDate)}</span>
+                                                </div>
+                                                <div className="flex items-center">
+                                                  <File className="h-3 w-3 mr-1" />
+                                                  <span>{doc.fileSize}</span>
+                                                </div>
+                                              </div>
+                                            </div>
+                                            
+                                            <div className="ml-4">
+                                              <button
+                                                onClick={async () => {
+                                                  try {
+                                                    const response = await fetch(`/api/documents/download?url=${encodeURIComponent(doc.downloadUrl)}`);
+                                                    if (response.ok) {
+                                                      const blob = await response.blob();
+                                                      const url = window.URL.createObjectURL(blob);
+                                                      const link = document.createElement('a');
+                                                      link.href = url;
+                                                      link.download = doc.title;
+                                                      link.click();
+                                                      window.URL.revokeObjectURL(url);
+                                                    } else {
+                                                      console.error('Download failed');
+                                                    }
+                                                  } catch (error) {
+                                                    console.error('Download error:', error);
+                                                  }
+                                                }}
+                                                className="flex items-center px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+                                              >
+                                                <Download className="h-3 w-3 mr-1" />
+                                                Download
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </CardContent>
                     )}

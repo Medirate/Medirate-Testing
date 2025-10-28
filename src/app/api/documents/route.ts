@@ -25,19 +25,23 @@ export async function GET(request: NextRequest) {
       const pathParts = filePath.split('/').filter(part => part && part !== '');
       const folderPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : 'Root';
       
+      // Extract subfolder (like ABA, BH, BILLING_MANUALS, IDD)
+      const subfolder = pathParts.length > 2 ? pathParts[pathParts.length - 2] : null;
+      
       return {
         id: blob.url.split('/').pop() || blob.url,
         title: fileName,
         type: fileExtension, // Show actual file extension
         folder: folderPath, // Show actual folder path
+        subfolder: subfolder, // Add subfolder information
         state: extractStateFromPath(blob.pathname),
-        category: folderPath, // Use folder as category
-        description: `File in ${folderPath} - Uploaded on ${new Date(blob.uploadedAt).toLocaleDateString()}`,
+        category: subfolder || folderPath, // Use subfolder as primary category
+        description: `File in ${folderPath}${subfolder ? ` → ${subfolder}` : ''} - Uploaded on ${new Date(blob.uploadedAt).toLocaleDateString()}`,
         uploadDate: blob.uploadedAt,
         lastModified: blob.uploadedAt,
         fileSize: formatFileSize(blob.size),
         downloadUrl: blob.url,
-        tags: [fileExtension, folderPath],
+        tags: [fileExtension, folderPath, ...(subfolder ? [subfolder] : [])],
         isPublic: true,
         filePath: filePath // Include full path for reference
       };
@@ -60,14 +64,26 @@ function getDocumentTypeFromPath(pathname: string): string {
 
 function extractStateFromPath(pathname: string): string | undefined {
   const pathParts = pathname.split('/');
-  const documentsIndex = pathParts.indexOf('documents');
-  const typeIndex = documentsIndex + 1;
-  const stateIndex = typeIndex + 1;
   
-  // Check if there's a state in the path
-  if (pathParts[stateIndex] && !pathParts[stateIndex].includes('.')) {
-    return pathParts[stateIndex];
+  // Look for state names in the path (case-insensitive)
+  const stateNames = [
+    'ALABAMA', 'ALASKA', 'ARIZONA', 'ARKANSAS', 'CALIFORNIA', 'COLORADO', 'CONNECTICUT',
+    'DELAWARE', 'FLORIDA', 'GEORGIA', 'HAWAII', 'IDAHO', 'ILLINOIS', 'INDIANA', 'IOWA',
+    'KANSAS', 'KENTUCKY', 'LOUISIANA', 'MAINE', 'MARYLAND', 'MASSACHUSETTS', 'MICHIGAN',
+    'MINNESOTA', 'MISSISSIPPI', 'MISSOURI', 'MONTANA', 'NEBRASKA', 'NEVADA', 'NEW_HAMPSHIRE',
+    'NEW_JERSEY', 'NEW_MEXICO', 'NEW_YORK', 'NORTH_CAROLINA', 'NORTH_DAKOTA', 'OHIO',
+    'OKLAHOMA', 'OREGON', 'PENNSYLVANIA', 'RHODE_ISLAND', 'SOUTH_CAROLINA', 'SOUTH_DAKOTA',
+    'TENNESSEE', 'TEXAS', 'UTAH', 'VERMONT', 'VIRGINIA', 'WASHINGTON', 'WEST_VIRGINIA',
+    'WISCONSIN', 'WYOMING', 'DC'
+  ];
+  
+  for (const part of pathParts) {
+    const upperPart = part.toUpperCase();
+    if (stateNames.includes(upperPart)) {
+      return upperPart.replace('_', ' ');
+    }
   }
+  
   return undefined;
 }
 
