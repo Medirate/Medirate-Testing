@@ -159,4 +159,70 @@ export async function POST(request: Request) {
     console.error("🚨 Unexpected error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { getUser } = getKindeServerSession();
+    const user = await getUser();
+
+    if (!user || !user.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { email } = body;
+
+    if (!email) {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+
+    console.log(`🔵 Removing sub user ${email} from primary user ${user.email}`);
+
+    // Get current sub users for this primary user
+    const { data: currentRecord, error: fetchError } = await supabase
+      .from("subscription_users")
+      .select("sub_users")
+      .eq("primary_user", user.email)
+      .single();
+
+    if (fetchError) {
+      console.error("❌ Error fetching current record:", fetchError);
+      return NextResponse.json({ error: "Database fetch error" }, { status: 500 });
+    }
+
+    if (!currentRecord) {
+      return NextResponse.json({ error: "No subscription found for this user" }, { status: 404 });
+    }
+
+    let currentSubUsers = [];
+    if (currentRecord.sub_users) {
+      currentSubUsers = Array.isArray(currentRecord.sub_users) ? currentRecord.sub_users : [];
+    }
+
+    // Check if user exists in the list
+    if (!currentSubUsers.includes(email)) {
+      return NextResponse.json({ error: "User is not in this subscription" }, { status: 404 });
+    }
+
+    // Remove the user
+    const updatedSubUsers = currentSubUsers.filter(userEmail => userEmail !== email);
+
+    // Update the record
+    const { error } = await supabase
+      .from("subscription_users")
+      .upsert({ primary_user: user.email, sub_users: updatedSubUsers });
+
+    if (error) {
+      console.error("❌ Supabase Error:", error);
+      return NextResponse.json({ error: "Database update error" }, { status: 500 });
+    }
+
+    console.log(`✅ Successfully removed ${email} from ${user.email}'s subscription`);
+    return NextResponse.json({ success: true, removedUser: email });
+
+  } catch (error) {
+    console.error("🚨 Unexpected error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
 } 
