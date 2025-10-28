@@ -257,8 +257,8 @@ const Navbar = () => {
                 Checking...
               </div>
             ) : (auth.isPrimaryUser || auth.isSubUser || auth.hasActiveSubscription) ? (
-              <Link href="/home" className="flex items-center border border-white bg-white px-4 py-2 rounded-md text-[#000000] font-semibold transition-colors hover:bg-transparent hover:text-white pointer-events-auto">
-                Home
+              <Link href="/dashboard" className="flex items-center border border-white bg-white px-4 py-2 rounded-md text-[#000000] font-semibold transition-colors hover:bg-transparent hover:text-white pointer-events-auto">
+                Dashboard
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             ) : (
@@ -310,8 +310,8 @@ const Navbar = () => {
                 Checking...
               </div>
             ) : (auth.isPrimaryUser || auth.isSubUser || auth.hasActiveSubscription) ? (
-              <Link href="/home" className="flex items-center border border-white bg-white px-4 py-2 rounded-md text-[#000000] font-semibold transition-colors hover:bg-transparent hover:text-white">
-                Home
+              <Link href="/dashboard" className="flex items-center border border-white bg-white px-4 py-2 rounded-md text-[#000000] font-semibold transition-colors hover:bg-transparent hover:text-white">
+                Dashboard
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             ) : (

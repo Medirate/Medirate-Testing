@@ -208,44 +208,6 @@ const SideNav = ({
           {/* Navigation Links */}
           <nav className="mt-6 pb-20">
             <ul className="space-y-2">
-              {/* Home */}
-              <li className="group">
-                {userRole === 'subscription_manager' ? (
-                  <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
-                    <div className="flex items-center justify-center w-6 h-6">
-                      <Home size={20} />
-                    </div>
-                    <span
-                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
-                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
-                      }`}
-                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                    >
-                      Home
-                    </span>
-                  </div>
-                ) : (
-                  <Link
-                    href="/home"
-                    onClick={() => setActiveTab("home")}
-                    className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
-                      activeTab === "home" ? "bg-gray-200/20" : ""
-                    }`}
-                  >
-                    <div className="flex items-center justify-center w-6 h-6">
-                      <Home size={20} />
-                    </div>
-                    <span
-                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
-                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
-                      }`}
-                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                    >
-                      Home
-                    </span>
-                  </Link>
-                )}
-              </li>
               <li className="group">
                 {userRole === 'subscription_manager' ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
@@ -430,6 +392,45 @@ const SideNav = ({
                       style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                     >
                       Rate Developments
+                    </span>
+                  </Link>
+                )}
+              </li>
+              
+              {/* State Profiles */}
+              <li className="group">
+                {userRole === 'subscription_manager' ? (
+                  <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Home size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      State Profiles
+                    </span>
+                  </div>
+                ) : (
+                  <Link
+                    href="/home"
+                    onClick={() => setActiveTab("home")}
+                    className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                      activeTab === "home" ? "bg-gray-200/20" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Home size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      State Profiles
                     </span>
                   </Link>
                 )}

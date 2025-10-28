@@ -6,7 +6,6 @@ import { useProtectedPage } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import USMap from "@/app/components/us-map";
 import { 
   MapPin,
   FileText,
@@ -36,12 +35,6 @@ import {
   Download
 } from "lucide-react";
 import { 
-  fetchRecentRateChanges,
-  getRecentRateChanges,
-  filterRecentRateChanges,
-  getRecentRateChangesSummary,
-  RecentRateChangesData,
-  RecentRateChange,
   fetchEnhancedMetrics,
   getProviderAlerts,
   getLegislativeUpdates,
@@ -108,7 +101,7 @@ const reverseStateMap = Object.fromEntries(
   Object.entries(stateMap).map(([key, value]) => [value, key])
 );
 
-const HomePage = () => {
+const StateProfilesPage = () => {
   // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
   const auth = useProtectedPage();
   const router = useRouter();
@@ -122,28 +115,11 @@ const HomePage = () => {
   const [alertData, setAlertData] = useState<any>(null);
   const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
   
-  // Recent rate changes state
-  const [recentRateData, setRecentRateData] = useState<any>(null);
-  const [isLoadingRateChanges, setIsLoadingRateChanges] = useState(false);
-  const [rateChangesError, setRateChangesError] = useState<string | null>(null);
-  
   // Rate developments state
   const [enhancedData, setEnhancedData] = useState<any>(null);
   const [isLoadingRateDevelopments, setIsLoadingRateDevelopments] = useState(false);
   const [rateDevelopmentsError, setRateDevelopmentsError] = useState<string | null>(null);
   const [rateDevelopmentsFilter, setRateDevelopmentsFilter] = useState<'all' | 'provider' | 'legislative'>('all');
-  
-  // Filter state for rate changes
-  const [rateChangeFilters, setRateChangeFilters] = useState({
-    serviceCategory: '',
-    serviceCode: '',
-    providerType: '',
-    program: ''
-  });
-  
-  // Pagination for rate changes
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
   
   // CSV Export state
   const [isExporting, setIsExporting] = useState(false);
@@ -177,32 +153,6 @@ const HomePage = () => {
     fetchStateMetrics();
   }, []);
 
-  // Fetch recent rate changes data on component mount
-  useEffect(() => {
-    const fetchRateChanges = async () => {
-      setIsLoadingRateChanges(true);
-      setRateChangesError(null);
-      
-      try {
-        // If a state is selected, fetch data for that specific state
-        // Otherwise, fetch general recent changes
-        const data = await fetchRecentRateChanges(30, 50, selectedState || undefined);
-        if (data) {
-          setRecentRateData(data);
-          console.log('✅ Recent rate changes loaded successfully:', data);
-        } else {
-          setRateChangesError('Failed to load recent rate changes');
-        }
-      } catch (error) {
-        console.error('Error fetching recent rate changes:', error);
-        setRateChangesError('Error loading recent rate changes');
-      } finally {
-        setIsLoadingRateChanges(false);
-      }
-    };
-
-    fetchRateChanges();
-  }, [selectedState]); // Add selectedState as dependency
 
   // Fetch rate developments data on component mount
   useEffect(() => {
@@ -237,94 +187,6 @@ const HomePage = () => {
   }, [auth.isAuthenticated, router]);
 
   // ALL useMemo hooks
-  // Get filtered rate changes based on selected state and filters
-  const filteredRateChanges = useMemo(() => {
-    if (!recentRateData || !recentRateData.changes) return [];
-    
-    let changes = recentRateData.changes;
-    
-    // Filter by selected state if one is selected
-    if (selectedState) {
-      changes = changes.filter((change: any) => 
-        change.state?.toLowerCase() === selectedState.toLowerCase()
-      );
-    }
-    
-    // Apply additional filters if they exist
-    if (rateChangeFilters.serviceCategory) {
-      changes = changes.filter((change: any) => 
-        change.serviceCategory === rateChangeFilters.serviceCategory
-      );
-    }
-    
-    if (rateChangeFilters.serviceCode) {
-      changes = changes.filter((change: any) => 
-        change.serviceCode === rateChangeFilters.serviceCode
-      );
-    }
-    
-    if (rateChangeFilters.providerType) {
-      changes = changes.filter((change: any) => 
-        change.providerType === rateChangeFilters.providerType
-      );
-    }
-    
-    if (rateChangeFilters.program) {
-      changes = changes.filter((change: any) => 
-        change.program === rateChangeFilters.program
-      );
-    }
-    
-    return changes;
-  }, [recentRateData, selectedState, rateChangeFilters]);
-
-  // Get paginated rate changes
-  const paginatedRateChanges = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredRateChanges.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredRateChanges, currentPage, itemsPerPage]);
-
-  // Get summary statistics for rate changes
-  const rateChangesSummary = useMemo(() => {
-    if (!recentRateData || !recentRateData.summary) {
-      return {
-        totalChanges: 0,
-        averagePercentageChange: 0,
-        statesWithChanges: 0,
-        categoriesWithChanges: 0,
-        topStates: [],
-        topCategories: []
-      };
-    }
-    
-    return {
-      totalChanges: recentRateData.totalChanges || 0,
-      averagePercentageChange: recentRateData.summary.averagePercentageChange || 0,
-      statesWithChanges: recentRateData.summary.totalStates || 0,
-      categoriesWithChanges: recentRateData.summary.totalServiceCategories || 0,
-      topStates: [],
-      topCategories: []
-    };
-  }, [recentRateData]);
-
-  // Get filter options
-  const filterOptions = useMemo(() => {
-    if (!recentRateData || !recentRateData.changes) return { serviceCategories: [], serviceCodes: [], providerTypes: [], programs: [] };
-    
-    const allChanges = recentRateData.changes;
-    
-    const serviceCategories = Array.from(new Set(allChanges.map((c: any) => c.serviceCategory).filter(Boolean))).sort();
-    const serviceCodes = Array.from(new Set(allChanges.map((c: any) => c.serviceCode).filter(Boolean))).sort();
-    const providerTypes = Array.from(new Set(allChanges.map((c: any) => c.providerType).filter(Boolean))).sort();
-    const programs = Array.from(new Set(allChanges.map((c: any) => c.program).filter(Boolean))).sort();
-    
-    return {
-      serviceCategories,
-      serviceCodes,
-      providerTypes,
-      programs
-    };
-  }, [recentRateData]);
 
   // Get rate developments data with proper sorting
   const rateDevelopmentsData = useMemo(() => {
@@ -586,93 +448,6 @@ const HomePage = () => {
     );
   }
 
-  // CSV Export utility function
-  const exportToCSV = (data: any[], filename: string = 'recent_rate_changes.csv') => {
-    if (!data || data.length === 0) {
-      alert('No data to export');
-      return;
-    }
-
-    // Define CSV headers
-    const headers = [
-      'Service Code',
-      'Service Description',
-      'State',
-      'Service Category',
-      'Old Rate',
-      'New Rate',
-      'Percentage Change',
-      'Effective Date',
-      'Provider Type',
-      'Change Type'
-    ];
-
-    // Convert data to CSV format
-    const csvContent = [
-      headers.join(','),
-      ...data.map(item => [
-        `"${item.serviceCode || ''}"`,
-        `"${(item.serviceDescription || '').replace(/"/g, '""')}"`, // Escape quotes
-        `"${item.state || ''}"`,
-        `"${item.serviceCategory || ''}"`,
-        `"${item.oldRate || ''}"`,
-        `"${item.newRate || ''}"`,
-        `"${item.percentageChange || 0}"`,
-        `"${item.effectiveDate || ''}"`,
-        `"${item.providerType || ''}"`,
-        `"${item.isChange ? 'Rate Change' : 'Latest Rate'}"`
-      ].join(','))
-    ].join('\n');
-
-    // Create and download the file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // CSV Download handler
-  const handleDownloadCSV = () => {
-    if (!filteredRateChanges || filteredRateChanges.length === 0) {
-      alert('No data to export. Please select a state first.');
-      return;
-    }
-
-    setIsExporting(true);
-    setExportProgress(0);
-
-    // Simulate progress
-    const progressInterval = setInterval(() => {
-      setExportProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + 10;
-      });
-    }, 100);
-
-    // Export the data
-    setTimeout(() => {
-      const filename = selectedState 
-        ? `recent_rate_changes_${selectedState.replace(/\s+/g, '_')}.csv`
-        : 'recent_rate_changes.csv';
-      
-      exportToCSV(filteredRateChanges, filename);
-      
-      setExportProgress(100);
-      setTimeout(() => {
-        setIsExporting(false);
-        setExportProgress(0);
-      }, 500);
-    }, 1000);
-  };
-
   const handleStateSelect = (stateName: string | null) => {
     // If clicking the same state, deselect it
     if (selectedState === stateName) {
@@ -685,8 +460,6 @@ const HomePage = () => {
         fetchAlertData(stateName);
       }
     }
-    // Reset pagination when state changes
-    setCurrentPage(1);
   };
 
   // Fetch alert data for a specific state
@@ -888,126 +661,62 @@ const HomePage = () => {
 
   const stateStatistics = getStateStatistics(selectedState);
 
-  // Handle filter changes
-  const handleFilterChange = (filterType: keyof typeof rateChangeFilters, value: string) => {
-    setRateChangeFilters(prev => ({ ...prev, [filterType]: value }));
-    setCurrentPage(1);
-  };
-
-  // Handle page change
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  // Format date
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '-';
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
-  };
-
-  // Format rate
-  const formatRate = (rate: string) => {
-    if (!rate) return '-';
-    const numericRate = parseFloat(rate.replace(/[^0-9.-]/g, ''));
-    if (isNaN(numericRate)) return rate;
-    return `$${numericRate.toFixed(2)}`;
-  };
-
   return (
     <AppLayout activeTab="home">
       <div className="space-y-8">
         {/* Page Title */}
         <div className="mb-8">
-          <h1 className="text-xl sm:text-3xl md:text-4xl text-[#012C61] font-lemonMilkRegular uppercase mb-3 sm:mb-0">Medicaid Rate Explorer</h1>
-          <p className="text-gray-600 mt-2">Select a state to view detailed rate information and recent changes</p>
+          <h1 className="text-xl sm:text-3xl md:text-4xl text-[#012C61] font-lemonMilkRegular uppercase mb-3 sm:mb-0">State Profiles</h1>
+          <p className="text-gray-600 mt-2">Select a state to view detailed rate information and legislative updates</p>
         </div>
 
-        {/* Map and Modules Layout */}
+        {/* Modules Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* US Map Section - Left Side */}
           <Card>
             <CardHeader>
-              <CardTitle>Select by State</CardTitle>
+              <CardTitle>Modules</CardTitle>
               <CardDescription>
-                Click on any state to view detailed Medicaid rate information and filter recent changes
+                Access different features and tools
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-[500px] mb-4">
-                <USMap 
-                  onStateSelect={handleStateSelect}
-                  selectedState={selectedState}
-                />
+              <div className="grid grid-cols-1 gap-4">
+                {[
+                  {
+                    icon: TrendingUp,
+                    title: "Rate Changes",
+                    description: "Track and analyze fluctuations in Medicaid rates over time."
+                  },
+                  {
+                    icon: BookOpen,
+                    title: "Legislative & Policy Updates",
+                    description: "Stay informed about new laws and policies affecting Medicaid."
+                  },
+                  {
+                    icon: FileText,
+                    title: "Documents & State Notes",
+                    description: "Access official documents and state-specific notes for detailed context."
+                  },
+                ].map((module, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => {
+                      // Handle module clicks here
+                    }}
+                  >
+                    <div className="flex-shrink-0 mr-4">
+                      <module.icon className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900">{module.title}</h3>
+                      <p className="text-sm text-gray-600">{module.description}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-              
-              {/* State Selection Indicator */}
-              {selectedState ? (
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center">
-                    <CheckCircle className="h-5 w-5 text-blue-600 mr-2" />
-                    <p className="text-blue-800 font-medium">Selected State: {selectedState}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex items-center">
-                    <MapPin className="h-5 w-5 text-gray-500 mr-2" />
-                    <p className="text-gray-600">No state selected. Click on any state above to view details and filter recent rate changes.</p>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
-
-          {/* Modules Section - Right Side */}
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Modules</CardTitle>
-                <CardDescription>
-                  Access different features and tools
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 gap-4">
-                  {[
-                    {
-                      icon: TrendingUp,
-                      title: "Rate Changes",
-                      description: "Track and analyze fluctuations in Medicaid rates over time."
-                    },
-                    {
-                      icon: BookOpen,
-                      title: "Legislative & Policy Updates",
-                      description: "Stay informed about new laws and policies affecting Medicaid."
-                    },
-                    {
-                      icon: FileText,
-                      title: "Documents & State Notes",
-                      description: "Access official documents and state-specific notes for detailed context."
-                    },
-                  ].map((module, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => {
-                        // Handle module clicks here
-                      }}
-                    >
-                      <div className="flex-shrink-0 mr-4">
-                        <module.icon className="h-6 w-6 text-green-600" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900">{module.title}</h3>
-                        <p className="text-sm text-gray-600">{module.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
 
         {/* Key Statistics Cards - State Specific */}
@@ -1064,290 +773,6 @@ const HomePage = () => {
             </CardContent>
           </Card>
         </div>
-
-        {/* Recent Rate Changes Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <TrendingUp className="h-5 w-5 mr-2" />
-              Recent Rate Changes
-              {selectedState && (
-                <span className="ml-2 text-sm font-normal text-blue-600">
-                  (Filtered for {selectedState})
-                </span>
-              )}
-            </CardTitle>
-            <CardDescription>
-              Track recent changes in service rates {selectedState && `for ${selectedState}`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Summary Cards for Rate Changes */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-500">Total Records</h3>
-                <p className="text-xl font-bold text-gray-900">{filteredRateChanges.length.toLocaleString()}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {filteredRateChanges.filter((c: any) => c.isChange).length} actual changes, {filteredRateChanges.filter((c: any) => !c.isChange).length} latest rates
-                </p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-500">Avg. % Change</h3>
-                <p className="text-xl font-bold text-gray-900">
-                  {(() => {
-                    const actualChanges = filteredRateChanges.filter((change: any) => change.isChange);
-                    return actualChanges.length > 0 
-                      ? (actualChanges.reduce((sum: number, change: any) => sum + change.percentageChange, 0) / actualChanges.length).toFixed(1)
-                      : '0.0';
-                  })()}%
-                </p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-500">States Affected</h3>
-                <p className="text-xl font-bold text-gray-900">
-                  {new Set(filteredRateChanges.map((c: any) => c.state)).size}
-                </p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-gray-500">Service Categories</h3>
-                <p className="text-xl font-bold text-gray-900">
-                  {new Set(filteredRateChanges.map((c: any) => c.serviceCategory)).size}
-                </p>
-              </div>
-            </div>
-
-            {/* Filters */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Service Category</label>
-                  <select
-                    value={rateChangeFilters.serviceCategory}
-                    onChange={(e) => handleFilterChange('serviceCategory', e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Categories</option>
-                    {filterOptions.serviceCategories.map((category: any) => (
-                      <option key={category} value={category}>{category}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Service Code</label>
-                  <select
-                    value={rateChangeFilters.serviceCode}
-                    onChange={(e) => handleFilterChange('serviceCode', e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Codes</option>
-                    {filterOptions.serviceCodes.map((code: any) => (
-                      <option key={code} value={code}>{code}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Provider Type</label>
-                  <select
-                    value={rateChangeFilters.providerType}
-                    onChange={(e) => handleFilterChange('providerType', e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Types</option>
-                    {filterOptions.providerTypes.map((type: any) => (
-                      <option key={type} value={type}>{type}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Program</label>
-                  <select
-                    value={rateChangeFilters.program}
-                    onChange={(e) => handleFilterChange('program', e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">All Programs</option>
-                    {filterOptions.programs.map((program: any) => (
-                      <option key={program} value={program}>{program}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Export Button */}
-            {filteredRateChanges.length > 0 && (
-              <div className="mb-6 flex justify-end">
-                <button
-                  onClick={handleDownloadCSV}
-                  disabled={isExporting}
-                  className={`group relative flex items-center px-6 py-3 rounded-lg transition-all duration-200 font-semibold shadow-lg transform ${
-                    isExporting 
-                      ? 'bg-gray-400 cursor-not-allowed' 
-                      : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 hover:shadow-xl hover:-translate-y-0.5'
-                  }`}
-                >
-                  <div className="flex items-center">
-                    {isExporting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        <span>Exporting... {exportProgress}%</span>
-                      </>
-                    ) : (
-                      <>
-                        <Download className="mr-2 group-hover:animate-bounce" />
-                        <span>Export CSV</span>
-                        <span className="ml-2 bg-green-500 text-xs px-2 py-1 rounded-full">
-                          {filteredRateChanges.length}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  {!isExporting && (
-                    <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 rounded-lg transition-opacity duration-200"></div>
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* Export Progress Bar */}
-            {isExporting && (
-              <div className="mb-4 bg-gray-100 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Exporting data...</span>
-                  <span className="text-sm text-gray-500">{exportProgress}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-green-600 h-2 rounded-full transition-all duration-300 ease-out"
-                    style={{ width: `${exportProgress}%` }}
-                  ></div>
-                </div>
-              </div>
-            )}
-
-            {/* Loading State */}
-            {isLoadingRateChanges && (
-              <div className="flex justify-center items-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                <span className="ml-2 text-gray-600">Loading rate changes...</span>
-              </div>
-            )}
-
-            {/* Error State */}
-            {rateChangesError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-red-700">
-                  <AlertCircle className="h-4 w-4 inline mr-1" />
-                  Error loading rate changes: {rateChangesError}
-                </p>
-              </div>
-            )}
-
-            {/* Rate Changes Table */}
-            {!isLoadingRateChanges && !rateChangesError && (
-              <>
-                {/* Results Summary */}
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Rate Changes</h3>
-                  <p className="text-sm text-gray-500">
-                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredRateChanges.length)} of {filteredRateChanges.length} results
-                  </p>
-                </div>
-
-                {/* Table */}
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service Code</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">State</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Old Rate</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">New Rate</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% Change</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Effective Date</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Provider Type</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {paginatedRateChanges.length > 0 ? (
-                        paginatedRateChanges.map((change: any) => (
-                          <tr key={change.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{change.serviceCode}</td>
-                            <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate" title={change.serviceDescription}>{change.serviceDescription}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{change.state}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{change.serviceCategory}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{formatRate(change.oldRate)}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{formatRate(change.newRate)}</td>
-                            <td className={`px-4 py-3 whitespace-nowrap text-sm font-medium flex items-center ${
-                              change.isChange 
-                                ? (change.percentageChange > 0 ? 'text-green-600' : 'text-red-600')
-                                : 'text-blue-600'
-                            }`}>
-                              {change.isChange ? (
-                                <>
-                                  {change.percentageChange > 0 ? (
-                                    <ArrowUp className="h-3 w-3 mr-1" />
-                                  ) : (
-                                    <ArrowDown className="h-3 w-3 mr-1" />
-                                  )}
-                                  {change.percentageChange > 0 ? '+' : ''}{change.percentageChange.toFixed(1)}%
-                                </>
-                              ) : (
-                                <span className="text-blue-600">Latest Rate</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{formatDate(change.effectiveDate)}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{change.providerType || '-'}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
-                            {selectedState 
-                              ? `No rate changes found for ${selectedState} with the current filters.`
-                              : 'Select a state to view rate changes.'
-                            }
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Pagination */}
-                {filteredRateChanges.length > itemsPerPage && (
-                  <div className="mt-6 flex justify-center">
-                    <nav className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage === 1}
-                        className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        Previous
-                      </button>
-                      <span className="px-3 py-2 text-sm text-gray-700">
-                        Page {currentPage} of {Math.ceil(filteredRateChanges.length / itemsPerPage)}
-                      </span>
-                      <button
-                        onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage >= Math.ceil(filteredRateChanges.length / itemsPerPage)}
-                        className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-                      >
-                        Next
-                      </button>
-                    </nav>
-                  </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Rate Developments Section */}
         <Card>
@@ -1505,4 +930,4 @@ const HomePage = () => {
   );
 };
 
-export default HomePage;
+export default StateProfilesPage;
