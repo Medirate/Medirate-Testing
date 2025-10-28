@@ -4,32 +4,53 @@ import { useState, useEffect } from 'react';
 import Modal from './modal';
 import { useKindeBrowserClient } from '@kinde-oss/kinde-auth-nextjs';
 
-export default function TermsModal() {
-  const { isAuthenticated, isLoading } = useKindeBrowserClient();
-  const [isOpen, setIsOpen] = useState(false);
+interface TermsModalProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  autoShow?: boolean;
+}
 
-  // Show the modal once per session when the user logs in
+export default function TermsModal({ isOpen, onClose, autoShow = true }: TermsModalProps) {
+  const { isAuthenticated, isLoading } = useKindeBrowserClient();
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+
+  // Show the modal once per session when the user logs in (only if autoShow is true)
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
+    if (autoShow && isAuthenticated && !isLoading) {
       const accepted = sessionStorage.getItem('termsAccepted');
       if (!accepted) {
-        setIsOpen(true);
+        setInternalIsOpen(true);
       }
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, autoShow]);
+
+  // Use external isOpen prop if provided, otherwise use internal state
+  const modalIsOpen = isOpen !== undefined ? isOpen : internalIsOpen;
 
   const handleAccept = () => {
     sessionStorage.setItem('termsAccepted', 'true');
-    setIsOpen(false);
+    if (onClose) {
+      onClose();
+    } else {
+      setInternalIsOpen(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      setInternalIsOpen(false);
+    }
   };
 
   return (
     <Modal 
-      isOpen={isOpen} 
-      onClose={() => {}} 
+      isOpen={modalIsOpen} 
+      onClose={handleClose} 
       width="max-w-4xl"
       className="z-[1002]"
-      showCloseButton={false}
+      showCloseButton={onClose ? true : false}
     >
       <div className="p-6 flex flex-col h-[80vh]">
         <h2 className="text-xl font-bold text-[#012C61] uppercase font-lemonMilkRegular text-center mb-4">

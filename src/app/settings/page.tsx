@@ -2040,9 +2040,11 @@ export default function Settings() {
       />
 
       {/* Terms Modal */}
-      {showTermsModal && (
-        <TermsModal />
-      )}
+      <TermsModal 
+        isOpen={showTermsModal} 
+        onClose={() => setShowTermsModal(false)}
+        autoShow={false}
+      />
     </AppLayout>
   );
 }
