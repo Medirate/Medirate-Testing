@@ -735,6 +735,14 @@ function SettingsSubscription({
                     </div>
                   )}
 
+                  {/* Debug: Show current role */}
+                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      <strong>Debug Info:</strong> Current role: <code>{userRole || 'null'}</code> | 
+                      Can add users: <code>{(userRole === 'subscription_manager' || userRole === 'user') ? 'Yes' : 'No'}</code>
+                    </p>
+                  </div>
+
                   {/* Read-only notice for secondary users */}
                   {userRole === 'sub_user' && (
                     <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
@@ -992,6 +1000,14 @@ function SettingsSubscription({
                       </div>
                     </div>
                   )}
+
+                  {/* Debug: Show current role */}
+                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      <strong>Debug Info:</strong> Current role: <code>{userRole || 'null'}</code> | 
+                      Can add users: <code>{(userRole === 'subscription_manager' || userRole === 'user') ? 'Yes' : 'No'}</code>
+                    </p>
+                  </div>
 
                   {/* Read-only notice for secondary users */}
                   {userRole === 'sub_user' && (

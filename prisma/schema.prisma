@@ -26,7 +26,6 @@ model User {
   Picture            String?
   TotalSignIns       Int            @default(0)
   KindeUserID        String         @unique(map: "User_kindeuserid_key")
-  WelcomeEmailSent   Boolean        @default(false)
   Payment            Payment[]
   Settings           Settings[]
   SubUsers           SubUsers[]
