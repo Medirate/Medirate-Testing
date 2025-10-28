@@ -102,18 +102,72 @@ export async function POST(request: NextRequest) {
         console.log('🔄 Reactivated cancelled subscription');
       }
 
-      // Return the updated subscription info
-      const updatedSubscription = await stripe.subscriptions.retrieve(subscription.id);
+    // For scheduled upgrades, we need to use a different approach since Stripe doesn't allow
+    // custom phases when using from_subscription. We'll use trial_end to schedule the change.
+    
+    try {
+      // Calculate when the current period ends
+      const currentPeriodEnd = subscription.current_period_end;
+      const now = Math.floor(Date.now() / 1000);
+      
+      // If we're close to the end of the period, we might need to handle this differently
+      const daysUntilEnd = Math.floor((currentPeriodEnd - now) / (24 * 60 * 60));
+      
+      console.log(`📅 Current period ends in ${daysUntilEnd} days`);
+      console.log(`📅 Current period end: ${new Date(currentPeriodEnd * 1000).toISOString()}`);
+      
+      // Create a subscription schedule without from_subscription
+      const schedule = await stripe.subscriptionSchedules.create({
+        customer: customer.id,
+        start_date: now,
+        phases: [
+          {
+            // Phase 1: Current monthly plan until period end
+            items: [{
+              price: currentItem.price.id,
+              quantity: 1,
+            }],
+            end_date: currentPeriodEnd,
+          },
+          {
+            // Phase 2: New annual plan starting after current period
+            items: [{
+              price: newPriceId,
+              quantity: 1,
+            }],
+            // No end_date means it continues indefinitely
+          }
+        ],
+      });
+
+      console.log('📅 Created subscription schedule:', schedule.id);
+      console.log('   Phase 1 (current):', new Date(currentPeriodEnd * 1000).toISOString());
+      console.log('   Phase 2 (annual):', 'indefinite');
+
+      // Cancel the original subscription since we're replacing it with a schedule
+      await stripe.subscriptions.update(subscription.id, {
+        cancel_at_period_end: true,
+      });
+      
+      console.log('🔄 Original subscription marked for cancellation at period end');
+
+      // If subscription was cancelled, reactivate it
+      if (subscription.cancel_at_period_end) {
+        await stripe.subscriptions.update(subscription.id, {
+          cancel_at_period_end: false,
+        });
+        console.log('🔄 Reactivated cancelled subscription');
+      }
 
       return NextResponse.json({
         success: true,
         subscription: {
-          id: updatedSubscription.id,
-          status: updatedSubscription.status,
-          current_period_end: updatedSubscription.current_period_end,
-          current_period_start: updatedSubscription.current_period_start,
-          cancel_at_period_end: updatedSubscription.cancel_at_period_end,
-          items: updatedSubscription.items.data.map(item => ({
+          id: subscription.id,
+          status: subscription.status,
+          current_period_end: subscription.current_period_end,
+          current_period_start: subscription.current_period_start,
+          cancel_at_period_end: subscription.cancel_at_period_end,
+          items: subscription.items.data.map(item => ({
             id: item.id,
             price: {
               id: item.price.id,
@@ -135,7 +189,7 @@ export async function POST(request: NextRequest) {
             })),
           })),
         },
-        reactivated: subscription.cancel_at_period_end && !updatedSubscription.cancel_at_period_end,
+        reactivated: subscription.cancel_at_period_end && !subscription.cancel_at_period_end,
         scheduledUpgrade: true,
         upgradeEffectiveDate: new Date(subscription.current_period_end * 1000).toISOString(),
       });
