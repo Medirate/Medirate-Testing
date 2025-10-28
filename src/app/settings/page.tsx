@@ -1533,6 +1533,8 @@ export default function Settings() {
   const [isRemovingUser, setIsRemovingUser] = useState<string | null>(null);
   const [showAddUserConfirmation, setShowAddUserConfirmation] = useState(false);
   const [userToAdd, setUserToAdd] = useState<string>("");
+  const [showRemoveUserConfirmation, setShowRemoveUserConfirmation] = useState(false);
+  const [userToRemove, setUserToRemove] = useState<string>("");
 
   // Check user role
   useEffect(() => {
@@ -1649,26 +1651,69 @@ export default function Settings() {
 
   // Remove user from subscription
   const removeUserFromSubscription = async (email: string) => {
-    setIsRemovingUser(email);
+    // Show confirmation dialog first
+    setUserToRemove(email);
+    setShowRemoveUserConfirmation(true);
+  };
+
+  const confirmRemoveUser = async () => {
+    if (!userToRemove.trim()) return;
+    
+    setIsRemovingUser(userToRemove.trim());
     try {
       const response = await fetch("/api/subscription-users", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email: userToRemove.trim() })
       });
       
       if (response.ok) {
-        fetchSubscriptionUsers(); // Refresh the list
+        setUserToRemove("");
+        setShowRemoveUserConfirmation(false);
+        
+        // Show success message
+        alert(`✅ Sub user ${userToRemove.trim()} has been successfully removed from your subscription!`);
+        
+        // Refresh the subscription users list
+        await fetchSubscriptionUsers();
+        
+        // Send email notification to removed user
+        try {
+          await fetch('/api/send-user-removal-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userEmail: userToRemove.trim(),
+              primaryUserEmail: auth.userEmail,
+              action: 'user_removed'
+            })
+          });
+          console.log('✅ Removal email sent successfully');
+        } catch (emailError) {
+          console.error('Error sending removal email:', emailError);
+          // Don't fail the removal if email fails
+        }
+        
+        // Auto-refresh the page after 2 seconds to show updated user list
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+        
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to remove user");
+        alert(`❌ Failed to remove sub user: ${error.error || "Unknown error"}`);
       }
     } catch (error) {
       console.error("Error removing user:", error);
-      alert("Failed to remove user");
+      alert("❌ Failed to remove sub user. Please try again.");
     } finally {
       setIsRemovingUser(null);
     }
+  };
+
+  const cancelRemoveUser = () => {
+    setShowRemoveUserConfirmation(false);
+    setUserToRemove("");
   };
 
   // Fetch users when component mounts
@@ -1892,6 +1937,70 @@ export default function Settings() {
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
                   {isAddingUser ? "Adding..." : "Add Sub User"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Remove Sub User Confirmation Modal */}
+      {showRemoveUserConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-xl font-semibold text-gray-900">Remove Sub User</h3>
+              <button
+                onClick={cancelRemoveUser}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <div className="flex items-start mb-4">
+                <div className="flex-shrink-0">
+                  <svg className="w-8 h-8 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">Confirm User Removal</h4>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Are you sure you want to remove <strong>{userToRemove}</strong> from your subscription?
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <h5 className="font-medium text-red-800 mb-2">What happens next?</h5>
+                <ul className="text-sm text-red-700 space-y-1">
+                  <li>• The user will lose access to the application immediately</li>
+                  <li>• They will receive an email notification about the removal</li>
+                  <li>• They can re-register as a sub user if needed</li>
+                  <li>• This action cannot be undone</li>
+                </ul>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={cancelRemoveUser}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmRemoveUser}
+                  disabled={isRemovingUser === userToRemove}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  {isRemovingUser === userToRemove ? "Removing..." : "Remove Sub User"}
                 </button>
               </div>
             </div>
