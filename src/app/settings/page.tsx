@@ -419,7 +419,7 @@ function SettingsSubscription({
                         {/* Show other users */}
                         {subscriptionUsers.length === 0 ? (
                           <div className="text-gray-500 text-sm text-center py-4">
-                            No other users in this subscription.
+                            No other sub users in this subscription.
                           </div>
                         ) : (
                           subscriptionUsers.map((user, index) => (
@@ -432,7 +432,7 @@ function SettingsSubscription({
                                 </div>
                                 <div className="ml-3">
                                   <div className="text-sm font-medium text-gray-900">{user.email}</div>
-                                  <div className="text-xs text-gray-500">Secondary User</div>
+                                  <div className="text-xs text-gray-500">Sub User</div>
                                 </div>
                               </div>
                               <div className="text-xs text-gray-400">View Only</div>
@@ -712,16 +712,16 @@ function SettingsSubscription({
                     </div>
                   </div>
 
-                  {/* Add User Form - Only for managers and primary users */}
+                  {/* Add Sub User Form - Only for managers and primary users */}
                   {(userRole === 'subscription_manager' || userRole === 'user') && (
                     <div className="mb-6">
-                      <h4 className="font-semibold text-gray-900 mb-3">Add User to Subscription</h4>
+                      <h4 className="font-semibold text-gray-900 mb-3">Add Sub User to Subscription</h4>
                       <div className="flex gap-2">
                         <input
                           type="email"
                           value={newUserEmail}
                           onChange={(e) => setNewUserEmail(e.target.value)}
-                          placeholder="Enter user email address"
+                          placeholder="Enter sub user email address"
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <button
@@ -729,7 +729,7 @@ function SettingsSubscription({
                           disabled={!newUserEmail.trim() || isAddingUser}
                           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isAddingUser ? "Adding..." : "Add User"}
+                          {isAddingUser ? "Adding..." : "Add Sub User"}
                         </button>
                       </div>
                     </div>
@@ -739,11 +739,11 @@ function SettingsSubscription({
                   <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-sm text-yellow-800">
                       <strong>Debug Info:</strong> Current role: <code>{userRole || 'null'}</code> | 
-                      Can add users: <code>{(userRole === 'subscription_manager' || userRole === 'user') ? 'Yes' : 'No'}</code>
+                      Can add sub users: <code>{(userRole === 'subscription_manager' || userRole === 'user') ? 'Yes' : 'No'}</code>
                     </p>
                   </div>
 
-                  {/* Read-only notice for secondary users */}
+                  {/* Read-only notice for sub users */}
                   {userRole === 'sub_user' && (
                     <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
                       <div className="flex items-center">
@@ -751,7 +751,7 @@ function SettingsSubscription({
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                         </svg>
                         <p className="text-sm text-gray-600">
-                          As a secondary user, you can view subscription information but cannot add or remove users. 
+                          As a sub user, you can view subscription information but cannot add or remove users. 
                           Contact your subscription manager or primary user for user management.
                         </p>
                       </div>
@@ -774,7 +774,7 @@ function SettingsSubscription({
                             <div className="text-sm font-medium text-gray-900">{auth.userEmail}</div>
                             <div className="text-xs text-gray-500">
                               {userRole === 'subscription_manager' ? 'Subscription Manager' : 
-                               userRole === 'user' ? 'Primary User' : 'Secondary User'}
+                               userRole === 'user' ? 'Primary User' : 'Sub User'}
                             </div>
                           </div>
                         </div>
@@ -785,8 +785,8 @@ function SettingsSubscription({
                       {subscriptionUsers.length === 0 ? (
                         <div className="text-gray-500 text-sm text-center py-4">
                           {userRole === 'subscription_manager' 
-                            ? "No secondary users added yet." 
-                            : "No other users in this subscription."}
+                            ? "No sub users added yet." 
+                            : "No other sub users in this subscription."}
                         </div>
                       ) : (
                         subscriptionUsers.map((user, index) => (
@@ -799,7 +799,7 @@ function SettingsSubscription({
                               </div>
                               <div className="ml-3">
                                 <div className="text-sm font-medium text-gray-900">{user.email}</div>
-                                <div className="text-xs text-gray-500">Secondary User</div>
+                                <div className="text-xs text-gray-500">Sub User</div>
                               </div>
                             </div>
                             {(userRole === 'subscription_manager' || userRole === 'user') ? (
@@ -978,16 +978,16 @@ function SettingsSubscription({
                     </div>
                   </div>
 
-                  {/* Add User Form - Only for managers and primary users */}
+                  {/* Add Sub User Form - Only for managers and primary users */}
                   {(userRole === 'subscription_manager' || userRole === 'user') && (
                     <div className="mb-6">
-                      <h5 className="font-semibold text-gray-900 mb-3">Add User to Subscription</h5>
+                      <h5 className="font-semibold text-gray-900 mb-3">Add Sub User to Subscription</h5>
                       <div className="flex gap-2">
                         <input
                           type="email"
                           value={newUserEmail}
                           onChange={(e) => setNewUserEmail(e.target.value)}
-                          placeholder="Enter user email address"
+                          placeholder="Enter sub user email address"
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <button
@@ -995,7 +995,7 @@ function SettingsSubscription({
                           disabled={!newUserEmail.trim() || isAddingUser}
                           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isAddingUser ? "Adding..." : "Add User"}
+                          {isAddingUser ? "Adding..." : "Add Sub User"}
                         </button>
                       </div>
                     </div>
@@ -1005,11 +1005,11 @@ function SettingsSubscription({
                   <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-sm text-yellow-800">
                       <strong>Debug Info:</strong> Current role: <code>{userRole || 'null'}</code> | 
-                      Can add users: <code>{(userRole === 'subscription_manager' || userRole === 'user') ? 'Yes' : 'No'}</code>
+                      Can add sub users: <code>{(userRole === 'subscription_manager' || userRole === 'user') ? 'Yes' : 'No'}</code>
                     </p>
                   </div>
 
-                  {/* Read-only notice for secondary users */}
+                  {/* Read-only notice for sub users */}
                   {userRole === 'sub_user' && (
                     <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
                       <div className="flex items-center">
@@ -1017,7 +1017,7 @@ function SettingsSubscription({
                           <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                           </svg>
                         <p className="text-sm text-gray-600">
-                          As a secondary user, you can view subscription information but cannot add or remove users. 
+                          As a sub user, you can view subscription information but cannot add or remove users. 
                           Contact your subscription manager or primary user for user management.
                         </p>
                       </div>
@@ -1040,7 +1040,7 @@ function SettingsSubscription({
                             <div className="text-sm font-medium text-gray-900">{auth.userEmail}</div>
                             <div className="text-xs text-gray-500">
                               {userRole === 'subscription_manager' ? 'Subscription Manager' : 
-                               userRole === 'user' ? 'Primary User' : 'Secondary User'}
+                               userRole === 'user' ? 'Primary User' : 'Sub User'}
                             </div>
                           </div>
                         </div>
@@ -1051,8 +1051,8 @@ function SettingsSubscription({
                       {subscriptionUsers.length === 0 ? (
                         <div className="text-gray-500 text-sm text-center py-4">
                           {userRole === 'subscription_manager' 
-                            ? "No secondary users added yet." 
-                            : "No other users in this subscription."}
+                            ? "No sub users added yet." 
+                            : "No other sub users in this subscription."}
                         </div>
                       ) : (
                         subscriptionUsers.map((user, index) => (
@@ -1065,7 +1065,7 @@ function SettingsSubscription({
                               </div>
                               <div className="ml-3">
                                 <div className="text-sm font-medium text-gray-900">{user.email}</div>
-                                <div className="text-xs text-gray-500">Secondary User</div>
+                                <div className="text-xs text-gray-500">Sub User</div>
                               </div>
                             </div>
                             {(userRole === 'subscription_manager' || userRole === 'user') ? (
@@ -1836,13 +1836,13 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Add User Confirmation Modal */}
+      {/* Add Sub User Confirmation Modal */}
       {showAddUserConfirmation && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900">Add Secondary User</h3>
+              <h3 className="text-xl font-semibold text-gray-900">Add Sub User</h3>
               <button
                 onClick={cancelAddUser}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -1864,7 +1864,7 @@ export default function Settings() {
                 <div className="ml-3">
                   <h4 className="text-lg font-medium text-gray-900 mb-2">Confirm User Addition</h4>
                   <p className="text-sm text-gray-600 mb-4">
-                    Are you sure you want to add <strong>{userToAdd}</strong> as a secondary user for the subscription?
+                    Are you sure you want to add <strong>{userToAdd}</strong> as a sub user for the subscription?
                   </p>
                 </div>
               </div>
@@ -1892,7 +1892,7 @@ export default function Settings() {
                   disabled={isAddingUser}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
-                  {isAddingUser ? "Adding..." : "Add User"}
+                  {isAddingUser ? "Adding..." : "Add Sub User"}
                 </button>
               </div>
             </div>
