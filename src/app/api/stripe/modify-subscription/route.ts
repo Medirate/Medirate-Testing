@@ -63,149 +63,96 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'You are already on the annual plan' }, { status: 400 });
     }
 
-    // For scheduled upgrades, we need to use Subscription Schedules to properly schedule the change
-    // This ensures the annual plan starts after the monthly period ends with no immediate charges
-    
-    try {
-      // Create a subscription schedule to handle the scheduled upgrade
-      const schedule = await stripe.subscriptionSchedules.create({
-        from_subscription: subscription.id,
-        phases: [
-          {
-            // Phase 1: Current monthly plan until period end
-            items: [{
-              price: currentItem.price.id,
-              quantity: 1,
-            }],
-            end_date: subscription.current_period_end,
-          },
-          {
-            // Phase 2: New annual plan starting after current period
-            items: [{
-              price: newPriceId,
-              quantity: 1,
-            }],
-            // No end_date means it continues indefinitely
-          }
-        ],
-      });
-
-      console.log('📅 Created subscription schedule:', schedule.id);
-      console.log('   Phase 1 (current):', subscription.current_period_end);
-      console.log('   Phase 2 (annual):', 'indefinite');
-
-      // If subscription is cancelled, reactivate it
-      if (subscription.cancel_at_period_end) {
-        await stripe.subscriptions.update(subscription.id, {
-          cancel_at_period_end: false,
-        });
-        console.log('🔄 Reactivated cancelled subscription');
-      }
-
     // For scheduled upgrades, we need to use a different approach since Stripe doesn't allow
-    // custom phases when using from_subscription. We'll use trial_end to schedule the change.
+    // custom phases when using from_subscription. We'll create a schedule directly.
     
-    try {
-      // Calculate when the current period ends
-      const currentPeriodEnd = subscription.current_period_end;
-      const now = Math.floor(Date.now() / 1000);
-      
-      // If we're close to the end of the period, we might need to handle this differently
-      const daysUntilEnd = Math.floor((currentPeriodEnd - now) / (24 * 60 * 60));
-      
-      console.log(`📅 Current period ends in ${daysUntilEnd} days`);
-      console.log(`📅 Current period end: ${new Date(currentPeriodEnd * 1000).toISOString()}`);
-      
-      // Create a subscription schedule without from_subscription
-      const schedule = await stripe.subscriptionSchedules.create({
-        customer: customer.id,
-        start_date: now,
-        phases: [
-          {
-            // Phase 1: Current monthly plan until period end
-            items: [{
-              price: currentItem.price.id,
-              quantity: 1,
-            }],
-            end_date: currentPeriodEnd,
-          },
-          {
-            // Phase 2: New annual plan starting after current period
-            items: [{
-              price: newPriceId,
-              quantity: 1,
-            }],
-            // No end_date means it continues indefinitely
-          }
-        ],
-      });
+    // Calculate when the current period ends
+    const currentPeriodEnd = subscription.current_period_end;
+    const now = Math.floor(Date.now() / 1000);
+    
+    // If we're close to the end of the period, we might need to handle this differently
+    const daysUntilEnd = Math.floor((currentPeriodEnd - now) / (24 * 60 * 60));
+    
+    console.log(`📅 Current period ends in ${daysUntilEnd} days`);
+    console.log(`📅 Current period end: ${new Date(currentPeriodEnd * 1000).toISOString()}`);
+    
+    // Create a subscription schedule without from_subscription
+    const schedule = await stripe.subscriptionSchedules.create({
+      customer: customer.id,
+      start_date: now,
+      phases: [
+        {
+          // Phase 1: Current monthly plan until period end
+          items: [{
+            price: currentItem.price.id,
+            quantity: 1,
+          }],
+          end_date: currentPeriodEnd,
+        },
+        {
+          // Phase 2: New annual plan starting after current period
+          items: [{
+            price: newPriceId,
+            quantity: 1,
+          }],
+          // No end_date means it continues indefinitely
+        }
+      ],
+    });
 
-      console.log('📅 Created subscription schedule:', schedule.id);
-      console.log('   Phase 1 (current):', new Date(currentPeriodEnd * 1000).toISOString());
-      console.log('   Phase 2 (annual):', 'indefinite');
+    console.log('📅 Created subscription schedule:', schedule.id);
+    console.log('   Phase 1 (current):', new Date(currentPeriodEnd * 1000).toISOString());
+    console.log('   Phase 2 (annual):', 'indefinite');
 
-      // Cancel the original subscription since we're replacing it with a schedule
+    // Cancel the original subscription since we're replacing it with a schedule
+    await stripe.subscriptions.update(subscription.id, {
+      cancel_at_period_end: true,
+    });
+    
+    console.log('🔄 Original subscription marked for cancellation at period end');
+
+    // If subscription was cancelled, reactivate it
+    if (subscription.cancel_at_period_end) {
       await stripe.subscriptions.update(subscription.id, {
-        cancel_at_period_end: true,
+        cancel_at_period_end: false,
       });
-      
-      console.log('🔄 Original subscription marked for cancellation at period end');
-
-      // If subscription was cancelled, reactivate it
-      if (subscription.cancel_at_period_end) {
-        await stripe.subscriptions.update(subscription.id, {
-          cancel_at_period_end: false,
-        });
-        console.log('🔄 Reactivated cancelled subscription');
-      }
-
-      return NextResponse.json({
-        success: true,
-        subscription: {
-          id: subscription.id,
-          status: subscription.status,
-          current_period_end: subscription.current_period_end,
-          current_period_start: subscription.current_period_start,
-          cancel_at_period_end: subscription.cancel_at_period_end,
-          items: subscription.items.data.map(item => ({
-            id: item.id,
-            price: {
-              id: item.price.id,
-              unit_amount: item.price.unit_amount,
-              currency: item.price.currency,
-              recurring: item.price.recurring,
-            },
-          })),
-        },
-        schedule: {
-          id: schedule.id,
-          current_phase: schedule.current_phase,
-          phases: schedule.phases.map(phase => ({
-            start_date: phase.start_date,
-            end_date: phase.end_date,
-            items: phase.items.map(item => ({
-              price_id: item.price,
-              quantity: item.quantity,
-            })),
-          })),
-        },
-        reactivated: subscription.cancel_at_period_end && !subscription.cancel_at_period_end,
-        scheduledUpgrade: true,
-        upgradeEffectiveDate: new Date(subscription.current_period_end * 1000).toISOString(),
-      });
-
-    } catch (scheduleError) {
-      console.error('❌ Error creating subscription schedule:', scheduleError);
-      
-      // Fallback: If subscription schedules fail, we'll need to handle this differently
-      return NextResponse.json(
-        { 
-          error: 'Failed to schedule upgrade. Please contact support.', 
-          details: 'Subscription schedule creation failed' 
-        },
-        { status: 500 }
-      );
+      console.log('🔄 Reactivated cancelled subscription');
     }
+
+    return NextResponse.json({
+      success: true,
+      subscription: {
+        id: subscription.id,
+        status: subscription.status,
+        current_period_end: subscription.current_period_end,
+        current_period_start: subscription.current_period_start,
+        cancel_at_period_end: subscription.cancel_at_period_end,
+        items: subscription.items.data.map(item => ({
+          id: item.id,
+          price: {
+            id: item.price.id,
+            unit_amount: item.price.unit_amount,
+            currency: item.price.currency,
+            recurring: item.price.recurring,
+          },
+        })),
+      },
+      schedule: {
+        id: schedule.id,
+        current_phase: schedule.current_phase,
+        phases: schedule.phases.map(phase => ({
+          start_date: phase.start_date,
+          end_date: phase.end_date,
+          items: phase.items.map(item => ({
+            price_id: item.price,
+            quantity: item.quantity,
+          })),
+        })),
+      },
+      reactivated: subscription.cancel_at_period_end && !subscription.cancel_at_period_end,
+      scheduledUpgrade: true,
+      upgradeEffectiveDate: new Date(subscription.current_period_end * 1000).toISOString(),
+    });
 
   } catch (error) {
     console.error('Error modifying subscription:', error);
