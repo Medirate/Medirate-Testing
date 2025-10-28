@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import AppLayout from "@/app/components/applayout";
-import { useProtectedPage } from "@/context/AuthContext";
+import { useRequireSubscription } from "@/hooks/useRequireAuth";
 import { useRouter } from "next/navigation";
 import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -103,7 +103,7 @@ const reverseStateMap = Object.fromEntries(
 
 const StateProfilesPage = () => {
   // ALL HOOKS MUST BE AT THE TOP - NO CONDITIONAL RETURNS BEFORE HOOKS
-  const auth = useProtectedPage();
+  const auth = useRequireSubscription();
   const router = useRouter();
   const { isSubscriptionManager, isChecking } = useSubscriptionManagerRedirect();
   
@@ -178,13 +178,6 @@ const StateProfilesPage = () => {
 
     fetchRateDevelopments();
   }, []);
-
-  // Redirect if not authenticated using useEffect
-  useEffect(() => {
-    if (!auth.isAuthenticated) {
-      router.push("/");
-    }
-  }, [auth.isAuthenticated, router]);
 
   // ALL useMemo hooks
 
@@ -425,11 +418,6 @@ const StateProfilesPage = () => {
 
 
   // NOW ALL CONDITIONAL RETURNS AFTER ALL HOOKS
-  // Early return for authentication
-  if (!auth.isAuthenticated) {
-    return null;
-  }
-
   // Show loading while checking role
   if (isChecking) {
     return (
@@ -668,55 +656,6 @@ const StateProfilesPage = () => {
         <div className="mb-8">
           <h1 className="text-xl sm:text-3xl md:text-4xl text-[#012C61] font-lemonMilkRegular uppercase mb-3 sm:mb-0">State Profiles</h1>
           <p className="text-gray-600 mt-2">Select a state to view detailed rate information and legislative updates</p>
-        </div>
-
-        {/* Modules Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Modules</CardTitle>
-              <CardDescription>
-                Access different features and tools
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-4">
-                {[
-                  {
-                    icon: TrendingUp,
-                    title: "Rate Changes",
-                    description: "Track and analyze fluctuations in Medicaid rates over time."
-                  },
-                  {
-                    icon: BookOpen,
-                    title: "Legislative & Policy Updates",
-                    description: "Stay informed about new laws and policies affecting Medicaid."
-                  },
-                  {
-                    icon: FileText,
-                    title: "Documents & State Notes",
-                    description: "Access official documents and state-specific notes for detailed context."
-                  },
-                ].map((module, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => {
-                      // Handle module clicks here
-                    }}
-                  >
-                    <div className="flex-shrink-0 mr-4">
-                      <module.icon className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{module.title}</h3>
-                      <p className="text-sm text-gray-600">{module.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Key Statistics Cards - State Specific */}
