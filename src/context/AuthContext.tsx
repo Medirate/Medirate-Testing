@@ -72,9 +72,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (hasActiveSubscription) {
         console.log("✅ AuthContext: User has active Stripe subscription - GRANTED ACCESS");
         
-        // Check for first-time login and send welcome email
-        await checkAndSendFirstLoginWelcome(userEmail);
-        
         setAuthState({
           isPrimaryUser: true, // Treat as primary user if they have active subscription
           isSubUser: false,
@@ -138,43 +135,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-// ✅ **Check and Send First Login Welcome Email**
-async function checkAndSendFirstLoginWelcome(userEmail: string) {
-  try {
-    // Check if this is the user's first login by looking at their login history
-    const response = await fetch('/api/user', {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    if (response.ok) {
-      const userData = await response.json();
-      
-      // Check if user has never logged in before (no LastSignedIn or TotalSignIns is 0)
-      if (userData.user && (!userData.user.LastSignedIn || userData.user.TotalSignIns === 0)) {
-        console.log(`🎉 First login detected for: ${userEmail}`);
-        
-        // Send first login welcome email
-        await fetch('/api/send-welcome-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userEmail,
-            firstName: userData.user.FirstName,
-            lastName: userData.user.LastName,
-            isFirstLogin: true
-          })
-        });
-        
-        console.log(`📧 First login welcome email sent to: ${userEmail}`);
-      }
-    }
-  } catch (error) {
-    console.error('Error checking first login:', error);
-    // Don't fail the auth process if this fails
-  }
 }
 
 export function useAuth() {

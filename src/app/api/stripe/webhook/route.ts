@@ -75,7 +75,7 @@ async function handleSubscription(subscription: Stripe.Subscription) {
 
   const { data: user, error } = await supabase
     .from("User")
-    .select("UserID, FirstName, LastName")
+    .select("UserID, FirstName, LastName, WelcomeEmailSent")
     .eq("Email", customerEmail.email)
     .single();
 
@@ -126,11 +126,19 @@ async function handleSubscription(subscription: Stripe.Subscription) {
   } else {
     console.log(`✅ User subscription updated: ${subscription.status}${selectedRole ? ` with role: ${selectedRole}` : ''}`);
     
-    // Send welcome email for new active subscriptions
-    if (subscription.status === 'active') {
+    // Send welcome email for new active subscriptions (only if not already sent)
+    if (subscription.status === 'active' && !user.WelcomeEmailSent) {
       try {
         console.log(`📧 Sending welcome email for new subscription to: ${customerEmail.email}`);
         await sendWelcomeEmailForSubscription(customerEmail.email, user.FirstName, user.LastName);
+        
+        // Mark welcome email as sent
+        await supabase
+          .from("User")
+          .update({ WelcomeEmailSent: true })
+          .eq("UserID", user.UserID);
+        
+        console.log(`✅ Welcome email sent and marked for: ${customerEmail.email}`);
       } catch (emailError) {
         console.error("❌ Error sending welcome email:", emailError);
         // Don't fail the webhook if email fails
