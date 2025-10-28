@@ -502,7 +502,7 @@ const StripePricingTableWithFooter = () => {
 
   // Removed subscription checking - allow all users to subscribe
 
-  // Removed sub-user checking - allow all users to subscribe
+  // Removed sub user checking - allow all users to subscribe
 
   // Email verification functions (real via Brevo-backed API)
   const handleSendVerificationCode = async () => {
@@ -861,7 +861,7 @@ const StripePricingTableWithFooter = () => {
                     <ul className="list-disc ml-4 space-y-1">
                       <li><strong>Subscription Manager:</strong> Manages billing and user access only (cannot use application features)</li>
                       <li><strong>Primary User:</strong> Full access to application features and can manage users</li>
-                      <li><strong>Secondary User:</strong> Full access to application features (managed by Subscription Manager or Primary User)</li>
+                      <li><strong>Sub User:</strong> Full access to application features (managed by Subscription Manager or Primary User)</li>
               </ul>
                   </div>
 
@@ -871,7 +871,7 @@ const StripePricingTableWithFooter = () => {
                       <p className="mb-2"><strong>Option 1: With Subscription Manager</strong></p>
                       <ul className="list-disc ml-4 space-y-1 text-xs">
                         <li>1 Subscription Manager (does not count toward user limit)</li>
-                        <li>3 Secondary Users (full application access)</li>
+                        <li>3 Sub Users (full application access)</li>
                         <li><strong>Total: 3 application users + 1 manager</strong></li>
                       </ul>
                     </div>
@@ -880,7 +880,7 @@ const StripePricingTableWithFooter = () => {
                       <p className="mb-2"><strong>Option 2: With Primary User</strong></p>
                       <ul className="list-disc ml-4 space-y-1 text-xs">
                         <li>1 Primary User (uses 1 slot, can manage others)</li>
-                        <li>2 Secondary Users (full application access)</li>
+                        <li>2 Sub Users (full application access)</li>
                         <li><strong>Total: 3 application users</strong></li>
                       </ul>
                     </div>
@@ -888,7 +888,7 @@ const StripePricingTableWithFooter = () => {
 
                   <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
                     <p className="text-xs text-amber-700">
-                      <strong>💡 Recommendation:</strong> If you need a dedicated billing manager who won't use the application, choose Subscription Manager. If you want to use the application yourself and manage others, choose Primary User. And if you want to be a Secondary User under an active subscription, contact your Subscription Manager/Primary User and ask them to add your email in the slot under Settings and then you can directly log into the application.
+                      <strong>💡 Recommendation:</strong> If you need a dedicated billing manager who won't use the application, choose Subscription Manager. If you want to use the application yourself and manage others, choose Primary User. And if you want to be a Sub User under an active subscription, contact your Subscription Manager/Primary User and ask them to add your email in the slot under Settings and then you can directly log into the application.
                     </p>
                   </div>
                 </div>
@@ -1782,7 +1782,7 @@ const StripePricingTableWithFooter = () => {
                 <div className="ml-3">
                   <h4 className="text-lg font-medium text-gray-900 mb-2">Sub-User Account Created</h4>
                   <p className="text-sm text-gray-600 mb-4">
-                    Since you're a sub-user, you'll need to be added to an existing subscription by your primary user or subscription manager.
+                    Since you're a sub user, you'll need to be added to an existing subscription by your primary user or subscription manager.
                   </p>
                 </div>
               </div>
@@ -1791,7 +1791,7 @@ const StripePricingTableWithFooter = () => {
                 <h5 className="font-medium text-blue-800 mb-2">What happens next?</h5>
                 <ul className="text-sm text-blue-700 space-y-1">
                   <li>• Contact your primary user or subscription manager</li>
-                  <li>• Ask them to add you as a secondary user</li>
+                  <li>• Ask them to add you as a sub user</li>
                   <li>• Once added, you can log in directly to the application</li>
                 </ul>
               </div>
