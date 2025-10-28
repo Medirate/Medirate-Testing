@@ -731,10 +731,10 @@ const StripePricingTableWithFooter = () => {
                     <p>As a Subscription Manager, you currently don't have an active subscription. Please create a new subscription <button onClick={() => scrollToElementById('pricing-table')} className="text-amber-800 underline hover:text-amber-900 font-medium">below</button>.</p>
                   )}
                   {redirectReason.startsWith('sub_user_no_primary_subscription') && (
-                    <p>The primary user associated with your account ({redirectReason.split(':')[1]}) doesn't have an active subscription. Please contact them to renew their subscription or create a new subscription <button onClick={() => scrollToElementById('pricing-table')} className="text-amber-800 underline hover:text-amber-900 font-medium">below</button>.</p>
+                    <p>You are registered as a sub user, but the subscription you are attached to is not currently active. The primary user ({redirectReason.split(':')[1]}) needs to renew their subscription for you to access the application. Please contact them to resolve this issue or create a new subscription <button onClick={() => scrollToElementById('pricing-table')} className="text-amber-800 underline hover:text-amber-900 font-medium">below</button>.</p>
                   )}
                   {redirectReason === 'sub_user_no_primary' && (
-                    <p>You are registered as a sub user but no primary user is associated with your account. Please contact support or create a new subscription <button onClick={() => scrollToElementById('pricing-table')} className="text-amber-800 underline hover:text-amber-900 font-medium">below</button>.</p>
+                    <p>You are registered as a sub user, but no primary user is currently associated with your account. Please contact your subscription manager or create a new subscription <button onClick={() => scrollToElementById('pricing-table')} className="text-amber-800 underline hover:text-amber-900 font-medium">below</button>.</p>
                   )}
                   <p className="text-sm mt-3">
                     <strong>Need assistance?</strong> If you have any questions or need support, please email us at{' '}

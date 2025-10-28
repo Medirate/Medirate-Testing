@@ -99,6 +99,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isSubUser = subUserData.isSubUser;
         primaryUserEmail = subUserData.primaryUser;
         console.log("🔍 AuthContext: Sub user check result:", { isSubUser, primaryUserEmail });
+        
+        // If user is a sub user, check if their primary user has an active subscription
+        if (isSubUser && primaryUserEmail) {
+          console.log("🔍 AuthContext: Checking primary user's subscription status...");
+          const primaryUserStripeResponse = await fetch("/api/stripe/subscription", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: primaryUserEmail }),
+          });
+          
+          if (primaryUserStripeResponse.ok) {
+            const primaryUserStripeData = await primaryUserStripeResponse.json();
+            const primaryUserHasActiveSubscription = primaryUserStripeData.status === 'active';
+            
+            console.log("🔍 AuthContext: Primary user subscription status:", { 
+              primaryUserEmail, 
+              hasActiveSubscription: primaryUserHasActiveSubscription 
+            });
+            
+            if (primaryUserHasActiveSubscription) {
+              console.log("✅ AuthContext: Sub user has access through primary user's active subscription");
+              setAuthState({
+                isPrimaryUser: false,
+                isSubUser: true,
+                hasActiveSubscription: false, // Sub user doesn't have their own subscription
+                hasFormData: true,
+                isCheckComplete: true,
+                subscriptionData: primaryUserStripeData,
+                primaryUserEmail: primaryUserEmail
+              });
+              return;
+            } else {
+              console.log("❌ AuthContext: Primary user does not have active subscription");
+              // Will fall through to show appropriate message
+            }
+          }
+        }
       }
       
       // Check if they have form data (for better redirect UX)
