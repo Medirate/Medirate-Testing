@@ -18,7 +18,7 @@ export async function GET() {
     console.log("🔍 Debug: Checking user status for:", userEmail);
 
     // Check all possible tables for this user
-    const results = {
+    const results: any = {
       userEmail,
       timestamp: new Date().toISOString(),
       checks: {}
@@ -38,7 +38,7 @@ export async function GET() {
         data: stripeData
       };
     } catch (error) {
-      results.checks.stripe = { error: error.message };
+      results.checks.stripe = { error: error instanceof Error ? error.message : String(error) };
     }
 
     // 2. Check subscription_users table
@@ -67,7 +67,7 @@ export async function GET() {
         error: subUsersError
       };
     } catch (error) {
-      results.checks.subscriptionUsers = { error: error.message };
+      results.checks.subscriptionUsers = { error: error instanceof Error ? error.message : String(error) };
     }
 
     // 3. Check transferred_subscriptions table
@@ -83,7 +83,7 @@ export async function GET() {
         error: transferredError
       };
     } catch (error) {
-      results.checks.transferredSubscriptions = { error: error.message };
+      results.checks.transferredSubscriptions = { error: error instanceof Error ? error.message : String(error) };
     }
 
     // 4. Check registration form
@@ -96,7 +96,7 @@ export async function GET() {
         error: formData.error
       };
     } catch (error) {
-      results.checks.registrationForm = { error: error.message };
+      results.checks.registrationForm = { error: error instanceof Error ? error.message : String(error) };
     }
 
     return NextResponse.json(results);
@@ -104,7 +104,7 @@ export async function GET() {
   } catch (error) {
     console.error("❌ Debug error:", error);
     return NextResponse.json(
-      { error: "Internal server error", details: error.message },
+      { error: "Internal server error", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
