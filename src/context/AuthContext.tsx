@@ -15,6 +15,7 @@ interface AuthState {
   hasFormData: boolean;
   isCheckComplete: boolean;
   subscriptionData: any;
+  primaryUserEmail?: string | null;
   checkStatus: () => Promise<void>;
 }
 
@@ -31,6 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     hasFormData: boolean;
     isCheckComplete: boolean;
     subscriptionData: any;
+    primaryUserEmail?: string | null;
   }>({
     isPrimaryUser: false,
     isSubUser: false,
@@ -38,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     hasFormData: false,
     isCheckComplete: false,
     subscriptionData: null,
+    primaryUserEmail: null,
   });
 
   const userEmail = user?.email || "";
@@ -83,8 +86,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // No active subscription found
-      console.log("❌ AuthContext: No active Stripe subscription found");
+      // No active subscription found - check if user is a sub user
+      console.log("❌ AuthContext: No active Stripe subscription found, checking if user is a sub user...");
+      
+      // Check if they are a sub user in the subscription_users table
+      const subUserResponse = await fetch("/api/subscription-users");
+      let isSubUser = false;
+      let primaryUserEmail = null;
+      
+      if (subUserResponse.ok) {
+        const subUserData = await subUserResponse.json();
+        isSubUser = subUserData.isSubUser;
+        primaryUserEmail = subUserData.primaryUser;
+        console.log("🔍 AuthContext: Sub user check result:", { isSubUser, primaryUserEmail });
+      }
       
       // Check if they have form data (for better redirect UX)
       const formResponse = await fetch(`/api/registrationform?email=${encodeURIComponent(userEmail)}`);
@@ -92,11 +107,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setAuthState({
         isPrimaryUser: false,
-        isSubUser: false,
+        isSubUser: isSubUser,
         hasActiveSubscription: false,
         hasFormData: !!hasFormData,
         isCheckComplete: true,
-        subscriptionData: stripeData
+        subscriptionData: stripeData,
+        primaryUserEmail: primaryUserEmail
       });
 
     } catch (error) {
@@ -127,6 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     hasFormData: authState.hasFormData,
     isCheckComplete: authState.isCheckComplete,
     subscriptionData: authState.subscriptionData,
+    primaryUserEmail: authState.primaryUserEmail,
     checkStatus,
   };
 

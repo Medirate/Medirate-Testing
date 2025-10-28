@@ -98,19 +98,63 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { subUsers } = await request.json();
+    const body = await request.json();
+    const { email, subUsers } = body;
 
-    // Upsert the sub-users for the primary user
-    const { error } = await supabase
-      .from("subscription_users")
-      .upsert({ primary_user: user.email, sub_users: subUsers });
+    // If adding a single user via email
+    if (email) {
+      console.log(`🔵 Adding sub user ${email} to primary user ${user.email}`);
+      
+      // Get current sub users for this primary user
+      const { data: currentRecord, error: fetchError } = await supabase
+        .from("subscription_users")
+        .select("sub_users")
+        .eq("primary_user", user.email)
+        .single();
 
-    if (error) {
-      console.error("❌ Supabase Error:", error);
-      return NextResponse.json({ error: "Database update error" }, { status: 500 });
+      let currentSubUsers = [];
+      if (currentRecord && currentRecord.sub_users) {
+        currentSubUsers = Array.isArray(currentRecord.sub_users) ? currentRecord.sub_users : [];
+      }
+
+      // Check if user is already added
+      if (currentSubUsers.includes(email)) {
+        return NextResponse.json({ error: "User is already added to this subscription" }, { status: 400 });
+      }
+
+      // Add the new user
+      currentSubUsers.push(email);
+
+      // Upsert the updated sub-users for the primary user
+      const { error } = await supabase
+        .from("subscription_users")
+        .upsert({ primary_user: user.email, sub_users: currentSubUsers });
+
+      if (error) {
+        console.error("❌ Supabase Error:", error);
+        return NextResponse.json({ error: "Database update error" }, { status: 500 });
+      }
+
+      console.log(`✅ Successfully added ${email} as sub user to ${user.email}`);
+      return NextResponse.json({ success: true, addedUser: email });
     }
 
-    return NextResponse.json({ success: true });
+    // If updating multiple users via subUsers array (legacy support)
+    if (subUsers) {
+      const { error } = await supabase
+        .from("subscription_users")
+        .upsert({ primary_user: user.email, sub_users: subUsers });
+
+      if (error) {
+        console.error("❌ Supabase Error:", error);
+        return NextResponse.json({ error: "Database update error" }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: "No email or subUsers provided" }, { status: 400 });
+
   } catch (error) {
     console.error("🚨 Unexpected error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

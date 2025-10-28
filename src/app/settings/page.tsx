@@ -735,13 +735,6 @@ function SettingsSubscription({
                     </div>
                   )}
 
-                  {/* Debug: Show current role */}
-                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-800">
-                      <strong>Debug Info:</strong> Current role: <code>{userRole || 'null'}</code> | 
-                      Can add sub users: <code>{(userRole === 'subscription_manager' || userRole === 'user') ? 'Yes' : 'No'}</code>
-                    </p>
-                  </div>
 
                   {/* Read-only notice for sub users */}
                   {userRole === 'sub_user' && (
@@ -1001,13 +994,6 @@ function SettingsSubscription({
                     </div>
                   )}
 
-                  {/* Debug: Show current role */}
-                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-800">
-                      <strong>Debug Info:</strong> Current role: <code>{userRole || 'null'}</code> | 
-                      Can add sub users: <code>{(userRole === 'subscription_manager' || userRole === 'user') ? 'Yes' : 'No'}</code>
-                    </p>
-                  </div>
 
                   {/* Read-only notice for sub users */}
                   {userRole === 'sub_user' && (
@@ -1613,7 +1599,12 @@ export default function Settings() {
         setNewUserEmail("");
         setUserToAdd("");
         setShowAddUserConfirmation(false);
-        fetchSubscriptionUsers(); // Refresh the list
+        
+        // Show success message
+        alert(`✅ Sub user ${userToAdd.trim()} has been successfully added to your subscription!`);
+        
+        // Refresh the subscription users list
+        await fetchSubscriptionUsers();
         
         // Send email notifications
         try {
@@ -1621,7 +1612,7 @@ export default function Settings() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              userEmail: userToAdd,
+              userEmail: userToAdd.trim(),
               primaryUserEmail: auth.userEmail,
               action: 'user_added'
             })
@@ -1631,13 +1622,19 @@ export default function Settings() {
           console.error('Error sending email notifications:', emailError);
           // Don't fail the user addition if emails fail
         }
+        
+        // Auto-refresh the page after 2 seconds to show updated user list
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+        
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to add user");
+        alert(`❌ Failed to add sub user: ${error.error || "Unknown error"}`);
       }
     } catch (error) {
       console.error("Error adding user:", error);
-      alert("Failed to add user");
+      alert("❌ Failed to add sub user. Please try again.");
     } finally {
       setIsAddingUser(false);
     }
