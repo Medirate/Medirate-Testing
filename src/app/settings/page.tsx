@@ -6,17 +6,15 @@ import SettingsProfile from "./components/SettingsProfile";
 import ManageSubscription from "./components/ManageSubscription";
 import ManageSubscriptionUsers from "./components/ManageSubscriptionUsers";
 import TermsAndConditions from "./components/TermsAndConditions";
-import SettingsEmailPreferences from "./components/SettingsEmailPreferences";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("profile");
 
   const tabs = [
-    { id: "profile", label: "Profile", icon: "👤" },
-    { id: "manage-subscription", label: "Manage Subscription", icon: "💳" },
-    { id: "manage-subscription-users", label: "Manage Subscription Users", icon: "👥" },
-    { id: "terms-and-conditions", label: "Terms and Conditions", icon: "📋" },
-    { id: "email-preferences", label: "Email Preferences", icon: "📧" },
+    { id: "profile", label: "Profile" },
+    { id: "manage-subscription", label: "Manage Subscription" },
+    { id: "manage-subscription-users", label: "Manage Subscription Users" },
+    { id: "terms-and-conditions", label: "Terms and Conditions" },
   ];
 
   const renderTabContent = () => {
@@ -29,8 +27,6 @@ export default function Settings() {
         return <ManageSubscriptionUsers />;
       case "terms-and-conditions":
         return <TermsAndConditions />;
-      case "email-preferences":
-        return <SettingsEmailPreferences />;
       default:
         return <SettingsProfile />;
     }
@@ -62,7 +58,6 @@ export default function Settings() {
                         : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                     }`}
                   >
-                    <span className="mr-2">{tab.icon}</span>
                     {tab.label}
                   </button>
                 ))}

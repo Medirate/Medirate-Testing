@@ -73,16 +73,6 @@ export default function TermsAndConditions() {
               </div>
             </div>
 
-            {/* Additional Information */}
-            <div className="mt-8 p-6 bg-gray-50 border border-gray-200 rounded-lg">
-              <h4 className="font-semibold text-gray-900 mb-3">Important Notes</h4>
-              <ul className="text-sm text-gray-700 space-y-2">
-                <li>• By using MediRate, you agree to be bound by these terms and conditions</li>
-                <li>• Terms may be updated periodically - please review them regularly</li>
-                <li>• For questions about these terms, contact us at contact@medirate.net</li>
-                <li>• Your continued use of the service constitutes acceptance of any changes</li>
-              </ul>
-            </div>
           </div>
         </div>
 
