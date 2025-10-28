@@ -198,16 +198,20 @@ const StripePricingTableWithFooter = () => {
 
       if (subscriptionResponse.ok) {
         const subscriptionData = await subscriptionResponse.json();
+        console.log("🔍 Subscribe page: Subscription check result:", subscriptionData);
         if (subscriptionData.status === 'active') {
           // User has active subscription, no redirect reason
+          console.log("✅ Subscribe page: User has active subscription, no redirect needed");
           return;
         }
       }
 
       // Check user role and subscription status
+      console.log("🔍 Subscribe page: Checking user role...");
       const roleResponse = await fetch("/api/user-role");
       if (roleResponse.ok) {
         const { role } = await roleResponse.json();
+        console.log("🔍 Subscribe page: User role:", role);
         
         if (role === 'subscription_manager') {
           setRedirectReason('subscription_manager_no_subscription');
@@ -217,7 +221,6 @@ const StripePricingTableWithFooter = () => {
           if (subUserResponse.ok) {
             const subUserData = await subUserResponse.json();
             if (subUserData.primaryUser) {
-              setRedirectReason('sub_user_no_primary_subscription');
               setRedirectReason(`sub_user_no_primary_subscription:${subUserData.primaryUser}`);
             } else {
               setRedirectReason('sub_user_no_primary');

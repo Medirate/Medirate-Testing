@@ -214,6 +214,7 @@ export function useProtectedPage() {
       console.log("🔍 ProtectedPage: Auth check complete:", {
         isAuthenticated: auth.isAuthenticated,
         hasActiveSubscription: auth.hasActiveSubscription,
+        isSubUser: auth.isSubUser,
         hasFormData: auth.hasFormData
       });
 
@@ -223,19 +224,22 @@ export function useProtectedPage() {
         return;
       }
 
-      // SIMPLIFIED: Only check if they have active Stripe subscription
-      if (!auth.hasActiveSubscription) {
-        console.log("❌ ProtectedPage: No active Stripe subscription");
+      // Check if user has access (either through their own subscription OR as a sub user)
+      const hasAccess = auth.hasActiveSubscription || auth.isSubUser;
+      
+      if (!hasAccess) {
+        console.log("❌ ProtectedPage: No access (no subscription and not a sub user)");
         if (!auth.hasFormData) {
           console.log("❌ ProtectedPage: No form data, redirecting to subscribe");
           router.push("/subscribe");
         } else {
-          console.log("❌ ProtectedPage: Has form data but no subscription, redirecting to subscribe");
+          console.log("❌ ProtectedPage: Has form data but no access, redirecting to subscribe");
           router.push("/subscribe?form_completed=1");
         }
         setShouldRedirect(true);
       } else {
-        console.log("✅ ProtectedPage: Active subscription found - ACCESS GRANTED");
+        console.log("✅ ProtectedPage: Access granted -", 
+          auth.hasActiveSubscription ? "Primary user with subscription" : "Sub user with access");
       }
     }
   }, [auth, router]);
