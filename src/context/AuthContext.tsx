@@ -86,6 +86,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (hasActiveSubscription) {
         console.log("✅ AuthContext: User has active Stripe subscription - GRANTED ACCESS");
         
+        // Initialize email preferences for fresh login
+        try {
+          console.log("🔍 AuthContext: Initializing email preferences for fresh login...");
+          const prefResponse = await fetch("/api/user/initialize-email-preferences", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_email: userEmail }),
+          });
+          
+          if (prefResponse.ok) {
+            const prefData = await prefResponse.json();
+            console.log("✅ AuthContext: Email preferences initialized:", prefData.message);
+          } else {
+            console.log("⚠️ AuthContext: Email preferences initialization failed, but continuing...");
+          }
+        } catch (prefError) {
+          console.log("⚠️ AuthContext: Email preferences initialization error, but continuing:", prefError);
+        }
+        
         setAuthState({
           isPrimaryUser: true, // Treat as primary user if they have active subscription
           isSubUser: false,
@@ -163,6 +182,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (isWireTransferUser && wireTransferData) {
           console.log("✅ AuthContext: User has access through wire transfer subscription");
+          
+          // Initialize email preferences for fresh login
+          try {
+            console.log("🔍 AuthContext: Initializing email preferences for wire transfer user...");
+            const prefResponse = await fetch("/api/user/initialize-email-preferences", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ user_email: userEmail }),
+            });
+            
+            if (prefResponse.ok) {
+              const prefData = await prefResponse.json();
+              console.log("✅ AuthContext: Email preferences initialized:", prefData.message);
+            } else {
+              console.log("⚠️ AuthContext: Email preferences initialization failed, but continuing...");
+            }
+          } catch (prefError) {
+            console.log("⚠️ AuthContext: Email preferences initialization error, but continuing:", prefError);
+          }
+          
           setAuthState({
             isPrimaryUser: false, // Wire transfer users are regular users, not primary users
             isSubUser: false, // They're not sub users either
