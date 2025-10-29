@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Toaster, toast } from "react-hot-toast";
 import Footer from "@/app/components/footer";
 import { CreditCard, CheckCircle, Mail, Shield, ArrowLeft } from "lucide-react"; // Added new icons
@@ -392,7 +393,15 @@ const StripePricingTableWithFooter = () => {
 
       if (!response.ok) {
         console.error("Error saving form data:", result.error);
-        toast.error("Failed to save form data. Please try again.");
+        
+        // Check if it's a constraint violation error
+        if (result.error && result.error.includes('chk_account_role')) {
+          toast.error("Invalid account role selected. Please try again.");
+        } else if (result.error && result.error.includes('constraint')) {
+          toast.error("There was a validation error. Please check your form data and try again.");
+        } else {
+          toast.error("Failed to save form data. Please try again.");
+        }
         return;
       }
 
@@ -1729,7 +1738,7 @@ const StripePricingTableWithFooter = () => {
       />
 
       {/* Sub User Message Modal */}
-      {showSubUserMessage && (
+      {showSubUserMessage && typeof window !== 'undefined' && createPortal(
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
             {/* Header */}
@@ -1797,7 +1806,8 @@ const StripePricingTableWithFooter = () => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Toast Notifications */}
