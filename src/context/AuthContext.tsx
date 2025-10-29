@@ -16,7 +16,7 @@ interface AuthState {
   isCheckComplete: boolean;
   subscriptionData: any;
   primaryUserEmail?: string | null;
-  isTransferredUser?: boolean;
+  isWireTransferUser?: boolean;
   checkStatus: () => Promise<void>;
 }
 
@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isCheckComplete: boolean;
     subscriptionData: any;
     primaryUserEmail?: string | null;
-    isTransferredUser?: boolean;
+    isWireTransferUser?: boolean;
   }>({
     isPrimaryUser: false,
     isSubUser: false,
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isCheckComplete: false,
     subscriptionData: null,
     primaryUserEmail: null,
-    isTransferredUser: false,
+    isWireTransferUser: false,
   });
 
   const userEmail = user?.email || "";
@@ -148,63 +148,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // FOURTH: If not a regular sub user, check if user is a transferred subscription user
-      console.log("❌ AuthContext: Not a regular sub user, checking if user is a transferred subscription user...");
+      // FOURTH: If not a regular sub user, check if user is a wire transfer subscription user
+      console.log("❌ AuthContext: Not a regular sub user, checking if user is a wire transfer subscription user...");
       
-      const transferredResponse = await fetch("/api/transferred-subscriptions");
-      let isTransferredUser = false;
-      let transferredData = null;
-      let isTransferredPrimaryUser = false;
+      const wireTransferResponse = await fetch("/api/wire-transfer-subscriptions");
+      let isWireTransferUser = false;
+      let wireTransferData = null;
       
-      if (transferredResponse.ok) {
-        const transferredUserData = await transferredResponse.json();
-        isTransferredUser = transferredUserData.isTransferredUser;
-        transferredData = transferredUserData.transferredData;
-        isTransferredPrimaryUser = transferredUserData.isTransferredPrimaryUser;
-        console.log("🔍 AuthContext: Transferred user check result:", { isTransferredUser, transferredData, isTransferredPrimaryUser });
+      if (wireTransferResponse.ok) {
+        const wireTransferUserData = await wireTransferResponse.json();
+        isWireTransferUser = wireTransferUserData.isWireTransferUser;
+        wireTransferData = wireTransferUserData.wireTransferData;
+        console.log("🔍 AuthContext: Wire transfer user check result:", { isWireTransferUser, wireTransferData });
         
-        if (isTransferredUser && transferredData) {
-          if (isTransferredPrimaryUser) {
-            console.log("✅ AuthContext: User is primary user in transferred subscription - can manage sub users");
-            setAuthState({
-              isPrimaryUser: true, // Primary user can manage sub users
-              isSubUser: false,
-              hasActiveSubscription: true, // Treat as having active subscription for access
-              hasFormData: hasFormData,
-              isCheckComplete: true,
-              subscriptionData: {
-                status: 'active',
-                plan: 'Transferred Subscription',
-                amount: 0,
-                currency: 'USD',
-                billingInterval: 'transferred',
-                startDate: transferredData.subscriptionStartDate,
-                endDate: transferredData.subscriptionEndDate
-              },
-              primaryUserEmail: userEmail, // They are the primary user
-              isTransferredUser: true
-            });
-          } else {
-            console.log("✅ AuthContext: User is sub user in transferred subscription");
-            setAuthState({
-              isPrimaryUser: false,
-              isSubUser: true, // Treat transferred sub users as sub users for UI purposes
-              hasActiveSubscription: false, // They don't have their own subscription
-              hasFormData: hasFormData,
-              isCheckComplete: true,
-              subscriptionData: {
-                status: 'active',
-                plan: 'Transferred Subscription',
-                amount: 0,
-                currency: 'USD',
-                billingInterval: 'transferred',
-                startDate: transferredData.subscriptionStartDate,
-                endDate: transferredData.subscriptionEndDate
-              },
-              primaryUserEmail: transferredData.primaryUserEmail,
-              isTransferredUser: true
-            });
-          }
+        if (isWireTransferUser && wireTransferData) {
+          console.log("✅ AuthContext: User has access through wire transfer subscription");
+          setAuthState({
+            isPrimaryUser: false, // Wire transfer users are regular users, not primary users
+            isSubUser: false, // They're not sub users either
+            hasActiveSubscription: true, // Treat as having active subscription for access
+            hasFormData: hasFormData,
+            isCheckComplete: true,
+            subscriptionData: {
+              status: 'active',
+              plan: 'Wire Transfer Subscription',
+              amount: 0,
+              currency: 'USD',
+              billingInterval: 'wire_transfer',
+              startDate: wireTransferData.subscriptionStartDate,
+              endDate: wireTransferData.subscriptionEndDate
+            },
+            primaryUserEmail: userEmail, // They are their own primary user
+            isWireTransferUser: true
+          });
           return;
         }
       }
@@ -218,7 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isCheckComplete: true,
         subscriptionData: stripeData,
         primaryUserEmail: primaryUserEmail,
-        isTransferredUser: false
+        isWireTransferUser: false
       });
 
     } catch (error) {
