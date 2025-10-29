@@ -324,7 +324,7 @@ export default function ManageSubscriptionUsers() {
                 <div className="mb-6">
                   <h3 className="text-xl font-bold text-gray-900 mb-2">Add New Sub User</h3>
                   <p className="text-sm text-gray-600">
-                    Add sub-users to your subscription. They will receive email notifications and have read-only access to the application.
+                    Add sub-users to your subscription. They will have full access to the application and receive email notifications about subscription changes.
                   </p>
                 </div>
                 
@@ -336,7 +336,7 @@ export default function ManageSubscriptionUsers() {
                     <div>
                       <h4 className="text-sm font-medium text-blue-800">Can add sub users</h4>
                       <p className="text-sm text-blue-700 mt-1">
-                        You can add sub users to your subscription. They will have read-only access to subscription information.
+                        You can add sub users to your subscription. They will have full access to the application.
                       </p>
                     </div>
                   </div>
@@ -433,7 +433,7 @@ export default function ManageSubscriptionUsers() {
                   <ul className="text-sm text-blue-700 space-y-1">
                     <li>• The sub user will receive an email notification</li>
                     <li>• They'll be able to log in and access the application</li>
-                    <li>• They'll have read-only access to subscription information</li>
+                    <li>• They'll have full access to all application features</li>
                     <li>• You can remove them at any time from the user management section</li>
                   </ul>
                 </div>

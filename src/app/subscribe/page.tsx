@@ -1626,8 +1626,8 @@ const StripePricingTableWithFooter = () => {
             MozUserSelect: "auto"
           }}>
           {React.createElement("stripe-pricing-table", {
-              "pricing-table-id": "prctbl_1SKcum2NeWrBDfGsTeavkMMT",
-              "publishable-key": "pk_test_51QXT6G2NeWrBDfGs1x7v1DgpvI2XDgWhGMH3nmSH5njuB69GHp7yGL7251F7X5TDB2VFZbEdVzf95GNqX0sRKrkF007PMhgJXG",
+              "pricing-table-id": "prctbl_1RBMKo2NeWrBDfGslMwYkTKz",
+              "publishable-key": process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
           })}
           </div>
         </div>
