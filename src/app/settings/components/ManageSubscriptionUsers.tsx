@@ -334,7 +334,7 @@ export default function ManageSubscriptionUsers() {
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                     </svg>
                     <div>
-                      <h4 className="text-sm font-medium text-blue-800">Can add sub users</h4>
+                      <h4 className="text-sm font-medium text-blue-800">Available Slots: {availableSlots} of {slotLimit}</h4>
                       <p className="text-sm text-blue-700 mt-1">
                         You can add sub users to your subscription. They will have read-only access to subscription information.
                       </p>
@@ -356,21 +356,40 @@ export default function ManageSubscriptionUsers() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex space-x-4">
-                      <input
-                        type="email"
-                        placeholder="Enter email address"
-                        value={newUserEmail}
-                        onChange={(e) => setNewUserEmail(e.target.value)}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                      <button
-                        onClick={addUserToSubscription}
-                        disabled={!newUserEmail.trim() || isAddingUser}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        {isAddingUser ? "Adding..." : "Add Sub User"}
-                      </button>
+                    <div>
+                      {/* Slot Usage Indicator */}
+                      <div className="mb-4 p-3 bg-white border border-blue-200 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-700">Subscription Usage</span>
+                          <span className="text-sm text-gray-600">{subscriptionUsers.length} / {slotLimit} slots used</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                            style={{ width: `${(subscriptionUsers.length / slotLimit) * 100}%` }}
+                          ></div>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {availableSlots} slot{availableSlots !== 1 ? 's' : ''} remaining
+                        </p>
+                      </div>
+                      
+                      <div className="flex space-x-4">
+                        <input
+                          type="email"
+                          placeholder="Enter email address"
+                          value={newUserEmail}
+                          onChange={(e) => setNewUserEmail(e.target.value)}
+                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        <button
+                          onClick={addUserToSubscription}
+                          disabled={!newUserEmail.trim() || isAddingUser || availableSlots === 0}
+                          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {isAddingUser ? "Adding..." : availableSlots === 0 ? "No Slots Available" : "Add Sub User"}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
