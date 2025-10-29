@@ -22,6 +22,7 @@ import {
   Home,
   Users,
   FileText,
+  HelpCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -644,7 +645,7 @@ const SideNav = ({
                   }`}
                 >
                   <div className="flex items-center justify-center w-6 h-6">
-                    <Mail size={20} />
+                    <HelpCircle size={20} />
                   </div>
                   <span
                     className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
