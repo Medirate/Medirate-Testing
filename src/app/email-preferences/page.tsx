@@ -65,21 +65,20 @@ export default function EmailPreferences() {
         setSelectedStates(data.preferences?.states || []);
         setSelectedCategories(data.preferences?.categories || []);
       } else {
-        // No preferences found, create new ones
-        const createResponse = await fetch('/api/user/email-preferences', {
+        // No preferences found, initialize with all states and categories
+        const initResponse = await fetch('/api/user/initialize-email-preferences', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            user_email: email, 
-            preferences: { states: [], categories: [] } 
-          })
+          body: JSON.stringify({ user_email: email })
         });
 
-        if (createResponse.ok) {
-          const createData = await createResponse.json();
-          setPreferenceId(createData.id);
+        if (initResponse.ok) {
+          const initData = await initResponse.json();
+          setPreferenceId(initData.id);
+          setSelectedStates(initData.preferences?.states || []);
+          setSelectedCategories(initData.preferences?.categories || []);
         } else {
-          throw new Error('Failed to create preferences');
+          throw new Error('Failed to initialize preferences');
         }
       }
     } catch (err) {
