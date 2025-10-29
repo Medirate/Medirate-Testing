@@ -25,11 +25,10 @@ interface SubscriptionData {
   } | null;
 }
 
-interface TransferredSubscriptionData {
-  primaryUserEmail: string;
+interface WireTransferSubscriptionData {
+  userEmail: string;
   subscriptionStartDate: string;
   subscriptionEndDate: string | null;
-  transferDate: string;
   status: string;
 }
 
@@ -51,8 +50,8 @@ export default function ManageSubscription() {
   const [isSubUser, setIsSubUser] = useState(false);
   const [primaryUserEmail, setPrimaryUserEmail] = useState<string | null>(null);
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
-  const [transferredData, setTransferredData] = useState<TransferredSubscriptionData | null>(null);
-  const [isTransferredUser, setIsTransferredUser] = useState(false);
+  const [wireTransferData, setWireTransferData] = useState<WireTransferSubscriptionData | null>(null);
+  const [isWireTransferUser, setIsWireTransferUser] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -94,20 +93,20 @@ export default function ManageSubscription() {
     }
   };
 
-  const checkTransferredSubscription = async () => {
+  const checkWireTransferSubscription = async () => {
     try {
-      const response = await fetch("/api/transferred-subscriptions");
+      const response = await fetch("/api/wire-transfer-subscriptions");
       if (response.ok) {
         const data = await response.json();
-        if (data.isTransferredUser) {
-          setIsTransferredUser(true);
-          setTransferredData(data.transferredData);
-          console.log("✅ User is a transferred user:", data.transferredData);
-          return true; // User is transferred, don't fetch Stripe data
+        if (data.isWireTransferUser) {
+          setIsWireTransferUser(true);
+          setWireTransferData(data.wireTransferData);
+          console.log("✅ User is a wire transfer user:", data.wireTransferData);
+          return true; // User is wire transfer, don't fetch Stripe data
         }
       }
     } catch (error) {
-      console.error("Error checking transferred subscription:", error);
+      console.error("Error checking wire transfer subscription:", error);
     }
     return false; // User is not transferred, proceed with Stripe
   };
@@ -205,11 +204,11 @@ export default function ManageSubscription() {
 
   const fetchSubscriptionData = async (email: string) => {
     try {
-      // First check if user is in transferred subscriptions
-      const isTransferred = await checkTransferredSubscription();
-      if (isTransferred) {
+      // First check if user is in wire transfer subscriptions
+      const isWireTransfer = await checkWireTransferSubscription();
+      if (isWireTransfer) {
         setLoading(false);
-        return; // Don't fetch Stripe data for transferred users
+        return; // Don't fetch Stripe data for wire transfer users
       }
 
       const response = await fetch("/api/stripe/subscription", {
@@ -361,14 +360,14 @@ export default function ManageSubscription() {
 
               {/* Subscription Details */}
               <div className="border-t border-gray-200 pt-8">
-                {isTransferredUser && transferredData ? (
+                {isWireTransferUser && wireTransferData ? (
                   <>
                     <div className="flex items-center justify-between mb-6">
                       <h3 className="text-xl font-bold text-gray-900">Transferred Subscription Details</h3>
                       <div className="flex items-center">
                         <div className="flex items-center">
                           <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                          <span className="text-sm font-medium text-blue-700 capitalize">{transferredData.status}</span>
+                          <span className="text-sm font-medium text-blue-700 capitalize">{wireTransferData.status}</span>
                         </div>
                       </div>
                     </div>
@@ -379,7 +378,7 @@ export default function ManageSubscription() {
                         <div className="text-center">
                           <h4 className="text-lg font-bold text-gray-900 mb-2">Transferred Access</h4>
                           <div className="text-sm text-gray-600 mb-2">
-                            Primary User: <span className="font-medium">{transferredData.primaryUserEmail}</span>
+                            User Email: <span className="font-medium">{wireTransferData.userEmail}</span>
                           </div>
                           <p className="text-xs text-gray-500">You have access through a transferred subscription</p>
                         </div>
@@ -391,20 +390,20 @@ export default function ManageSubscription() {
                         <div className="space-y-3">
                           <div>
                             <p className="text-sm text-gray-500">Start Date</p>
-                            <p className="font-medium text-gray-900">{new Date(transferredData.subscriptionStartDate).toLocaleDateString()}</p>
+                            <p className="font-medium text-gray-900">{new Date(wireTransferData.subscriptionStartDate).toLocaleDateString()}</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">End Date</p>
                             <p className="font-medium text-gray-900">
-                              {transferredData.subscriptionEndDate 
-                                ? new Date(transferredData.subscriptionEndDate).toLocaleDateString()
+                              {wireTransferData.subscriptionEndDate 
+                                ? new Date(wireTransferData.subscriptionEndDate).toLocaleDateString()
                                 : 'No end date'
                               }
                             </p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">Transfer Date</p>
-                            <p className="font-medium text-gray-900">{new Date(transferredData.transferDate).toLocaleDateString()}</p>
+                            <p className="font-medium text-gray-900">N/A</p>
                           </div>
                         </div>
                       </div>
@@ -415,7 +414,7 @@ export default function ManageSubscription() {
                         <div className="space-y-3">
                           <div>
                             <p className="text-sm text-gray-500">Status</p>
-                            <p className="font-medium text-gray-900 capitalize">{transferredData.status}</p>
+                            <p className="font-medium text-gray-900 capitalize">{wireTransferData.status}</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">Access Type</p>
@@ -439,8 +438,8 @@ export default function ManageSubscription() {
                         <div>
                           <h4 className="text-sm font-medium text-yellow-800">Transferred Subscription</h4>
                           <p className="text-sm text-yellow-700 mt-1">
-                            You are accessing MediRate through a transferred subscription from {transferredData.primaryUserEmail}. 
-                            Contact them for any subscription changes or billing questions.
+                            You are accessing MediRate through a wire transfer subscription. 
+                            Contact support for any subscription changes or billing questions.
                           </p>
                         </div>
                       </div>
@@ -601,14 +600,14 @@ export default function ManageSubscription() {
 
             {/* Subscription Details */}
             <div className="border-t border-gray-200 pt-8">
-              {isTransferredUser && transferredData ? (
+              {isWireTransferUser && wireTransferData ? (
                 <>
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-bold text-gray-900">Transferred Subscription Details</h3>
                     <div className="flex items-center">
                       <div className="flex items-center">
                         <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                        <span className="text-sm font-medium text-blue-700 capitalize">{transferredData.status}</span>
+                        <span className="text-sm font-medium text-blue-700 capitalize">{wireTransferData.status}</span>
                       </div>
                     </div>
                   </div>
@@ -619,7 +618,7 @@ export default function ManageSubscription() {
                       <div className="text-center">
                         <h4 className="text-lg font-bold text-gray-900 mb-2">Transferred Access</h4>
                         <div className="text-sm text-gray-600 mb-2">
-                          Primary User: <span className="font-medium">{transferredData.primaryUserEmail}</span>
+                          User Email: <span className="font-medium">{wireTransferData.userEmail}</span>
                         </div>
                         <p className="text-xs text-gray-500">You have access through a transferred subscription</p>
                       </div>
@@ -631,20 +630,20 @@ export default function ManageSubscription() {
                       <div className="space-y-3">
                         <div>
                           <p className="text-sm text-gray-500">Start Date</p>
-                          <p className="font-medium text-gray-900">{new Date(transferredData.subscriptionStartDate).toLocaleDateString()}</p>
+                          <p className="font-medium text-gray-900">{new Date(wireTransferData.subscriptionStartDate).toLocaleDateString()}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">End Date</p>
                           <p className="font-medium text-gray-900">
-                            {transferredData.subscriptionEndDate 
-                              ? new Date(transferredData.subscriptionEndDate).toLocaleDateString()
+                            {wireTransferData.subscriptionEndDate 
+                              ? new Date(wireTransferData.subscriptionEndDate).toLocaleDateString()
                               : 'No end date'
                             }
                           </p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">Transfer Date</p>
-                          <p className="font-medium text-gray-900">{new Date(transferredData.transferDate).toLocaleDateString()}</p>
+                          <p className="font-medium text-gray-900">N/A</p>
                         </div>
                       </div>
                     </div>
@@ -655,7 +654,7 @@ export default function ManageSubscription() {
                       <div className="space-y-3">
                         <div>
                           <p className="text-sm text-gray-500">Status</p>
-                          <p className="font-medium text-gray-900 capitalize">{transferredData.status}</p>
+                          <p className="font-medium text-gray-900 capitalize">{wireTransferData.status}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">Access Type</p>
@@ -679,8 +678,8 @@ export default function ManageSubscription() {
                       <div>
                         <h4 className="text-sm font-medium text-yellow-800">Transferred Subscription</h4>
                         <p className="text-sm text-yellow-700 mt-1">
-                          You are accessing MediRate through a transferred subscription from {transferredData.primaryUserEmail}. 
-                          Contact them for any subscription changes or billing questions.
+                          You are accessing MediRate through a wire transfer subscription. 
+                          Contact support for any subscription changes or billing questions.
                         </p>
                       </div>
                     </div>
