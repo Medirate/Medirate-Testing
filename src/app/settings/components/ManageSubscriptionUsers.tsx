@@ -245,20 +245,29 @@ export default function ManageSubscriptionUsers() {
             Add and manage sub users for your subscription
           </p>
           
-          {/* Debug Information */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg max-w-md mx-auto">
-            <h3 className="text-sm font-semibold text-blue-800 mb-2">Debug Information</h3>
-            <div className="text-xs text-blue-700 space-y-1">
-              <p><strong>User Email:</strong> {auth.userEmail}</p>
-              <p><strong>User Role:</strong> {userRole || 'Loading...'}</p>
-              <p><strong>Can Add Users:</strong> {canAddUsers ? 'Yes' : 'No'}</p>
-              <p><strong>Slot Limit:</strong> {slotLimit}</p>
-              <p><strong>Available Slots:</strong> {availableSlots}</p>
-              <p><strong>Current Users:</strong> {subscriptionUsers.length}</p>
-              <p><strong>Is At Slot Limit:</strong> {isAtSlotLimit ? 'Yes' : 'No'}</p>
-              <p><strong>Is Wire Transfer User:</strong> {auth.isWireTransferUser ? 'Yes' : 'No'}</p>
-              <p><strong>Is Primary User:</strong> {auth.isPrimaryUser ? 'Yes' : 'No'}</p>
-              <p><strong>Has Active Subscription:</strong> {auth.hasActiveSubscription ? 'Yes' : 'No'}</p>
+          {/* Subscription Status */}
+          <div className="mt-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl max-w-2xl mx-auto">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Subscription Management</h3>
+                {userRole === 'sub_user' ? (
+                  <div className="text-sm text-gray-700 space-y-2">
+                    <p>As a <span className="font-medium text-blue-700 capitalize">{userRole}</span>, your subscription slots are managed by your associated primary user or subscription manager.</p>
+                    <p>You have <span className="font-medium text-green-600">read-only access</span> to view subscription information.</p>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-700 space-y-2">
+                    <p>As a <span className="font-medium text-blue-700 capitalize">{userRole}</span>, you have <span className="font-medium text-green-600">{slotLimit} slots</span> in your subscription for managing sub-users.</p>
+                    <p>Currently using <span className="font-medium text-orange-600">{subscriptionUsers.length}</span> of <span className="font-medium text-blue-600">{slotLimit}</span> available slots.</p>
+                    <p>You can <span className="font-medium text-green-600">add {availableSlots} more sub-user{availableSlots !== 1 ? 's' : ''}</span> to your subscription.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -312,11 +321,11 @@ export default function ManageSubscriptionUsers() {
             {/* Add User Section */}
             {canAddUsers ? (
               <div className="border-t border-gray-200 pt-8">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-900">Add New Sub User</h3>
-                  <div className="text-sm text-gray-600">
-                    <span className="font-medium">{availableSlots}</span> of <span className="font-medium">{slotLimit}</span> slots available
-                  </div>
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Add New Sub User</h3>
+                  <p className="text-sm text-gray-600">
+                    Add sub-users to your subscription. They will receive email notifications and have read-only access to the application.
+                  </p>
                 </div>
                 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
@@ -339,9 +348,9 @@ export default function ManageSubscriptionUsers() {
                           <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                         </svg>
                         <div>
-                          <h4 className="text-sm font-medium text-yellow-800">Slot Limit Reached</h4>
+                          <h4 className="text-sm font-medium text-yellow-800">Subscription Limit Reached</h4>
                           <p className="text-sm text-yellow-700 mt-1">
-                            You have reached your maximum of {slotLimit} sub users. Remove a user to add a new one.
+                            You have reached your subscription limit of {slotLimit} sub-users. Please remove an existing sub-user before adding a new one.
                           </p>
                         </div>
                       </div>
