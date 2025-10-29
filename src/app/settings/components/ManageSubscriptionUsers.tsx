@@ -18,15 +18,33 @@ export default function ManageSubscriptionUsers() {
   const [userToAdd, setUserToAdd] = useState<string>("");
   const [showRemoveUserConfirmation, setShowRemoveUserConfirmation] = useState(false);
   const [userToRemove, setUserToRemove] = useState<string>("");
+  const [isTransferredUser, setIsTransferredUser] = useState(false);
 
   const fetchSubscriptionUsers = async () => {
     try {
+      // Check if user is a transferred user first
+      if (auth.isTransferredUser) {
+        const response = await fetch("/api/transferred-subscription-users");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.isTransferredPrimaryUser) {
+            // Convert array of email strings to array of objects with email property
+            const users = (data.subUsers || []).map((email: string) => ({ email }));
+            setSubscriptionUsers(users);
+            setIsTransferredUser(true);
+            return;
+          }
+        }
+      }
+      
+      // Fallback to regular subscription users
       const response = await fetch("/api/subscription-users");
       if (response.ok) {
         const data = await response.json();
         // Convert array of email strings to array of objects with email property
         const users = (data.subUsers || []).map((email: string) => ({ email }));
         setSubscriptionUsers(users);
+        setIsTransferredUser(false);
       }
     } catch (error) {
       console.error("Error fetching subscription users:", error);
@@ -63,7 +81,10 @@ export default function ManageSubscriptionUsers() {
     
     setIsAddingUser(true);
     try {
-      const response = await fetch("/api/subscription-users", {
+      // Choose the appropriate API endpoint based on user type
+      const apiEndpoint = isTransferredUser ? "/api/transferred-subscription-users" : "/api/subscription-users";
+      
+      const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: userToAdd.trim() })
@@ -130,7 +151,10 @@ export default function ManageSubscriptionUsers() {
     
     setIsRemovingUser(userToRemove);
     try {
-      const response = await fetch("/api/subscription-users", {
+      // Choose the appropriate API endpoint based on user type
+      const apiEndpoint = isTransferredUser ? "/api/transferred-subscription-users" : "/api/subscription-users";
+      
+      const response = await fetch(apiEndpoint, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: userToRemove })
@@ -185,7 +209,7 @@ export default function ManageSubscriptionUsers() {
     setUserToRemove("");
   };
 
-  const canAddUsers = userRole === 'primary_user' || userRole === 'subscription_manager';
+  const canAddUsers = userRole === 'primary_user' || userRole === 'subscription_manager' || (auth.isTransferredUser && auth.isPrimaryUser);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">

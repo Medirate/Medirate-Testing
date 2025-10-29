@@ -154,33 +154,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const transferredResponse = await fetch("/api/transferred-subscriptions");
       let isTransferredUser = false;
       let transferredData = null;
+      let isTransferredPrimaryUser = false;
       
       if (transferredResponse.ok) {
         const transferredUserData = await transferredResponse.json();
         isTransferredUser = transferredUserData.isTransferredUser;
         transferredData = transferredUserData.transferredData;
-        console.log("🔍 AuthContext: Transferred user check result:", { isTransferredUser, transferredData });
+        isTransferredPrimaryUser = transferredUserData.isTransferredPrimaryUser;
+        console.log("🔍 AuthContext: Transferred user check result:", { isTransferredUser, transferredData, isTransferredPrimaryUser });
         
         if (isTransferredUser && transferredData) {
-          console.log("✅ AuthContext: User has access through transferred subscription");
-          setAuthState({
-            isPrimaryUser: false,
-            isSubUser: true, // Treat transferred users as sub users for UI purposes
-            hasActiveSubscription: false, // They don't have their own subscription
-            hasFormData: hasFormData,
-            isCheckComplete: true,
-            subscriptionData: {
-              status: 'active',
-              plan: 'Transferred Subscription',
-              amount: 0,
-              currency: 'USD',
-              billingInterval: 'transferred',
-              startDate: transferredData.subscriptionStartDate,
-              endDate: transferredData.subscriptionEndDate
-            },
-            primaryUserEmail: transferredData.primaryUserEmail,
-            isTransferredUser: true
-          });
+          if (isTransferredPrimaryUser) {
+            console.log("✅ AuthContext: User is primary user in transferred subscription - can manage sub users");
+            setAuthState({
+              isPrimaryUser: true, // Primary user can manage sub users
+              isSubUser: false,
+              hasActiveSubscription: true, // Treat as having active subscription for access
+              hasFormData: hasFormData,
+              isCheckComplete: true,
+              subscriptionData: {
+                status: 'active',
+                plan: 'Transferred Subscription',
+                amount: 0,
+                currency: 'USD',
+                billingInterval: 'transferred',
+                startDate: transferredData.subscriptionStartDate,
+                endDate: transferredData.subscriptionEndDate
+              },
+              primaryUserEmail: userEmail, // They are the primary user
+              isTransferredUser: true
+            });
+          } else {
+            console.log("✅ AuthContext: User is sub user in transferred subscription");
+            setAuthState({
+              isPrimaryUser: false,
+              isSubUser: true, // Treat transferred sub users as sub users for UI purposes
+              hasActiveSubscription: false, // They don't have their own subscription
+              hasFormData: hasFormData,
+              isCheckComplete: true,
+              subscriptionData: {
+                status: 'active',
+                plan: 'Transferred Subscription',
+                amount: 0,
+                currency: 'USD',
+                billingInterval: 'transferred',
+                startDate: transferredData.subscriptionStartDate,
+                endDate: transferredData.subscriptionEndDate
+              },
+              primaryUserEmail: transferredData.primaryUserEmail,
+              isTransferredUser: true
+            });
+          }
           return;
         }
       }

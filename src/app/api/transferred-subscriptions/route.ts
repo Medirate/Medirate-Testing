@@ -17,38 +17,27 @@ export async function GET() {
 
     console.log("🔵 Checking transferred subscription status for:", user.email);
 
-    // Check if the current user exists in transferred_subscriptions table
-    const { data: transferredData, error: transferredError } = await supabase
+    // First check if user is a primary user in transferred_subscriptions
+    const { data: primaryUserData, error: primaryUserError } = await supabase
       .from("transferred_subscriptions")
       .select("*")
-      .eq("sub_user_email", user.email)
+      .eq("primary_user_email", user.email)
       .eq("status", "active")
+      .is("sub_user_email", null) // Primary user has null sub_user_email
       .single();
 
-    if (transferredError) {
-      if (transferredError.code === 'PGRST116') {
-        // No rows found - user is not in transferred subscriptions
-        console.log(`❌ User ${user.email} not found in transferred subscriptions`);
-        return NextResponse.json({ 
-          isTransferredUser: false,
-          transferredData: null
-        });
-      }
-      console.error("❌ Error checking transferred subscriptions:", transferredError);
-      return NextResponse.json({ error: "Database error" }, { status: 500 });
-    }
-
-    if (transferredData) {
-      console.log(`✅ User ${user.email} found in transferred subscriptions under ${transferredData.primary_user_email}`);
+    if (primaryUserData) {
+      console.log(`✅ User ${user.email} is primary user in transferred subscriptions`);
       
       // Check if subscription is still active (not expired)
       const now = new Date();
-      const endDate = transferredData.subscription_end_date ? new Date(transferredData.subscription_end_date) : null;
+      const endDate = primaryUserData.subscription_end_date ? new Date(primaryUserData.subscription_end_date) : null;
       
       if (endDate && endDate < now) {
         console.log(`❌ Transferred subscription for ${user.email} has expired`);
         return NextResponse.json({ 
           isTransferredUser: false,
+          isTransferredPrimaryUser: false,
           transferredData: null,
           reason: "expired"
         });
@@ -56,12 +45,65 @@ export async function GET() {
 
       return NextResponse.json({ 
         isTransferredUser: true,
+        isTransferredPrimaryUser: true,
         transferredData: {
-          primaryUserEmail: transferredData.primary_user_email,
-          subscriptionStartDate: transferredData.subscription_start_date,
-          subscriptionEndDate: transferredData.subscription_end_date,
-          transferDate: transferredData.transfer_date,
-          status: transferredData.status
+          primaryUserEmail: primaryUserData.primary_user_email,
+          subscriptionStartDate: primaryUserData.subscription_start_date,
+          subscriptionEndDate: primaryUserData.subscription_end_date,
+          transferDate: primaryUserData.transfer_date,
+          status: primaryUserData.status
+        }
+      });
+    }
+
+    // If not a primary user, check if user is a sub user in transferred_subscriptions
+    const { data: subUserData, error: subUserError } = await supabase
+      .from("transferred_subscriptions")
+      .select("*")
+      .eq("sub_user_email", user.email)
+      .eq("status", "active")
+      .single();
+
+    if (subUserError) {
+      if (subUserError.code === 'PGRST116') {
+        // No rows found - user is not in transferred subscriptions
+        console.log(`❌ User ${user.email} not found in transferred subscriptions`);
+        return NextResponse.json({ 
+          isTransferredUser: false,
+          isTransferredPrimaryUser: false,
+          transferredData: null
+        });
+      }
+      console.error("❌ Error checking transferred subscriptions:", subUserError);
+      return NextResponse.json({ error: "Database error" }, { status: 500 });
+    }
+
+    if (subUserData) {
+      console.log(`✅ User ${user.email} found as sub user in transferred subscriptions under ${subUserData.primary_user_email}`);
+      
+      // Check if subscription is still active (not expired)
+      const now = new Date();
+      const endDate = subUserData.subscription_end_date ? new Date(subUserData.subscription_end_date) : null;
+      
+      if (endDate && endDate < now) {
+        console.log(`❌ Transferred subscription for ${user.email} has expired`);
+        return NextResponse.json({ 
+          isTransferredUser: false,
+          isTransferredPrimaryUser: false,
+          transferredData: null,
+          reason: "expired"
+        });
+      }
+
+      return NextResponse.json({ 
+        isTransferredUser: true,
+        isTransferredPrimaryUser: false,
+        transferredData: {
+          primaryUserEmail: subUserData.primary_user_email,
+          subscriptionStartDate: subUserData.subscription_start_date,
+          subscriptionEndDate: subUserData.subscription_end_date,
+          transferDate: subUserData.transfer_date,
+          status: subUserData.status
         }
       });
     }
