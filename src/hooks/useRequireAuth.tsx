@@ -30,7 +30,8 @@ export function useRequireSubscription() {
         return;
       }
 
-      const hasAccess = auth.isPrimaryUser || auth.isSubUser || auth.hasActiveSubscription;
+      // Include wire transfer users in access check
+      const hasAccess = auth.isPrimaryUser || auth.isSubUser || auth.hasActiveSubscription || auth.isWireTransferUser;
       
       if (!hasAccess) {
         console.log("🔒 Redirecting to subscribe - no subscription access");
@@ -45,7 +46,7 @@ export function useRequireSubscription() {
 
   return {
     ...auth,
-    hasAccess: auth.isPrimaryUser || auth.isSubUser || auth.hasActiveSubscription,
+    hasAccess: auth.isPrimaryUser || auth.isSubUser || auth.hasActiveSubscription || auth.isWireTransferUser,
     isLoading: auth.isLoading || !auth.isCheckComplete,
     shouldRedirect: !auth.isLoading && auth.isCheckComplete && !auth.isAuthenticated,
   };

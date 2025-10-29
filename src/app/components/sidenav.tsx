@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
+import { useAuth } from "@/context/AuthContext";
 import {
   Menu,
   X,
@@ -51,6 +52,7 @@ const SideNav = ({
   const pathname = usePathname();
   const [isClientSide, setIsClientSide] = useState(false);
   const { user } = useKindeBrowserClient();
+  const auth = useAuth(); // Add auth context to check subscription status
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminCheckComplete, setAdminCheckComplete] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
@@ -58,6 +60,10 @@ const SideNav = ({
   const [rateComparisonMenuOpen, setRateComparisonMenuOpen] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [roleCheckComplete, setRoleCheckComplete] = useState(false);
+
+  // Check if subscription manager should have restricted access
+  // Only restrict if they're a subscription manager AND don't have an active subscription
+  const shouldRestrictSubscriptionManager = userRole === 'subscription_manager' && !auth.hasActiveSubscription && !auth.isWireTransferUser;
 
   // Check admin access
   const checkAdminAccess = async () => {
@@ -210,7 +216,7 @@ const SideNav = ({
           <nav className="mt-6 pb-20">
             <ul className="space-y-2">
               <li className="group">
-                {userRole === 'subscription_manager' ? (
+                {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
                       <Table2 size={20} />
@@ -248,7 +254,7 @@ const SideNav = ({
               </li>
               {/* State Rate Comparison with submenu */}
               <li className="group">
-                {userRole === 'subscription_manager' ? (
+                {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center w-full p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
                       <ChartColumnStacked size={20} />
@@ -323,7 +329,7 @@ const SideNav = ({
                 )}
               </li>
               <li className="group">
-                {userRole === 'subscription_manager' ? (
+                {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
                       <ChartLine size={20} />
@@ -361,7 +367,7 @@ const SideNav = ({
               </li>
               {/* Rate Developments */}
               <li className="group">
-                {userRole === 'subscription_manager' ? (
+                {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
                       <Megaphone size={20} />
@@ -400,7 +406,7 @@ const SideNav = ({
               
               {/* State Profiles */}
               <li className="group">
-                {userRole === 'subscription_manager' ? (
+                {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
                       <Home size={20} />
@@ -439,7 +445,7 @@ const SideNav = ({
               
               {/* Email Preferences */}
               <li className="group">
-                {userRole === 'subscription_manager' ? (
+                {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
                       <Mail size={20} />
@@ -478,7 +484,7 @@ const SideNav = ({
               
               {/* Documents */}
               <li className="group">
-                {userRole === 'subscription_manager' ? (
+                {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
                       <FileText size={20} />

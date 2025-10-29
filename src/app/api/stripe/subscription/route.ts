@@ -46,38 +46,7 @@ export async function POST(req: Request) {
 
     if (!customers.data.length) {
       console.log("❌ Stripe API: No customer found for email:", email);
-      console.log("🔍 Stripe API: Let's check if there are any customers at all...");
-      
-      // Debug: Check if there are any customers in the account
-      const allCustomers = await stripe.customers.list({ limit: 10 });
-      console.log("🔍 Stripe API: Total customers in account:", allCustomers.data.length);
-      console.log("🔍 Stripe API: Recent customers:", allCustomers.data.map(c => ({ 
-        email: c.email, 
-        created: new Date(c.created * 1000).toISOString(),
-        id: c.id 
-      })));
-      
-      // Try to find the specific customer by ID from the image (cus_THEBRqdqJDorFN)
-      try {
-        console.log("🔍 Stripe API: Trying to find customer by ID: cus_THEBRqdqJDorFN");
-        const specificCustomer = await stripe.customers.retrieve("cus_THEBRqdqJDorFN");
-        console.log("🔍 Stripe API: Found customer by ID:", { 
-          id: specificCustomer.id, 
-          email: specificCustomer.deleted ? 'deleted' : specificCustomer.email 
-        });
-        
-        // If we found the customer by ID, use that instead
-        if (!specificCustomer.deleted && specificCustomer.email === email) {
-          console.log("✅ Stripe API: Customer found by ID, using that customer");
-          customer = specificCustomer;
-        } else {
-          console.log("❌ Stripe API: Customer ID doesn't match email");
-          return NextResponse.json({ status: "no_customer" }, { status: 200 });
-        }
-      } catch (idError) {
-        console.log("❌ Stripe API: Could not find customer by ID:", idError);
-        return NextResponse.json({ status: "no_customer" }, { status: 200 });
-      }
+      return NextResponse.json({ status: "no_customer" }, { status: 200 });
     } else {
       customer = customers.data[0];
       console.log("🔍 Stripe API: Customer found:", { id: customer.id, email: customer.email });

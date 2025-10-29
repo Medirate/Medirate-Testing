@@ -265,6 +265,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isCheckComplete: authState.isCheckComplete,
     subscriptionData: authState.subscriptionData,
     primaryUserEmail: authState.primaryUserEmail,
+    isWireTransferUser: authState.isWireTransferUser,
     checkStatus,
   };
 
@@ -304,8 +305,8 @@ export function useProtectedPage() {
         return;
       }
 
-      // Check if user has access (either through their own subscription OR as a sub user)
-      const hasAccess = auth.hasActiveSubscription || auth.isSubUser;
+      // Check if user has access (either through their own subscription OR as a sub user OR wire transfer user)
+      const hasAccess = auth.hasActiveSubscription || auth.isSubUser || auth.isWireTransferUser;
       
       if (!hasAccess) {
         console.log("❌ ProtectedPage: No access (no subscription and not a sub user)");
