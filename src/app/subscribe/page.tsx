@@ -206,6 +206,18 @@ const StripePricingTableWithFooter = () => {
         }
       }
 
+      // Check if user has wire transfer subscription
+      console.log("🔍 Subscribe page: Checking wire transfer subscription...");
+      const wireTransferResponse = await fetch("/api/wire-transfer-subscriptions");
+      if (wireTransferResponse.ok) {
+        const wireTransferData = await wireTransferResponse.json();
+        if (wireTransferData.isWireTransferUser && wireTransferData.wireTransferData) {
+          // User has wire transfer subscription, no redirect reason
+          console.log("✅ Subscribe page: User has wire transfer subscription, no redirect needed");
+          return;
+        }
+      }
+
       // Check user role and subscription status
       console.log("🔍 Subscribe page: Checking user role...");
       const roleResponse = await fetch("/api/user-role");
