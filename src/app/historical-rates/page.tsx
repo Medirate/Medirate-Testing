@@ -805,7 +805,7 @@ export default function HistoricalRates() {
   const [stateData, setStateData] = useState<StateData[]>([]);
   
   // Chart display options
-  const [showLabels, setShowLabels] = useState(false);
+  const [showLabels, setShowLabels] = useState(true);
 
   // Lazy loading state for duration unit options with counts
   const [durationUnitOptionsWithCounts, setDurationUnitOptionsWithCounts] = useState<{ value: string; label: string }[]>([]);
@@ -2203,50 +2203,69 @@ export default function HistoricalRates() {
                           axisPointer: {
                             type: 'cross',
                             crossStyle: {
-                              color: '#999'
+                              color: '#3B82F6'
                             },
                             lineStyle: {
-                              color: '#999',
-                              width: 1,
-                              type: 'dashed'
+                              color: '#3B82F6',
+                              width: 2,
+                              type: 'solid'
                             }
                           },
-                          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                          borderColor: '#ccc',
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                          borderColor: '#E5E7EB',
                           borderWidth: 1,
+                          borderRadius: 8,
                           textStyle: {
-                            color: '#fff'
+                            color: '#1F2937',
+                            fontSize: 13
                           },
+                          padding: [12, 16],
                           formatter: (params: any) => {
                             if (!params || params.length === 0) return '';
                             
-                            // Group by date to show all overlapping values
                             const date = params[0].axisValue;
-                            let tooltipContent = `<div style="margin-bottom: 8px;"><b>📅 Date:</b> ${formatDate(date)}</div>`;
+                            let tooltipContent = `
+                              <div style="
+                                font-weight: 600; 
+                                color: #374151; 
+                                margin-bottom: 12px; 
+                                padding-bottom: 8px; 
+                                border-bottom: 1px solid #E5E7EB;
+                                font-size: 14px;
+                              ">
+                                ${formatDate(date)}
+                              </div>
+                            `;
                             
-                            params.forEach((param: any, index: number) => {
+                            params.forEach((param: any) => {
                               const data = param.data;
                               if (!data || data.value === null || data.value === undefined) return;
                               
-                              const seriesName = param.seriesName;
                               const rate = data.value ? `$${data.value.toFixed(2)}` : '-';
                               const isExtended = data.isExtended ? ' (Projected)' : '';
                               
-                              const modifiers = [
-                                data.modifier1 ? `${data.modifier1}${data.modifier1Details ? ` - ${data.modifier1Details}` : ''}` : null,
-                                data.modifier2 ? `${data.modifier2}${data.modifier2Details ? ` - ${data.modifier2Details}` : ''}` : null,
-                                data.modifier3 ? `${data.modifier3}${data.modifier3Details ? ` - ${data.modifier3Details}` : ''}` : null,
-                                data.modifier4 ? `${data.modifier4}${data.modifier4Details ? ` - ${data.modifier4Details}` : ''}` : null
-                              ].filter(Boolean).join('<br>');
-
                               tooltipContent += `
-                                <div style="margin-bottom: 12px; padding: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; border-left: 3px solid ${param.color};">
-                                  <div style="color: ${param.color}; font-weight: bold; margin-bottom: 4px;">📊 ${seriesName}${isExtended}</div>
-                                  <div><b>Rate:</b> ${rate}</div>
-                                  <div><b>State:</b> ${data.state || '-'}</div>
-                                  <div><b>Service Code:</b> ${data.serviceCode || '-'}</div>
-                                  <div><b>Provider Type:</b> ${data.providerType || '-'}</div>
-                                  ${modifiers ? `<div><b>Modifiers:</b><br>${modifiers}</div>` : ''}
+                                <div style="
+                                  margin-bottom: 8px; 
+                                  padding: 10px; 
+                                  background: linear-gradient(135deg, ${param.color}15, ${param.color}08); 
+                                  border-radius: 6px; 
+                                  border-left: 3px solid ${param.color};
+                                ">
+                                  <div style="
+                                    color: ${param.color}; 
+                                    font-weight: 600; 
+                                    margin-bottom: 6px; 
+                                    font-size: 13px;
+                                  ">
+                                    ${param.seriesName}${isExtended}
+                                  </div>
+                                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px; color: #6B7280;">
+                                    <div><span style="font-weight: 500;">Rate:</span> <span style="color: #1F2937; font-weight: 600;">${rate}</span></div>
+                                    <div><span style="font-weight: 500;">State:</span> ${data.state || '-'}</div>
+                                    <div><span style="font-weight: 500;">Code:</span> ${data.serviceCode || '-'}</div>
+                                    <div><span style="font-weight: 500;">Provider:</span> ${data.providerType || '-'}</div>
+                                  </div>
                                 </div>
                               `;
                             });
