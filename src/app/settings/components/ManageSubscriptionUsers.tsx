@@ -199,7 +199,8 @@ export default function ManageSubscriptionUsers() {
     setUserToRemove("");
   };
 
-  const canAddUsers = userRole === 'subscription_manager' || userRole === 'primary_user' || userRole === 'admin';
+  // Allow user management if user has active subscription and is not a sub_user
+  const canAddUsers = auth.hasActiveSubscription && userRole !== 'sub_user';
 
   // Debug logging
   console.log("🔍 ManageSubscriptionUsers Debug:", {
