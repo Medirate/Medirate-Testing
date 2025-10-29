@@ -1696,10 +1696,21 @@ const StripePricingTableWithFooter = () => {
 
 
         {/* Accepted Payment Methods - Always visible */}
-        <div className="mt-6 p-4 bg-gray-100 rounded-lg shadow-md flex items-center space-x-2">
-          <span className="text-lg font-semibold">Accepted Payment Methods:</span>
-          <CreditCard className="w-6 h-6 text-blue-600" />
-          <span className="text-lg">Card</span>
+        <div className="mt-6 p-4 bg-gray-100 rounded-lg shadow-md">
+          <div className="flex items-center space-x-2 mb-3">
+            <span className="text-lg font-semibold">Accepted Payment Methods:</span>
+            <CreditCard className="w-6 h-6 text-blue-600" />
+            <span className="text-lg">Card</span>
+          </div>
+          <p className="text-sm text-gray-600">
+            If you wish to use other payment methods such as wire transfer, please contact us at{" "}
+            <a 
+              href="mailto:contact@medirate.net" 
+              className="text-blue-600 hover:text-blue-800 underline"
+            >
+              contact@medirate.net
+            </a>
+          </p>
         </div>
 
         {/* Terms and Conditions Link - Always Visible */}
