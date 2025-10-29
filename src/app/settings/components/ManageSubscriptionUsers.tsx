@@ -201,6 +201,26 @@ export default function ManageSubscriptionUsers() {
 
   // Allow user management if user has active subscription and is not a sub_user
   const canAddUsers = auth.hasActiveSubscription && userRole !== 'sub_user';
+  
+  // Determine slot limits based on user role
+  const getSlotLimit = () => {
+    switch (userRole) {
+      case 'admin':
+        return 6; // 6 slots for admins
+      case 'subscription_manager':
+        return 3;
+      case 'user':
+        return 2;
+      case 'sub_user':
+        return 0; // Read-only for sub users
+      default:
+        return 0;
+    }
+  };
+  
+  const slotLimit = getSlotLimit();
+  const availableSlots = Math.max(0, slotLimit - subscriptionUsers.length);
+  const isAtSlotLimit = subscriptionUsers.length >= slotLimit;
 
   // Debug logging
   console.log("🔍 ManageSubscriptionUsers Debug:", {
@@ -208,7 +228,11 @@ export default function ManageSubscriptionUsers() {
     isWireTransferUser: auth.isWireTransferUser,
     isPrimaryUser: auth.isPrimaryUser,
     canAddUsers,
-    userEmail: auth.userEmail
+    userEmail: auth.userEmail,
+    slotLimit,
+    availableSlots,
+    currentUsers: subscriptionUsers.length,
+    isAtSlotLimit
   });
 
   return (
@@ -228,6 +252,10 @@ export default function ManageSubscriptionUsers() {
               <p><strong>User Email:</strong> {auth.userEmail}</p>
               <p><strong>User Role:</strong> {userRole || 'Loading...'}</p>
               <p><strong>Can Add Users:</strong> {canAddUsers ? 'Yes' : 'No'}</p>
+              <p><strong>Slot Limit:</strong> {slotLimit}</p>
+              <p><strong>Available Slots:</strong> {availableSlots}</p>
+              <p><strong>Current Users:</strong> {subscriptionUsers.length}</p>
+              <p><strong>Is At Slot Limit:</strong> {isAtSlotLimit ? 'Yes' : 'No'}</p>
               <p><strong>Is Wire Transfer User:</strong> {auth.isWireTransferUser ? 'Yes' : 'No'}</p>
               <p><strong>Is Primary User:</strong> {auth.isPrimaryUser ? 'Yes' : 'No'}</p>
               <p><strong>Has Active Subscription:</strong> {auth.hasActiveSubscription ? 'Yes' : 'No'}</p>
@@ -284,7 +312,12 @@ export default function ManageSubscriptionUsers() {
             {/* Add User Section */}
             {canAddUsers ? (
               <div className="border-t border-gray-200 pt-8">
-                <h3 className="text-xl font-bold text-gray-900 mb-6">Add New Sub User</h3>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-gray-900">Add New Sub User</h3>
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">{availableSlots}</span> of <span className="font-medium">{slotLimit}</span> slots available
+                  </div>
+                </div>
                 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                   <div className="flex items-start mb-4">
@@ -299,22 +332,38 @@ export default function ManageSubscriptionUsers() {
                     </div>
                   </div>
                   
-                  <div className="flex space-x-4">
-                    <input
-                      type="email"
-                      placeholder="Enter email address"
-                      value={newUserEmail}
-                      onChange={(e) => setNewUserEmail(e.target.value)}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <button
-                      onClick={addUserToSubscription}
-                      disabled={!newUserEmail.trim() || isAddingUser}
-                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {isAddingUser ? "Adding..." : "Add Sub User"}
-                    </button>
-                  </div>
+                  {isAtSlotLimit ? (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 text-yellow-400 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <div>
+                          <h4 className="text-sm font-medium text-yellow-800">Slot Limit Reached</h4>
+                          <p className="text-sm text-yellow-700 mt-1">
+                            You have reached your maximum of {slotLimit} sub users. Remove a user to add a new one.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex space-x-4">
+                      <input
+                        type="email"
+                        placeholder="Enter email address"
+                        value={newUserEmail}
+                        onChange={(e) => setNewUserEmail(e.target.value)}
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                      <button
+                        onClick={addUserToSubscription}
+                        disabled={!newUserEmail.trim() || isAddingUser}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isAddingUser ? "Adding..." : "Add Sub User"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
