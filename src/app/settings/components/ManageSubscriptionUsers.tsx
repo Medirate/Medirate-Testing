@@ -48,7 +48,15 @@ export default function ManageSubscriptionUsers() {
   useEffect(() => {
     fetchSubscriptionUsers();
     fetchUserRole();
-  }, []);
+    
+    // Debug: Log auth state
+    console.log("🔍 ManageSubscriptionUsers: Auth state:", {
+      isWireTransferUser: auth.isWireTransferUser,
+      isPrimaryUser: auth.isPrimaryUser,
+      hasActiveSubscription: auth.hasActiveSubscription,
+      userEmail: auth.userEmail
+    });
+  }, [auth]);
 
   const addUserToSubscription = async () => {
     if (!newUserEmail.trim()) return;
