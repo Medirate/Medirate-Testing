@@ -62,12 +62,9 @@ const SideNav = ({
   const [roleCheckComplete, setRoleCheckComplete] = useState(false);
 
   // Check if subscription manager should have restricted access
-  // Only restrict if they're a subscription manager AND don't have an active subscription
-  // AND auth check is complete (to avoid flickering during loading)
-  const shouldRestrictSubscriptionManager = userRole === 'subscription_manager' && 
-    auth.isCheckComplete && 
-    !auth.hasActiveSubscription && 
-    !auth.isWireTransferUser;
+  // Subscription managers should ONLY have access to Settings and Support
+  // regardless of subscription status
+  const shouldRestrictSubscriptionManager = userRole === 'subscription_manager' && auth.isCheckComplete;
 
   // Check admin access
   const checkAdminAccess = async () => {
