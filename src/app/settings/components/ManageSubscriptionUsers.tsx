@@ -191,7 +191,7 @@ export default function ManageSubscriptionUsers() {
     setUserToRemove("");
   };
 
-  const canAddUsers = userRole === 'subscription_manager';
+  const canAddUsers = userRole === 'subscription_manager' || userRole === 'primary_user' || userRole === 'admin';
 
   // Debug logging
   console.log("🔍 ManageSubscriptionUsers Debug:", {
@@ -211,6 +211,19 @@ export default function ManageSubscriptionUsers() {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Add and manage sub users for your subscription
           </p>
+          
+          {/* Debug Information */}
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg max-w-md mx-auto">
+            <h3 className="text-sm font-semibold text-blue-800 mb-2">Debug Information</h3>
+            <div className="text-xs text-blue-700 space-y-1">
+              <p><strong>User Email:</strong> {auth.userEmail}</p>
+              <p><strong>User Role:</strong> {userRole || 'Loading...'}</p>
+              <p><strong>Can Add Users:</strong> {canAddUsers ? 'Yes' : 'No'}</p>
+              <p><strong>Is Wire Transfer User:</strong> {auth.isWireTransferUser ? 'Yes' : 'No'}</p>
+              <p><strong>Is Primary User:</strong> {auth.isPrimaryUser ? 'Yes' : 'No'}</p>
+              <p><strong>Has Active Subscription:</strong> {auth.hasActiveSubscription ? 'Yes' : 'No'}</p>
+            </div>
+          </div>
         </div>
 
         {/* Main Content */}
