@@ -10,6 +10,8 @@ export async function GET() {
     const { getUser } = getKindeServerSession();
     const user = await getUser();
 
+    console.log("🔵 Wire Transfer API: getUser result:", { user: user ? { email: user.email, id: user.id } : null });
+
     if (!user || !user.email) {
       console.error("❌ Unauthorized: User or email is missing.");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,12 +20,15 @@ export async function GET() {
     console.log("🔵 Checking wire transfer subscription status for:", user.email);
 
     // Check if the current user exists in wire_transfer_subscriptions table
+    console.log("🔵 Querying wire_transfer_subscriptions for:", user.email);
     const { data: wireTransferData, error: wireTransferError } = await supabase
       .from("wire_transfer_subscriptions")
       .select("*")
       .eq("user_email", user.email)
       .eq("status", "active")
       .single();
+
+    console.log("🔵 Database query result:", { wireTransferData, wireTransferError });
 
     if (wireTransferError) {
       if (wireTransferError.code === 'PGRST116') {
