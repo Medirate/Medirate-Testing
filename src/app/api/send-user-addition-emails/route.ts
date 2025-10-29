@@ -19,14 +19,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email service not configured' }, { status: 500 });
     }
 
-    // Send email to the added user
+    // Send email to the user (added or removed)
     if (action === 'user_added') {
       await sendUserAddedEmail(userEmail);
+    } else if (action === 'user_removed') {
+      await sendUserRemovedEmail(userEmail);
     }
 
     // Send email to the primary user
     if (action === 'user_added') {
       await sendPrimaryUserNotificationEmail(primaryUserEmail, userEmail);
+    } else if (action === 'user_removed') {
+      await sendPrimaryUserRemovalNotificationEmail(primaryUserEmail, userEmail);
     }
 
     return NextResponse.json({ 
@@ -135,6 +139,103 @@ async function sendPrimaryUserNotificationEmail(primaryUserEmail: string, addedU
 
   } catch (error) {
     console.error('Error sending primary user notification email:', error);
+    throw error;
+  }
+}
+
+async function sendUserRemovedEmail(userEmail: string) {
+  try {
+    // Read the user-removed email template
+    const templatePath = path.join(process.cwd(), 'public', 'user-removed-email-template.html');
+    let emailTemplate = fs.readFileSync(templatePath, 'utf8');
+
+    // Replace any placeholders if needed
+    emailTemplate = emailTemplate.replace(/{{USER_EMAIL}}/g, userEmail);
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': BREVO_API_KEY!,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: {
+          name: BREVO_SENDER_NAME,
+          email: BREVO_SENDER_EMAIL,
+        },
+        to: [
+          {
+            email: userEmail,
+            name: userEmail.split('@')[0],
+          },
+        ],
+        subject: 'Access Removed from MediRate Subscription',
+        htmlContent: emailTemplate,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Brevo API error for user removal email:', errorData);
+      throw new Error(`Brevo API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ User removal email sent successfully:', result.messageId);
+    return result;
+
+  } catch (error) {
+    console.error('Error sending user removal email:', error);
+    throw error;
+  }
+}
+
+async function sendPrimaryUserRemovalNotificationEmail(primaryUserEmail: string, removedUserEmail: string) {
+  try {
+    // Read the primary user removal notification template
+    const templatePath = path.join(process.cwd(), 'public', 'user-removed-email-template.html');
+    let emailTemplate = fs.readFileSync(templatePath, 'utf8');
+
+    // Replace placeholders
+    emailTemplate = emailTemplate.replace(/{{USER_EMAIL}}/g, removedUserEmail);
+    emailTemplate = emailTemplate.replace(/{{PRIMARY_USER_EMAIL}}/g, primaryUserEmail);
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': BREVO_API_KEY!,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: {
+          name: BREVO_SENDER_NAME,
+          email: BREVO_SENDER_EMAIL,
+        },
+        to: [
+          {
+            email: primaryUserEmail,
+            name: primaryUserEmail.split('@')[0],
+          },
+        ],
+        subject: 'User Removed from Your MediRate Subscription',
+        htmlContent: emailTemplate,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Brevo API error for primary user removal notification:', errorData);
+      throw new Error(`Brevo API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('✅ Primary user removal notification email sent successfully:', result.messageId);
+    return result;
+
+  } catch (error) {
+    console.error('Error sending primary user removal notification email:', error);
     throw error;
   }
 }
