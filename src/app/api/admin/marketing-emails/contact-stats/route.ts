@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       return authResult.error;
     }
 
-    const { days = 30 } = await req.json();
+    const { days = 90 } = await req.json(); // Default to 90 days (Brevo's API limit)
 
     if (!BREVO_API_KEY) {
       return NextResponse.json({ error: "Brevo API key not configured" }, { status: 500 });
@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
 
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    // Brevo events API has a 90-day limit
+    startDate.setDate(startDate.getDate() - Math.min(days, 90));
 
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
