@@ -18,10 +18,26 @@ export async function GET() {
       batchCount++;
       console.log(`📦 Fetching batch ${batchCount} (records ${start}-${start + batchSize - 1})...`);
       
-      const { data, error } = await supabase
-        .from('master_data_sept_2')
-        .select('modifier_1, modifier_1_details, modifier_2, modifier_2_details, modifier_3, modifier_3_details, modifier_4, modifier_4_details')
-        .range(start, start + batchSize - 1);
+      // Pull modifiers from the SAME table as code definitions
+      // Attempt 1: common modifier columns present on code_definitions
+      let data: any[] | null = null;
+      let error: any = null;
+      const trySelect = async (cols: string) => {
+        return await supabase
+          .from('code_definitions')
+          .select(cols)
+          .range(start, start + batchSize - 1);
+      };
+
+      // Try standard modifier_1..4 columns
+      let resp = await trySelect('modifier_1, modifier_1_details, modifier_2, modifier_2_details, modifier_3, modifier_3_details, modifier_4, modifier_4_details');
+      if (resp.error) {
+        console.warn('⚠️ code_definitions missing modifier_1..4 columns, trying fallback columns');
+        // Try fallback generic columns if schema differs
+        resp = await trySelect('modifier, modifier_details');
+      }
+      data = resp.data as any[] | null;
+      error = resp.error;
       
       if (error) {
         console.error(`❌ Supabase error fetching batch ${batchCount}:`, error);
@@ -38,13 +54,15 @@ export async function GET() {
       }
 
       // Process modifiers from this batch
-      data.forEach(record => {
+      (data || []).forEach(record => {
         // Check each modifier column
         const modifierColumns = [
           { code: record.modifier_1, details: record.modifier_1_details },
           { code: record.modifier_2, details: record.modifier_2_details },
           { code: record.modifier_3, details: record.modifier_3_details },
-          { code: record.modifier_4, details: record.modifier_4_details }
+          { code: record.modifier_4, details: record.modifier_4_details },
+          // Fallback generic columns if only one modifier column exists
+          { code: record.modifier, details: record.modifier_details }
         ];
 
         modifierColumns.forEach(({ code, details }) => {
