@@ -650,9 +650,9 @@ const StateProfilesPage = () => {
                 className="w-full max-w-md px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
               >
                 <option value="">All States</option>
-                {Object.entries(stateMap).map(([key, value]) => (
-                  <option key={key} value={value}>
-                    {value}
+                {Object.entries(stateMap).map(([fullName, code]) => (
+                  <option key={fullName} value={fullName}>
+                    {fullName}
                   </option>
                 ))}
               </select>

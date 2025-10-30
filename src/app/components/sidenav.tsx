@@ -139,6 +139,7 @@ const SideNav = ({
   // Update the tab mapping
   useEffect(() => {
     const tabMapping: { [key: string]: string } = {
+      "/state-profiles": "home",
       "/home": "home",
       "/recent-rate-changes": "home",
       "/dashboard": "dashboard",
@@ -423,7 +424,7 @@ const SideNav = ({
                   </div>
                 ) : (
                   <Link
-                    href="/home"
+                    href="/state-profiles"
                     onClick={() => setActiveTab("home")}
                     className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
                       activeTab === "home" ? "bg-gray-200/20" : ""
