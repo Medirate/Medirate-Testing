@@ -124,6 +124,7 @@ const Navbar = () => {
   const authenticatedPages = [
     "/dashboard",
     "/home",
+    "/state-profiles",
     "/recent-rate-changes",
     "/profile",
     "/settings",
