@@ -277,6 +277,9 @@ export async function POST(req: NextRequest) {
       log(`DEBUG: Known columns for bill_track_50: ${knownColumns.join(', ')}`, 'info', 'debug');
       log(`DEBUG: Actual columns in filtered data: ${columns.join(', ')}`, 'info', 'debug');
       
+      // Keep an audit list that includes source info (not written to DB)
+      const insertedWithSource: any[] = [];
+
       for (const entry of newEntries) {
         const insertObj = { ...entry, is_new: 'yes', date_extracted: today };
         delete insertObj.source_sheet;
@@ -284,6 +287,8 @@ export async function POST(req: NextRequest) {
         // Debug: Show the raw entry data
         log(`DEBUG: Raw entry data keys: ${Object.keys(entry).join(', ')}`, 'info', 'debug');
         log(`DEBUG: Entry URL: ${entry.url}`, 'info', 'debug');
+        // Explicit source logging for each insert attempt
+        log(`SOURCE: file='${fileName}', sheet='${latestSheet}', url='${entry.url || ''}', state='${entry.state || ''}', bill='${entry.bill_number || ''}'`, 'info', 'insert');
         
         // Filter out unknown columns to prevent schema errors
         const filteredInsertObj: any = {};
@@ -302,6 +307,7 @@ export async function POST(req: NextRequest) {
         if (!error) {
           inserted.push(filteredInsertObj);
           log(`Inserted new entry: ${filteredInsertObj.url}`, 'success', 'insert');
+          insertedWithSource.push({ ...filteredInsertObj, _source_file: fileName, _source_sheet: latestSheet });
         } else {
           log(`Failed to insert: ${filteredInsertObj.url} - ${error.message}`, 'error', 'insert');
           
@@ -314,6 +320,7 @@ export async function POST(req: NextRequest) {
       log(`Inserted ${inserted.length} new entries.`, 'success', 'insert');
       // 4. Update changed entries
       const updated: any[] = [];
+      const updatedWithSource: any[] = [];
       for (const entry of filteredRows) {
         if (!entry.url || !dbByUrl.has(entry.url)) continue;
         const dbRow = dbByUrl.get(entry.url);
@@ -357,11 +364,14 @@ export async function POST(req: NextRequest) {
           updateObj.date_extracted = today;
           
           log(`DEBUG: Updating entry ${entry.url} with changes: ${JSON.stringify(updateObj)}`, 'info', 'debug');
+          // Explicit source logging for each update attempt
+          log(`SOURCE: file='${fileName}', sheet='${latestSheet}', url='${entry.url || ''}', state='${entry.state || ''}', bill='${entry.bill_number || ''}'`, 'info', 'update');
           
           const { data, error } = await supabase.from('bill_track_50').update(updateObj).eq('url', entry.url);
           if (!error) {
             updated.push({ url: entry.url, ...updateObj });
             log(`Updated entry: ${entry.url}`, 'success', 'update');
+            updatedWithSource.push({ url: entry.url, ...updateObj, _source_file: fileName, _source_sheet: latestSheet });
           } else {
             log(`Failed to update: ${entry.url} - ${error.message}`, 'error', 'update');
           }
@@ -393,6 +403,9 @@ export async function POST(req: NextRequest) {
         updatedCount: updated.length,
         insertedPreview: inserted.slice(0, 5),
         updatedPreview: updated.slice(0, 5),
+        // Full audit trails with explicit source
+        insertedWithSourcePreview: insertedWithSource.slice(0, 5),
+        updatedWithSourcePreview: updatedWithSource.slice(0, 5),
         logs,
         message: `Updated bill_track_50: ${inserted.length} inserted, ${updated.length} updated.`
       });
