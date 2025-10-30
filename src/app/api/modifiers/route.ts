@@ -48,8 +48,8 @@ export async function GET() {
         if (!desc) return;
         // If the description references modifiers explicitly, prioritize those tokens
         const scanText = desc;
-        const matches = scanText.match(MODIFIER_REGEX) || [];
-        matches.forEach(token => {
+        const matches = (scanText.match(MODIFIER_REGEX) || []) as string[];
+        matches.forEach((token: string) => {
           const code = token.trim().toUpperCase();
           // Heuristic: skip common two-letter English words that are not modifiers
           if ([

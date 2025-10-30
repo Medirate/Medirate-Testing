@@ -185,7 +185,7 @@ const CodeDefinitionsIcon = () => {
     }
     
     return filtered;
-  }, [data, searchTerm, columnFilters]);
+  }, [data, modifierSearch, descriptionSearch, columnFilters]);
 
   // No separate modifiers dataset anymore
 
