@@ -86,6 +86,12 @@ export default function MarketingEmailsAdminPage() {
   const [bouncedLoading, setBouncedLoading] = useState<boolean>(false);
   const [bouncedError, setBouncedError] = useState<string | null>(null);
 
+  // Contact statistics state
+  const [contactStats, setContactStats] = useState<any[]>([]);
+  const [contactStatsLoading, setContactStatsLoading] = useState<boolean>(false);
+  const [contactStatsError, setContactStatsError] = useState<string | null>(null);
+  const [contactStatsSearch, setContactStatsSearch] = useState<string>("");
+
   // Search state for both lists
   const [testEmailSearch, setTestEmailSearch] = useState<string>("");
   const [marketingEmailSearch, setMarketingEmailSearch] = useState<string>("");
@@ -690,10 +696,44 @@ export default function MarketingEmailsAdminPage() {
     }
   };
 
+  const fetchContactStats = async (days: number = 30) => {
+    setContactStatsLoading(true);
+    setContactStatsError(null);
+    
+    try {
+      const response = await fetch('/api/admin/marketing-emails/contact-stats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ days })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to fetch contact stats: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setContactStats(data.contacts || []);
+      } else {
+        throw new Error(data.error || 'Failed to fetch contact stats');
+      }
+    } catch (error) {
+      console.error('Contact stats error:', error);
+      setContactStatsError(error instanceof Error ? error.message : 'Failed to fetch contact stats');
+    } finally {
+      setContactStatsLoading(false);
+    }
+  };
+
   // Load analytics when days change
   useEffect(() => {
     fetchAnalytics(analyticsDays);
     fetchBouncedEmails(analyticsDays);
+    fetchContactStats(analyticsDays);
   }, [analyticsDays]);
 
   return (
@@ -2152,6 +2192,182 @@ export default function MarketingEmailsAdminPage() {
               <div className="text-green-500 text-6xl mb-4">✅</div>
               <p className="text-gray-600 mb-4">No bounced emails found in the last {analyticsDays} days!</p>
               <p className="text-sm text-gray-500">This is good - it means your email list is clean and your deliverability is healthy.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Contact Statistics Section */}
+        <div className="bg-white shadow-xl rounded-lg p-8 border border-gray-200 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              👥 Contact Statistics
+              <span className="text-sm font-normal text-gray-500">({contactStats.length} contacts)</span>
+            </h3>
+            {contactStatsError && (
+              <span className="text-red-600 text-sm">⚠️ {contactStatsError}</span>
+            )}
+          </div>
+
+          {/* Search Bar */}
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search by email address..."
+              value={contactStatsSearch}
+              onChange={(e) => setContactStatsSearch(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {contactStatsError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <p className="text-red-700">⚠️ {contactStatsError}</p>
+            </div>
+          )}
+
+          {!contactStatsError && contactStats.length > 0 && (
+            <div className="space-y-4">
+              {/* Summary */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-lg font-semibold text-blue-800 mb-2">📊 Contact Performance Summary</h4>
+                    <p className="text-sm text-blue-700">
+                      Showing email engagement data for <strong>{contactStats.length}</strong> unique contacts in the last {analyticsDays} days.
+                    </p>
+                  </div>
+                  <div className="text-blue-500 text-4xl">📈</div>
+                </div>
+              </div>
+
+              {/* Contact Stats Table */}
+              <div className="overflow-x-auto">
+                <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Email Address</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Sent</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Opened</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Clicked</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Bounced</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Spam</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Unsub</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Last Activity</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {contactStats
+                      .filter(contact => 
+                        contactStatsSearch === "" || 
+                        contact.email.toLowerCase().includes(contactStatsSearch.toLowerCase())
+                      )
+                      .slice(0, 100)
+                      .map((contact: any, index: number) => {
+                        const openRate = contact.sent > 0 ? ((contact.opened / contact.sent) * 100).toFixed(1) : '0.0';
+                        const clickRate = contact.sent > 0 ? ((contact.clicked / contact.sent) * 100).toFixed(1) : '0.0';
+                        
+                        return (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm text-gray-900 font-medium">{contact.email}</td>
+                            <td className="px-4 py-3 text-sm text-gray-900">{contact.sent}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className={contact.opened > 0 ? 'text-green-700 font-medium' : 'text-gray-500'}>
+                                  {contact.opened}
+                                </span>
+                                <span className="text-xs text-gray-500">({openRate}%)</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className={contact.clicked > 0 ? 'text-blue-700 font-medium' : 'text-gray-500'}>
+                                  {contact.clicked}
+                                </span>
+                                <span className="text-xs text-gray-500">({clickRate}%)</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className={contact.bounced > 0 ? 'text-red-600 font-medium' : 'text-gray-500'}>
+                                {contact.bounced}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className={contact.spam > 0 ? 'text-orange-600 font-medium' : 'text-gray-500'}>
+                                {contact.spam}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className={contact.unsubscribed > 0 ? 'text-purple-600 font-medium' : 'text-gray-500'}>
+                                {contact.unsubscribed}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-500">
+                              {contact.lastActivity ? new Date(contact.lastActivity).toLocaleDateString() : 'N/A'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+
+              {contactStats.filter(contact => 
+                contactStatsSearch === "" || 
+                contact.email.toLowerCase().includes(contactStatsSearch.toLowerCase())
+              ).length > 100 && (
+                <div className="text-center py-4 text-gray-500 text-sm">
+                  Showing first 100 of {contactStats.filter(contact => 
+                    contactStatsSearch === "" || 
+                    contact.email.toLowerCase().includes(contactStatsSearch.toLowerCase())
+                  ).length} contacts
+                </div>
+              )}
+
+              {/* Stats Legend */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-6">
+                <h5 className="text-sm font-semibold text-gray-700 mb-2">📋 Metrics Explained</h5>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <strong className="text-green-700">Opened:</strong>
+                    <p className="text-gray-600">Number and percentage of emails the contact opened.</p>
+                  </div>
+                  <div>
+                    <strong className="text-blue-700">Clicked:</strong>
+                    <p className="text-gray-600">Number and percentage of emails where the contact clicked a link.</p>
+                  </div>
+                  <div>
+                    <strong className="text-red-700">Bounced:</strong>
+                    <p className="text-gray-600">Emails that failed to deliver to this contact.</p>
+                  </div>
+                  <div>
+                    <strong className="text-orange-700">Spam:</strong>
+                    <p className="text-gray-600">Number of times the contact marked emails as spam.</p>
+                  </div>
+                  <div>
+                    <strong className="text-purple-700">Unsub:</strong>
+                    <p className="text-gray-600">Number of times the contact unsubscribed.</p>
+                  </div>
+                  <div>
+                    <strong className="text-gray-700">Last Activity:</strong>
+                    <p className="text-gray-600">Most recent email interaction date.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {contactStatsLoading && (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading contact statistics...</p>
+            </div>
+          )}
+
+          {!contactStatsLoading && contactStats.length === 0 && !contactStatsError && (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-6xl mb-4">📭</div>
+              <p className="text-gray-600 mb-4">No contact data found in the last {analyticsDays} days.</p>
+              <p className="text-sm text-gray-500">Send some emails to start tracking contact engagement.</p>
             </div>
           )}
         </div>
