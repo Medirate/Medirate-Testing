@@ -395,9 +395,10 @@ export async function GET(request: Request) {
       const { data: spaceStateData } = await spaceStateTest;
       console.log(`🔍 API Debug - State with trailing space "${trimmedState} ":`, spaceStateData?.length || 0);
       
-      // Use ILIKE with wildcards to handle any trailing spaces
-      console.log(`🔍 API Debug - Using ILIKE pattern for state: "%${trimmedState}%"`);
-      query = query.ilike('state_name', `%${trimmedState}%`);
+      // Avoid substring matches like "KANSAS" matching "ARKANSAS".
+      // Prefer prefix match (handles potential trailing spaces in source data) OR exact match.
+      console.log(`🔍 API Debug - Using ILIKE pattern for state (prefix): "${trimmedState}%" with OR exact`);
+      query = query.or(`state_name.eq.${trimmedState},state_name.ilike.${trimmedState}%`);
     }
     if (serviceCode) {
       if (serviceCode.includes(',')) {
