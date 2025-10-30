@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateAdminAuth } from "@/lib/admin-auth";
+import { createServiceClient } from "@/lib/supabase";
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const BREVO_API_URL = "https://api.brevo.com/v3";
@@ -103,37 +104,36 @@ export async function POST(req: NextRequest) {
       else if (eventType === 'invalid') stat.invalid.add(messageId);
     });
 
-    // Fetch ALL emails from marketing list (to show everyone, not just those with events)
-    const allEmailsResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/admin/marketing-emails/list`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ table: 'marketing_email_list' })
-    });
-
-    let allMarketingEmails: string[] = [];
-    if (allEmailsResponse.ok) {
-      const data = await allEmailsResponse.json();
-      allMarketingEmails = (data.data || []).map((row: any) => row.email);
-    }
-
-    // Merge: include all marketing list emails, even those with no events
-    allMarketingEmails.forEach(email => {
-      if (!contactStats[email]) {
-        contactStats[email] = {
-          email,
-          sent: new Set<string>(),
-          opened: new Set<string>(),
-          clicked: new Set<string>(),
-          bounced: new Set<string>(),
-          spam: new Set<string>(),
-          unsubscribed: new Set<string>(),
-          blocked: new Set<string>(),
-          deferred: new Set<string>(),
-          invalid: new Set<string>(),
-          lastActivity: ''
-        };
+    // Optionally fetch ALL emails from marketing list directly from DB (to show everyone, not just those with events)
+    try {
+      const supabase = createServiceClient();
+      const { data: marketingData } = await supabase
+        .from('marketing_email_list')
+        .select('email');
+      
+      if (marketingData) {
+        marketingData.forEach((row: any) => {
+          const email = row.email;
+          if (!contactStats[email]) {
+            contactStats[email] = {
+              email,
+              sent: new Set<string>(),
+              opened: new Set<string>(),
+              clicked: new Set<string>(),
+              bounced: new Set<string>(),
+              spam: new Set<string>(),
+              unsubscribed: new Set<string>(),
+              blocked: new Set<string>(),
+              deferred: new Set<string>(),
+              invalid: new Set<string>(),
+              lastActivity: ''
+            };
+          }
+        });
       }
-    });
+    } catch (dbError) {
+      console.warn('Could not fetch marketing list from DB, showing only contacts with events:', dbError);
+    }
 
     // Convert Sets to counts and create final array
     const contactList = Object.values(contactStats).map(stat => ({
