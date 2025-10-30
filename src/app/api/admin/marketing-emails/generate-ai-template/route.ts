@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Run on Edge to minimize cold starts and lower latency
+export const runtime = 'edge';
+
 // OpenAI API configuration
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
@@ -150,6 +153,10 @@ Create a template that would win awards at email marketing conferences and drive
 
 **REMEMBER**: Your entire response must be ONLY the HTML code - nothing else!`;
 
+    // Add a timeout guard so we never hang and Vercel doesn't 504 the route
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000); // 25s hard cap
+
     const response = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
@@ -168,10 +175,13 @@ Create a template that would win awards at email marketing conferences and drive
             content: enhancedPrompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 4000
-      })
+        temperature: 0.6,
+        max_tokens: 1500
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeout);
 
     if (!response.ok) {
       let errorData;
