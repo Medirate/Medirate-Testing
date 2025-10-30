@@ -2261,7 +2261,6 @@ export default function MarketingEmailsAdminPage() {
                         contactStatsSearch === "" || 
                         contact.email.toLowerCase().includes(contactStatsSearch.toLowerCase())
                       )
-                      .slice(0, 100)
                       .map((contact: any, index: number) => {
                         const openRate = contact.sent > 0 ? ((contact.opened / contact.sent) * 100).toFixed(1) : '0.0';
                         const clickRate = contact.sent > 0 ? ((contact.clicked / contact.sent) * 100).toFixed(1) : '0.0';
@@ -2311,17 +2310,6 @@ export default function MarketingEmailsAdminPage() {
                 </table>
               </div>
 
-              {contactStats.filter(contact => 
-                contactStatsSearch === "" || 
-                contact.email.toLowerCase().includes(contactStatsSearch.toLowerCase())
-              ).length > 100 && (
-                <div className="text-center py-4 text-gray-500 text-sm">
-                  Showing first 100 of {contactStats.filter(contact => 
-                    contactStatsSearch === "" || 
-                    contact.email.toLowerCase().includes(contactStatsSearch.toLowerCase())
-                  ).length} contacts
-                </div>
-              )}
 
               {/* Stats Legend */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-6">

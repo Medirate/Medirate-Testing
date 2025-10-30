@@ -47,18 +47,18 @@ export async function POST(req: NextRequest) {
     const eventsData = await eventsResponse.json();
     const events = eventsData?.events || [];
 
-    // Build per-contact statistics
+    // Build per-contact statistics with UNIQUE message tracking
     const contactStats: Record<string, {
       email: string;
-      sent: number;
-      opened: number;
-      clicked: number;
-      bounced: number;
-      spam: number;
-      unsubscribed: number;
-      blocked: number;
-      deferred: number;
-      invalid: number;
+      sent: Set<string>;
+      opened: Set<string>;
+      clicked: Set<string>;
+      bounced: Set<string>;
+      spam: Set<string>;
+      unsubscribed: Set<string>;
+      blocked: Set<string>;
+      deferred: Set<string>;
+      invalid: Set<string>;
       lastActivity: string;
     }> = {};
 
@@ -66,19 +66,20 @@ export async function POST(req: NextRequest) {
       const email = e.email || 'unknown';
       const eventType = (e.event || '').toLowerCase();
       const eventDate = e.date || e.ts_event || '';
+      const messageId = e['message-id'] || e.messageId || `${email}-${eventDate}`;
 
       if (!contactStats[email]) {
         contactStats[email] = {
           email,
-          sent: 0,
-          opened: 0,
-          clicked: 0,
-          bounced: 0,
-          spam: 0,
-          unsubscribed: 0,
-          blocked: 0,
-          deferred: 0,
-          invalid: 0,
+          sent: new Set<string>(),
+          opened: new Set<string>(),
+          clicked: new Set<string>(),
+          bounced: new Set<string>(),
+          spam: new Set<string>(),
+          unsubscribed: new Set<string>(),
+          blocked: new Set<string>(),
+          deferred: new Set<string>(),
+          invalid: new Set<string>(),
           lastActivity: eventDate
         };
       }
@@ -90,20 +91,64 @@ export async function POST(req: NextRequest) {
         stat.lastActivity = eventDate;
       }
 
-      // Count events
-      if (eventType === 'sent' || eventType === 'delivered') stat.sent++;
-      else if (eventType === 'opened' || eventType === 'open') stat.opened++;
-      else if (eventType === 'click' || eventType === 'clicked') stat.clicked++;
-      else if (eventType.includes('bounce') || eventType === 'hardbounce' || eventType === 'softbounce') stat.bounced++;
-      else if (eventType === 'spam' || eventType === 'spamreport' || eventType === 'complaint') stat.spam++;
-      else if (eventType === 'unsubscribed' || eventType === 'unsubscribe') stat.unsubscribed++;
-      else if (eventType === 'blocked') stat.blocked++;
-      else if (eventType === 'deferred') stat.deferred++;
-      else if (eventType === 'invalid') stat.invalid++;
+      // Track UNIQUE messages per event type
+      if (eventType === 'sent' || eventType === 'delivered') stat.sent.add(messageId);
+      else if (eventType === 'opened' || eventType === 'open') stat.opened.add(messageId);
+      else if (eventType === 'click' || eventType === 'clicked') stat.clicked.add(messageId);
+      else if (eventType.includes('bounce') || eventType === 'hardbounce' || eventType === 'softbounce') stat.bounced.add(messageId);
+      else if (eventType === 'spam' || eventType === 'spamreport' || eventType === 'complaint') stat.spam.add(messageId);
+      else if (eventType === 'unsubscribed' || eventType === 'unsubscribe') stat.unsubscribed.add(messageId);
+      else if (eventType === 'blocked') stat.blocked.add(messageId);
+      else if (eventType === 'deferred') stat.deferred.add(messageId);
+      else if (eventType === 'invalid') stat.invalid.add(messageId);
     });
 
-    // Convert to array and sort by sent count descending
-    const contactList = Object.values(contactStats).sort((a, b) => b.sent - a.sent);
+    // Fetch ALL emails from marketing list (to show everyone, not just those with events)
+    const allEmailsResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/admin/marketing-emails/list`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table: 'marketing_email_list' })
+    });
+
+    let allMarketingEmails: string[] = [];
+    if (allEmailsResponse.ok) {
+      const data = await allEmailsResponse.json();
+      allMarketingEmails = (data.data || []).map((row: any) => row.email);
+    }
+
+    // Merge: include all marketing list emails, even those with no events
+    allMarketingEmails.forEach(email => {
+      if (!contactStats[email]) {
+        contactStats[email] = {
+          email,
+          sent: new Set<string>(),
+          opened: new Set<string>(),
+          clicked: new Set<string>(),
+          bounced: new Set<string>(),
+          spam: new Set<string>(),
+          unsubscribed: new Set<string>(),
+          blocked: new Set<string>(),
+          deferred: new Set<string>(),
+          invalid: new Set<string>(),
+          lastActivity: ''
+        };
+      }
+    });
+
+    // Convert Sets to counts and create final array
+    const contactList = Object.values(contactStats).map(stat => ({
+      email: stat.email,
+      sent: stat.sent.size,
+      opened: stat.opened.size,
+      clicked: stat.clicked.size,
+      bounced: stat.bounced.size,
+      spam: stat.spam.size,
+      unsubscribed: stat.unsubscribed.size,
+      blocked: stat.blocked.size,
+      deferred: stat.deferred.size,
+      invalid: stat.invalid.size,
+      lastActivity: stat.lastActivity
+    })).sort((a, b) => b.sent - a.sent);
 
     return NextResponse.json({
       success: true,
