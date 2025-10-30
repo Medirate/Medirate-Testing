@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Process unique daily stats and overall unique metrics from events
-    const { dailyUniqueStats, uniqueSummary } = processUniqueFromEvents(eventsData?.events || [], startDate, endDate);
+    const { dailyUniqueStats, uniqueSummary, linkStats } = processUniqueFromEvents(eventsData?.events || [], startDate, endDate);
 
     // Create analytics response
     const analytics = {
@@ -95,8 +95,27 @@ export async function POST(req: NextRequest) {
         aggregatedOpens: aggregatedData?.opens || 0,
         aggregatedClicks: aggregatedData?.clicks || 0,
         aggregatedBounces: aggregatedData?.bounces || 0,
+        aggregatedSpam: (aggregatedData?.spamReports ?? aggregatedData?.spam ?? 0),
+        aggregatedUnsubscribed: (aggregatedData?.unsubscribed ?? aggregatedData?.unsubscriptions ?? 0),
+        aggregatedBlocked: (aggregatedData?.blocked ?? 0),
+        aggregatedDeferred: (aggregatedData?.deferred ?? 0),
+        aggregatedInvalid: (aggregatedData?.invalid ?? 0),
       },
       dailyStats: dailyUniqueStats,
+      extended: {
+        unique: {
+          sent: uniqueSummary.sent,
+          opened: uniqueSummary.opened,
+          clicked: uniqueSummary.clicked,
+          bounced: uniqueSummary.bounced,
+          spam: uniqueSummary.spam,
+          unsubscribed: uniqueSummary.unsubscribed,
+          blocked: uniqueSummary.blocked,
+          deferred: uniqueSummary.deferred,
+          invalid: uniqueSummary.invalid,
+        },
+        links: linkStats
+      },
       recentEmails: eventsData?.events?.slice(0, 10) || [],
       dateRange: {
         startDate: startDate.toISOString().split('T')[0],
@@ -134,11 +153,12 @@ export async function POST(req: NextRequest) {
 
 // Helper: compute UNIQUE per-day and overall metrics from events by message-id/email
 function processUniqueFromEvents(events: any[], startDate: Date, endDate: Date) {
-  const perDay: { [key: string]: { sent: Set<string>; opened: Set<string>; clicked: Set<string>; bounced: Set<string> } } = {};
-  const overall = { sent: new Set<string>(), opened: new Set<string>(), clicked: new Set<string>(), bounced: new Set<string>() };
+  const perDay: { [key: string]: { sent: Set<string>; opened: Set<string>; clicked: Set<string>; bounced: Set<string>; spam: Set<string>; unsub: Set<string>; blocked: Set<string>; deferred: Set<string>; invalid: Set<string> } } = {};
+  const overall = { sent: new Set<string>(), opened: new Set<string>(), clicked: new Set<string>(), bounced: new Set<string>(), spam: new Set<string>(), unsubscribed: new Set<string>(), blocked: new Set<string>(), deferred: new Set<string>(), invalid: new Set<string>() };
+  const clicksByLink: Record<string, Set<string>> = {};
 
   const initDay = (dateKey: string) => {
-    if (!perDay[dateKey]) perDay[dateKey] = { sent: new Set(), opened: new Set(), clicked: new Set(), bounced: new Set() };
+    if (!perDay[dateKey]) perDay[dateKey] = { sent: new Set(), opened: new Set(), clicked: new Set(), bounced: new Set(), spam: new Set(), unsub: new Set(), blocked: new Set(), deferred: new Set(), invalid: new Set() };
   };
 
   events.forEach((e: any) => {
@@ -148,9 +168,21 @@ function processUniqueFromEvents(events: any[], startDate: Date, endDate: Date) 
     const id = (e['message-id'] || e.messageId || '') + '|' + (e.email || '');
     const type = (e.event || '').toLowerCase();
     if (type === 'sent' || type === 'delivered') { perDay[dateKey].sent.add(id); overall.sent.add(id); }
-    else if (type === 'opened') { perDay[dateKey].opened.add(id); overall.opened.add(id); }
-    else if (type === 'click' || type === 'clicked') { perDay[dateKey].clicked.add(id); overall.clicked.add(id); }
+    else if (type === 'opened' || type === 'open') { perDay[dateKey].opened.add(id); overall.opened.add(id); }
+    else if (type === 'click' || type === 'clicked') {
+      perDay[dateKey].clicked.add(id); overall.clicked.add(id);
+      const link = (e.link || e.url || '').toString();
+      if (link) {
+        if (!clicksByLink[link]) clicksByLink[link] = new Set<string>();
+        clicksByLink[link].add(id);
+      }
+    }
     else if (type.includes('bounce') || type === 'blocked' || type === 'hardbounce' || type === 'softbounce') { perDay[dateKey].bounced.add(id); overall.bounced.add(id); }
+    else if (type === 'spam' || type === 'spamreport' || type === 'complaint') { perDay[dateKey].spam.add(id); overall.spam.add(id); }
+    else if (type === 'unsubscribed' || type === 'unsubscribe') { perDay[dateKey].unsub.add(id); overall.unsubscribed.add(id); }
+    else if (type === 'deferred') { perDay[dateKey].deferred.add(id); overall.deferred.add(id); }
+    else if (type === 'invalid') { perDay[dateKey].invalid.add(id); overall.invalid.add(id); }
+    else if (type === 'blocked') { perDay[dateKey].blocked.add(id); overall.blocked.add(id); }
   });
 
   // Initialize missing days
@@ -167,6 +199,11 @@ function processUniqueFromEvents(events: any[], startDate: Date, endDate: Date) 
     opened: sets.opened.size,
     clicked: sets.clicked.size,
     bounced: sets.bounced.size,
+    spam: sets.spam.size,
+    unsubscribed: sets.unsub.size,
+    blocked: sets.blocked.size,
+    deferred: sets.deferred.size,
+    invalid: sets.invalid.size,
   }));
 
   const uniqueSummary = {
@@ -174,7 +211,16 @@ function processUniqueFromEvents(events: any[], startDate: Date, endDate: Date) 
     opened: overall.opened.size,
     clicked: overall.clicked.size,
     bounced: overall.bounced.size,
+    spam: overall.spam.size,
+    unsubscribed: overall.unsubscribed.size,
+    blocked: overall.blocked.size,
+    deferred: overall.deferred.size,
+    invalid: overall.invalid.size,
   };
+  const linkStats = Object.entries(clicksByLink)
+    .map(([link, set]) => ({ link, uniqueClicks: set.size }))
+    .sort((a,b)=> b.uniqueClicks - a.uniqueClicks)
+    .slice(0, 20);
 
-  return { dailyUniqueStats, uniqueSummary };
+  return { dailyUniqueStats, uniqueSummary, linkStats };
 }
