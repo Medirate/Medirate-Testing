@@ -2317,19 +2317,19 @@ export default function MarketingEmailsAdminPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                   <div>
                     <strong className="text-green-700">Opened:</strong>
-                    <p className="text-gray-600">Number and percentage of emails the contact opened.</p>
+                    <p className="text-gray-600">Number and percentage of unique emails the contact opened.</p>
                   </div>
                   <div>
                     <strong className="text-blue-700">Clicked:</strong>
-                    <p className="text-gray-600">Number and percentage of emails where the contact clicked a link.</p>
+                    <p className="text-gray-600">Number and percentage of unique emails where the contact clicked a link.</p>
                   </div>
                   <div>
                     <strong className="text-red-700">Bounced:</strong>
-                    <p className="text-gray-600">Emails that failed to deliver to this contact.</p>
+                    <p className="text-gray-600">Unique emails that failed to deliver to this contact.</p>
                   </div>
                   <div>
                     <strong className="text-orange-700">Spam:</strong>
-                    <p className="text-gray-600">Number of times the contact marked emails as spam.</p>
+                    <p className="text-gray-600">Number of unique emails the contact marked as spam.</p>
                   </div>
                   <div>
                     <strong className="text-purple-700">Unsub:</strong>
@@ -2337,7 +2337,7 @@ export default function MarketingEmailsAdminPage() {
                   </div>
                   <div>
                     <strong className="text-gray-700">Last Activity:</strong>
-                    <p className="text-gray-600">Most recent email interaction date.</p>
+                    <p className="text-gray-600">Most recent email interaction date. "N/A" means no emails sent/opened in the selected date range.</p>
                   </div>
                 </div>
               </div>

@@ -26,27 +26,53 @@ export async function POST(req: NextRequest) {
     const startDateStr = startDate.toISOString().split('T')[0];
     const endDateStr = endDate.toISOString().split('T')[0];
 
-    // Fetch events from Brevo (limit 1000, if you need more, implement pagination)
-    const eventsUrl = `${BREVO_API_URL}/smtp/statistics/events?limit=1000&startDate=${startDateStr}&endDate=${endDateStr}`;
-    
-    const eventsResponse = await fetch(eventsUrl, {
-      headers: {
-        'Accept': 'application/json',
-        'api-key': BREVO_API_KEY
-      }
-    });
+    // Fetch ALL events from Brevo with pagination (max 1000 per call)
+    let allEvents: any[] = [];
+    let offset = 0;
+    const limit = 1000;
+    let hasMore = true;
 
-    if (!eventsResponse.ok) {
-      const errorText = await eventsResponse.text();
-      console.error("Brevo events API error:", eventsResponse.status, errorText);
-      return NextResponse.json({ 
-        error: "Failed to fetch Brevo events", 
-        details: `Status ${eventsResponse.status}` 
-      }, { status: 500 });
+    console.log(`[contact-stats] Fetching Brevo events from ${startDateStr} to ${endDateStr}...`);
+
+    while (hasMore) {
+      const eventsUrl = `${BREVO_API_URL}/smtp/statistics/events?limit=${limit}&offset=${offset}&startDate=${startDateStr}&endDate=${endDateStr}`;
+      
+      const eventsResponse = await fetch(eventsUrl, {
+        headers: {
+          'Accept': 'application/json',
+          'api-key': BREVO_API_KEY
+        }
+      });
+
+      if (!eventsResponse.ok) {
+        const errorText = await eventsResponse.text();
+        console.error("Brevo events API error:", eventsResponse.status, errorText);
+        return NextResponse.json({ 
+          error: "Failed to fetch Brevo events", 
+          details: `Status ${eventsResponse.status}` 
+        }, { status: 500 });
+      }
+
+      const eventsData = await eventsResponse.json();
+      const events = eventsData?.events || [];
+      
+      if (events.length === 0) {
+        hasMore = false;
+      } else {
+        allEvents = allEvents.concat(events);
+        offset += limit;
+        console.log(`[contact-stats] Fetched ${allEvents.length} events so far...`);
+        
+        // Safety: stop after 10k events to avoid timeouts
+        if (allEvents.length >= 10000) {
+          console.warn(`[contact-stats] Reached 10k events limit, stopping pagination`);
+          hasMore = false;
+        }
+      }
     }
 
-    const eventsData = await eventsResponse.json();
-    const events = eventsData?.events || [];
+    console.log(`[contact-stats] Total events fetched: ${allEvents.length}`);
+    const events = allEvents;
 
     // Build per-contact statistics with UNIQUE message tracking
     const contactStats: Record<string, {
