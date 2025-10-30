@@ -2204,9 +2204,57 @@ export default function MarketingEmailsAdminPage() {
               👥 Contact Statistics
               <span className="text-sm font-normal text-gray-500">({contactStats.length} contacts)</span>
             </h3>
-            {contactStatsError && (
-              <span className="text-red-600 text-sm">⚠️ {contactStatsError}</span>
-            )}
+            <div className="flex items-center gap-4">
+              {contactStats.length > 0 && (
+                <button
+                  onClick={() => {
+                    // Convert contact stats to CSV
+                    const headers = ['Email Address', 'Sent', 'Opened', 'Open Rate %', 'Clicked', 'Click Rate %', 'Bounced', 'Spam', 'Unsubscribed', 'Last Activity'];
+                    const csvRows = [
+                      headers.join(','),
+                      ...contactStats.map((contact: any) => {
+                        const openRate = contact.sent > 0 ? ((contact.opened / contact.sent) * 100).toFixed(1) : '0.0';
+                        const clickRate = contact.sent > 0 ? ((contact.clicked / contact.sent) * 100).toFixed(1) : '0.0';
+                        const lastActivity = contact.lastActivity ? new Date(contact.lastActivity).toLocaleDateString() : 'N/A';
+                        return [
+                          contact.email,
+                          contact.sent,
+                          contact.opened,
+                          openRate,
+                          contact.clicked,
+                          clickRate,
+                          contact.bounced,
+                          contact.spam,
+                          contact.unsubscribed,
+                          lastActivity
+                        ].join(',');
+                      })
+                    ];
+                    
+                    // Create blob and download
+                    const csvContent = csvRows.join('\n');
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `contact-statistics-${new Date().toISOString().split('T')[0]}.csv`);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Export to Excel
+                </button>
+              )}
+              {contactStatsError && (
+                <span className="text-red-600 text-sm">⚠️ {contactStatsError}</span>
+              )}
+            </div>
           </div>
 
           {/* Search Bar */}
