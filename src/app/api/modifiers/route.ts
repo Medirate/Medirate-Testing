@@ -19,25 +19,12 @@ export async function GET() {
       console.log(`📦 Fetching batch ${batchCount} (records ${start}-${start + batchSize - 1})...`);
       
       // Pull modifiers from the SAME table as code definitions
-      // Attempt 1: common modifier columns present on code_definitions
-      let data: any[] | null = null;
-      let error: any = null;
-      const trySelect = async (cols: string) => {
-        return await supabase
-          .from('code_definitions')
-          .select(cols)
-          .range(start, start + batchSize - 1);
-      };
-
-      // Try standard modifier_1..4 columns
-      let resp = await trySelect('modifier_1, modifier_1_details, modifier_2, modifier_2_details, modifier_3, modifier_3_details, modifier_4, modifier_4_details');
-      if (resp.error) {
-        console.warn('⚠️ code_definitions missing modifier_1..4 columns, trying fallback columns');
-        // Try fallback generic columns if schema differs
-        resp = await trySelect('modifier, modifier_details');
-      }
-      data = resp.data as any[] | null;
-      error = resp.error;
+      // The code_definitions table contains: hcpcs_code_cpt_code, service_code, service_description
+      // We derive modifiers by scanning service_description for 2-character modifier codes (e.g., 25, 59, 26, TC, RT, LT, GT, QK, etc.)
+      const { data, error } = await supabase
+        .from('code_definitions')
+        .select('service_description')
+        .range(start, start + batchSize - 1);
       
       if (error) {
         console.error(`❌ Supabase error fetching batch ${batchCount}:`, error);
@@ -53,38 +40,26 @@ export async function GET() {
         break;
       }
 
-      // Process modifiers from this batch
+      // Process modifiers from this batch by parsing service_description
+      const MODIFIER_REGEX = /\b([A-Z]{2}|[A-Z]\d|\d[A-Z]|\d{2})\b/g; // conservative 2-char tokens
+      const KNOWN_PREFIX_REGEX = /\bmodifier[s]?\b\s*:?\s*/i; // e.g., "Modifier 59" or "modifiers: RT, LT"
       (data || []).forEach(record => {
-        // Check each modifier column
-        const modifierColumns = [
-          { code: record.modifier_1, details: record.modifier_1_details },
-          { code: record.modifier_2, details: record.modifier_2_details },
-          { code: record.modifier_3, details: record.modifier_3_details },
-          { code: record.modifier_4, details: record.modifier_4_details },
-          // Fallback generic columns if only one modifier column exists
-          { code: record.modifier, details: record.modifier_details }
-        ];
-
-        modifierColumns.forEach(({ code, details }) => {
-          if (code && code.trim() !== '' && code.toUpperCase() !== 'NULL') {
-            // Check if this modifier already exists
-            const existingModifier = allModifiers.find(m => m.modifier_code === code.trim().toUpperCase());
-            
-            if (!existingModifier) {
-              allModifiers.push({
-                modifier_code: code.trim().toUpperCase(),
-                modifier_details: details?.trim() || 'No details available',
-                usage_count: 1
-              });
-            } else {
-              // Increment usage count
-              existingModifier.usage_count += 1;
-              
-              // Update details if current one is more descriptive
-              if (details && details.trim() !== '' && details.trim().length > existingModifier.modifier_details.length) {
-                existingModifier.modifier_details = details.trim();
-              }
-            }
+        const desc = (record?.service_description || '').toString();
+        if (!desc) return;
+        // If the description references modifiers explicitly, prioritize those tokens
+        const scanText = desc;
+        const matches = scanText.match(MODIFIER_REGEX) || [];
+        matches.forEach(token => {
+          const code = token.trim().toUpperCase();
+          // Heuristic: skip common two-letter English words that are not modifiers
+          if ([
+            'OF','IN','ON','TO','BY','AN','AS','AT','OR','IF','IT','IS','BE','US','NO','UP','PT','PA','FC'
+          ].includes(code)) return;
+          const existing = allModifiers.find(m => m.modifier_code === code);
+          if (!existing) {
+            allModifiers.push({ modifier_code: code, modifier_details: 'Derived from code definitions', usage_count: 1 });
+          } else {
+            existing.usage_count += 1;
           }
         });
       });
