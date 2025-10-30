@@ -74,21 +74,29 @@ export async function POST(req: NextRequest) {
       console.log(`✅ Retrieved events data from Brevo:`, eventsData);
     }
 
-    // Process daily stats from events
-    const dailyStats = processDailyStats(eventsData?.events || [], startDate, endDate);
+    // Process unique daily stats and overall unique metrics from events
+    const { dailyUniqueStats, uniqueSummary } = processUniqueFromEvents(eventsData?.events || [], startDate, endDate);
 
     // Create analytics response
     const analytics = {
       summary: {
-        totalSent: aggregatedData?.requests || 0,
-        totalOpened: aggregatedData?.opens || 0,
-        totalClicked: aggregatedData?.clicks || 0,
-        totalBounced: aggregatedData?.bounces || 0,
-        openRate: aggregatedData?.requests > 0 ? ((aggregatedData.opens / aggregatedData.requests) * 100) : 0,
-        clickRate: aggregatedData?.requests > 0 ? ((aggregatedData.clicks / aggregatedData.requests) * 100) : 0,
-        bounceRate: aggregatedData?.requests > 0 ? ((aggregatedData.bounces / aggregatedData.requests) * 100) : 0,
+        // unique metrics preferred; fallback to aggregated if unavailable
+        totalSent: uniqueSummary.sent > 0 ? uniqueSummary.sent : (aggregatedData?.requests || 0),
+        totalOpened: uniqueSummary.opened,
+        totalClicked: uniqueSummary.clicked,
+        totalBounced: uniqueSummary.bounced,
+        openRate: (uniqueSummary.sent || aggregatedData?.requests || 0) > 0 ? ((uniqueSummary.opened / (uniqueSummary.sent || aggregatedData?.requests || 1)) * 100) : 0,
+        clickRate: (uniqueSummary.sent || aggregatedData?.requests || 0) > 0 ? ((uniqueSummary.clicked / (uniqueSummary.sent || aggregatedData?.requests || 1)) * 100) : 0,
+        bounceRate: (uniqueSummary.sent || aggregatedData?.requests || 0) > 0 ? ((uniqueSummary.bounced / (uniqueSummary.sent || aggregatedData?.requests || 1)) * 100) : 0,
       },
-      dailyStats: dailyStats,
+      totals: {
+        // expose raw event totals for transparency
+        aggregatedRequests: aggregatedData?.requests || 0,
+        aggregatedOpens: aggregatedData?.opens || 0,
+        aggregatedClicks: aggregatedData?.clicks || 0,
+        aggregatedBounces: aggregatedData?.bounces || 0,
+      },
+      dailyStats: dailyUniqueStats,
       recentEmails: eventsData?.events?.slice(0, 10) || [],
       dateRange: {
         startDate: startDate.toISOString().split('T')[0],
@@ -104,7 +112,7 @@ export async function POST(req: NextRequest) {
 
     console.log("✅ Analytics processed successfully:", {
       summary: analytics.summary,
-      dailyStatsCount: dailyStats.length,
+      dailyStatsCount: dailyUniqueStats.length,
       recentEmailsCount: analytics.recentEmails.length,
       aggregatedError,
       eventsError
@@ -124,44 +132,49 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Helper function to process daily stats from events
-function processDailyStats(events: any[], startDate: Date, endDate: Date) {
-  const dailyStats: { [key: string]: { sent: number; opened: number; clicked: number; bounced: number } } = {};
-  
-  // Initialize all dates in range
-  const currentDate = new Date(startDate);
-  while (currentDate <= endDate) {
-    const dateKey = currentDate.toISOString().split('T')[0];
-    dailyStats[dateKey] = { sent: 0, opened: 0, clicked: 0, bounced: 0 };
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
+// Helper: compute UNIQUE per-day and overall metrics from events by message-id/email
+function processUniqueFromEvents(events: any[], startDate: Date, endDate: Date) {
+  const perDay: { [key: string]: { sent: Set<string>; opened: Set<string>; clicked: Set<string>; bounced: Set<string> } } = {};
+  const overall = { sent: new Set<string>(), opened: new Set<string>(), clicked: new Set<string>(), bounced: new Set<string>() };
 
-  // Process events
-  events.forEach((event: any) => {
-    const eventDate = event.date?.split('T')[0];
-    if (eventDate && dailyStats[eventDate]) {
-      switch (event.event) {
-        case 'sent':
-        case 'delivered':
-          dailyStats[eventDate].sent++;
-          break;
-        case 'opened':
-          dailyStats[eventDate].opened++;
-          break;
-        case 'clicked':
-          dailyStats[eventDate].clicked++;
-          break;
-        case 'bounce':
-        case 'blocked':
-          dailyStats[eventDate].bounced++;
-          break;
-      }
-    }
+  const initDay = (dateKey: string) => {
+    if (!perDay[dateKey]) perDay[dateKey] = { sent: new Set(), opened: new Set(), clicked: new Set(), bounced: new Set() };
+  };
+
+  events.forEach((e: any) => {
+    const dateKey = (e.date?.split('T')[0]) || '';
+    if (!dateKey) return;
+    initDay(dateKey);
+    const id = (e['message-id'] || e.messageId || '') + '|' + (e.email || '');
+    const type = (e.event || '').toLowerCase();
+    if (type === 'sent' || type === 'delivered') { perDay[dateKey].sent.add(id); overall.sent.add(id); }
+    else if (type === 'opened') { perDay[dateKey].opened.add(id); overall.opened.add(id); }
+    else if (type === 'clicked') { perDay[dateKey].clicked.add(id); overall.clicked.add(id); }
+    else if (type.includes('bounce') || type === 'blocked') { perDay[dateKey].bounced.add(id); overall.bounced.add(id); }
   });
 
-  // Convert to array format
-  return Object.entries(dailyStats).map(([date, stats]) => ({
+  // Initialize missing days
+  const current = new Date(startDate);
+  while (current <= endDate) {
+    const key = current.toISOString().split('T')[0];
+    initDay(key);
+    current.setDate(current.getDate() + 1);
+  }
+
+  const dailyUniqueStats = Object.entries(perDay).sort(([a],[b])=> a.localeCompare(b)).map(([date, sets]) => ({
     date,
-    ...stats
+    sent: sets.sent.size,
+    opened: sets.opened.size,
+    clicked: sets.clicked.size,
+    bounced: sets.bounced.size,
   }));
+
+  const uniqueSummary = {
+    sent: overall.sent.size,
+    opened: overall.opened.size,
+    clicked: overall.clicked.size,
+    bounced: overall.bounced.size,
+  };
+
+  return { dailyUniqueStats, uniqueSummary };
 }
