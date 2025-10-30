@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import AppLayout from "@/app/components/applayout";
 import { FaSpinner, FaExclamationCircle, FaChevronLeft, FaChevronRight, FaFilter, FaChartLine } from 'react-icons/fa';
 import Select from "react-select";
@@ -17,7 +17,7 @@ import {
   Legend,
 } from 'chart.js';
 
-import { useRequireSubscription } from "@/hooks/useRequireAuth";
+import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
 import { useRouter } from "next/navigation";
 import type { Dispatch, SetStateAction } from 'react';
 import { gunzipSync, strFromU8 } from "fflate";
@@ -511,11 +511,6 @@ function getAvailableOptionsForFilter(filterKey: keyof Selections, selections: S
           // Handle multi-select values (arrays) vs single values (strings)
           if (Array.isArray(value)) {
             return value.includes(combo[key]);
-          } else if (typeof value === 'string' && (value.includes(',') || value.includes('|'))) {
-            // Handle comma-separated or pipe-separated values (multi-select)
-            const separator = value.includes('|') ? '|' : ',';
-            const selectedValues = value.split(separator).map(v => v.trim());
-            return selectedValues.includes(combo[key]);
           } else {
             return combo[key] === value;
           }
@@ -619,7 +614,6 @@ const hasBlankEntriesForFilter = (filterKey: keyof Selections, selections: Selec
   });
 };
 
-
 // Add Selections type and state for unified filter management
 // --- NEW: Types for client-side filtering ---
 interface Combination {
@@ -628,13 +622,6 @@ interface Combination {
 
 type Selections = {
   [key: string]: string | null;
-};
-
-// Add type for multi-state selection
-type StateData = {
-  state: string;
-  data: ServiceData[];
-  totalCount: number;
 };
 // --- END NEW ---
 
@@ -675,7 +662,7 @@ function formatDate(dateString: string | undefined): string {
 }
 
 export default function HistoricalRates() {
-  const auth = useRequireSubscription();
+  const { isAuthenticated, isLoading, user } = useKindeBrowserClient();
   const router = useRouter();
   
   // Add proper data state management
@@ -717,68 +704,25 @@ export default function HistoricalRates() {
     // This can be implemented later if needed for filter options
   };
 
-  // Function to fetch data for multiple states
-  const fetchDataForStates = async (states: string[], filters: Record<string, string> = {}): Promise<StateData[]> => {
-    const stateDataResults: StateData[] = [];
-    
-    for (const state of states) {
-      setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams();
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value) params.append(key, value);
-        });
-        params.append('state_name', state);
-        
-        const url = `/api/state-payment-comparison?${params.toString()}`;
-        const response = await fetch(url, { credentials: 'include' });
-        const result = await response.json();
-        
-        if (result && Array.isArray(result.data)) {
-          stateDataResults.push({
-            state: state,
-            data: result.data,
-            totalCount: result.count || result.data.length
-          });
-        }
-      } catch (err) {
-        console.error(`Failed to fetch data for state ${state}:`, err);
-        // Continue with other states even if one fails
-      }
-    }
-    
-    setLoading(false);
-    return stateDataResults;
-  };
-
+  const [isSubscriptionCheckComplete, setIsSubscriptionCheckComplete] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Authentication is now handled by useRequireSubscription hook
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/api/auth/login");
+    } else if (isAuthenticated) {
+      checkSubscriptionAndSubUser();
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   // Add pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
-  const itemsPerPage: number = 1000;
+  const itemsPerPage: number = 50;
 
   // Keep only the states that are still needed
   const [selectedEntry, setSelectedEntry] = useState<ServiceData | null>(null);
-  const [selectedEntries, setSelectedEntries] = useState<ServiceData[]>([]);
   const [showRatePerHour, setShowRatePerHour] = useState(false);
-
-  // Color palette for multi-selection - memoized to prevent re-renders
-  const colorPalette = useMemo(() => [
-    '#3b82f6', // Blue
-    '#ef4444', // Red
-    '#10b981', // Green
-    '#f59e0b', // Yellow
-    '#8b5cf6', // Purple
-    '#06b6d4', // Cyan
-    '#f97316', // Orange
-    '#84cc16', // Lime
-    '#ec4899', // Pink
-    '#6b7280', // Gray
-  ], []);
   const [comment, setComment] = useState<string | null>(null);
   const [filterStep, setFilterStep] = useState(1);
   const [shouldExtractFilters, setShouldExtractFilters] = useState(false);
@@ -800,20 +744,8 @@ export default function HistoricalRates() {
     modifier_1: null,
   });
 
-  // Multi-state selection
-  const [selectedStates, setSelectedStates] = useState<string[]>([]);
-  const [stateData, setStateData] = useState<StateData[]>([]);
-  
-  // Chart display options
-  const [showLabels, setShowLabels] = useState(true);
-
-  // Lazy loading state for duration unit options with counts
-  const [durationUnitOptionsWithCounts, setDurationUnitOptionsWithCounts] = useState<{ value: string; label: string }[]>([]);
-  const [durationUnitCalculated, setDurationUnitCalculated] = useState(false);
-  const [durationUnitCalculationKey, setDurationUnitCalculationKey] = useState('');
-
   // Update areFiltersApplied to use selections state
-  const areFiltersApplied = selections.service_category && selectedStates.length > 0 && (selections.service_code || selections.service_description);
+  const areFiltersApplied = selections.service_category && selections.state_name && (selections.service_code || selections.service_description);
 
   // Generic handler to update selections state
   const handleSelectionChange = (field: keyof Selections, value: string | null) => {
@@ -839,117 +771,16 @@ export default function HistoricalRates() {
     setData([]);
   };
 
-  // Function to add entry to multi-selection
-  const addToSelection = useCallback((entry: ServiceData) => {
-    setSelectedEntries(prev => {
-      // Check if entry already exists
-      const exists = prev.some(selected => 
-        selected.state_name === entry.state_name &&
-        selected.service_category === entry.service_category &&
-        selected.service_code === entry.service_code &&
-        selected.service_description === entry.service_description &&
-        selected.program === entry.program &&
-        selected.location_region === entry.location_region &&
-        selected.modifier_1 === entry.modifier_1 &&
-        selected.modifier_1_details === entry.modifier_1_details &&
-        selected.modifier_2 === entry.modifier_2 &&
-        selected.modifier_2_details === entry.modifier_2_details &&
-        selected.modifier_3 === entry.modifier_3 &&
-        selected.modifier_3_details === entry.modifier_3_details &&
-        selected.modifier_4 === entry.modifier_4 &&
-        selected.modifier_4_details === entry.modifier_4_details &&
-        selected.duration_unit === entry.duration_unit &&
-        selected.provider_type === entry.provider_type &&
-        selected.rate_effective_date === entry.rate_effective_date
-      );
-      
-      if (!exists && prev.length < colorPalette.length) {
-        return [...prev, entry];
-      }
-      return prev;
-    });
-  }, [colorPalette.length]);
-
-  // Function to remove entry from multi-selection
-  const removeFromSelection = useCallback((entry: ServiceData) => {
-    setSelectedEntries(prev => prev.filter(selected => 
-      !(selected.state_name === entry.state_name &&
-        selected.service_category === entry.service_category &&
-        selected.service_code === entry.service_code &&
-        selected.service_description === entry.service_description &&
-        selected.program === entry.program &&
-        selected.location_region === entry.location_region &&
-        selected.modifier_1 === entry.modifier_1 &&
-        selected.modifier_1_details === entry.modifier_1_details &&
-        selected.modifier_2 === entry.modifier_2 &&
-        selected.modifier_2_details === entry.modifier_2_details &&
-        selected.modifier_3 === entry.modifier_3 &&
-        selected.modifier_3_details === entry.modifier_3_details &&
-        selected.modifier_4 === entry.modifier_4 &&
-        selected.modifier_4_details === entry.modifier_4_details &&
-        selected.duration_unit === entry.duration_unit &&
-        selected.provider_type === entry.provider_type &&
-        selected.rate_effective_date === entry.rate_effective_date)
-    ));
-  }, []);
-
-  // Function to check if entry is in selection
-  const isInSelection = useCallback((entry: ServiceData) => {
-    return selectedEntries.some(selected => 
-      selected.state_name === entry.state_name &&
-      selected.service_category === entry.service_category &&
-      selected.service_code === entry.service_code &&
-      selected.service_description === entry.service_description &&
-      selected.program === entry.program &&
-      selected.location_region === entry.location_region &&
-      selected.modifier_1 === entry.modifier_1 &&
-      selected.modifier_1_details === entry.modifier_1_details &&
-      selected.modifier_2 === entry.modifier_2 &&
-      selected.modifier_2_details === entry.modifier_2_details &&
-      selected.modifier_3 === entry.modifier_3 &&
-      selected.modifier_3_details === entry.modifier_3_details &&
-      selected.modifier_4 === entry.modifier_4 &&
-      selected.modifier_4_details === entry.modifier_4_details &&
-      selected.duration_unit === entry.duration_unit &&
-      selected.provider_type === entry.provider_type &&
-      selected.rate_effective_date === entry.rate_effective_date
-    );
-  }, [selectedEntries]);
-
-  // Function to get color for an entry in selection
-  const getSelectionColor = useCallback((entry: ServiceData) => {
-    const index = selectedEntries.findIndex(selected => 
-      selected.state_name === entry.state_name &&
-      selected.service_category === entry.service_category &&
-      selected.service_code === entry.service_code &&
-      selected.service_description === entry.service_description &&
-      selected.program === entry.program &&
-      selected.location_region === entry.location_region &&
-      selected.modifier_1 === entry.modifier_1 &&
-      selected.modifier_1_details === entry.modifier_1_details &&
-      selected.modifier_2 === entry.modifier_2 &&
-      selected.modifier_2_details === entry.modifier_2_details &&
-      selected.modifier_3 === entry.modifier_3 &&
-      selected.modifier_3_details === entry.modifier_3_details &&
-      selected.modifier_4 === entry.modifier_4 &&
-      selected.modifier_4_details === entry.modifier_4_details &&
-      selected.duration_unit === entry.duration_unit &&
-      selected.provider_type === entry.provider_type &&
-      selected.rate_effective_date === entry.rate_effective_date
-    );
-    return index >= 0 ? colorPalette[index] : null;
-  }, [selectedEntries, colorPalette]);
-
   const filteredData = useMemo(() => {
     // Only show data after a search has been performed
-    if (!hasSearched || !selections.service_category || selectedStates.length === 0 || (!selections.service_code && !selections.service_description)) return [];
+    if (!hasSearched || !selections.service_category || !selections.state_name || (!selections.service_code && !selections.service_description)) return [];
 
     console.log('🏁 TABLE DATA SOURCE (filteredData) - Starting with raw data:', data.length, 'entries');
 
     // First get all matching entries
     const allMatchingEntries = data.filter(item => {
       if (selections.service_category && item.service_category !== selections.service_category) return false;
-      if (selectedStates.length > 0 && !selectedStates.some(state => item.state_name?.trim().toUpperCase() === state.trim().toUpperCase())) return false;
+      if (selections.state_name && item.state_name?.trim().toUpperCase() !== selections.state_name.trim().toUpperCase()) return false;
       if (selections.service_code && selections.service_code !== '-') {
         // Handle comma-separated service codes
         const selectedCodes = typeof selections.service_code === 'string' 
@@ -960,48 +791,22 @@ export default function HistoricalRates() {
         if (item.service_code && item.service_code.trim() !== '') return false;
       }
       if (selections.service_description && item.service_description !== selections.service_description) return false;
-      if (selections.program && selections.program !== "-") {
-        // Handle pipe-separated programs (to avoid splitting on commas within program names)
-        const selectedPrograms = typeof selections.program === 'string' 
-          ? selections.program.split('|').map(program => program.trim())
-          : [];
-        if (!selectedPrograms.includes(item.program?.trim() || '')) return false;
-      }
-      if (selections.location_region && selections.location_region !== "-") {
-        // Handle comma-separated location regions
-        const selectedRegions = typeof selections.location_region === 'string' 
-          ? selections.location_region.split(',').map(region => region.trim())
-          : [];
-        if (!selectedRegions.includes(item.location_region?.trim() || '')) return false;
-      }
+      if (selections.program && selections.program !== "-" && item.program !== selections.program) return false;
+      if (selections.location_region && selections.location_region !== "-" && item.location_region !== selections.location_region) return false;
       if (selections.modifier_1 && selections.modifier_1 !== "-") {
-        // Handle pipe-separated modifiers (to avoid splitting on commas within modifier names)
-        const selectedModifiers = typeof selections.modifier_1 === 'string' 
-          ? selections.modifier_1.split('|').map(mod => mod.trim())
-          : [];
-        const hasModifier = selectedModifiers.some(selectedModifier => {
-          const selectedModifierCode = selectedModifier.split(' - ')[0];
-          return 
-            (item.modifier_1?.split(' - ')[0] === selectedModifierCode) ||
-            (item.modifier_2?.split(' - ')[0] === selectedModifierCode) ||
-            (item.modifier_3?.split(' - ')[0] === selectedModifierCode) ||
-            (item.modifier_4?.split(' - ')[0] === selectedModifierCode);
-        });
+        const selectedModifierCode = selections.modifier_1.split(' - ')[0];
+        const hasModifier = 
+          (item.modifier_1 && item.modifier_1.split(' - ')[0] === selectedModifierCode) ||
+          (item.modifier_2 && item.modifier_2.split(' - ')[0] === selectedModifierCode) ||
+          (item.modifier_3 && item.modifier_3.split(' - ')[0] === selectedModifierCode) ||
+          (item.modifier_4 && item.modifier_4.split(' - ')[0] === selectedModifierCode);
         if (!hasModifier) return false;
       }
       if (selections.provider_type && selections.provider_type !== "-") {
-        // Handle comma-separated provider types
-        const selectedProviderTypes = typeof selections.provider_type === 'string' 
-          ? selections.provider_type.split(',').map(type => type.trim())
-          : [];
-        if (!selectedProviderTypes.includes(item.provider_type?.trim() || '')) return false;
+        if (item.provider_type !== selections.provider_type) return false;
       }
       if (selections.duration_unit && selections.duration_unit !== "-") {
-        // Handle comma-separated duration units
-        const selectedUnits = typeof selections.duration_unit === 'string' 
-          ? selections.duration_unit.split(',').map(unit => unit.trim())
-          : [];
-        if (!selectedUnits.includes(item.duration_unit?.trim() || '')) return false;
+        if (item.duration_unit !== selections.duration_unit) return false;
       }
 
       // Handle "-" selections (empty/null values)
@@ -1094,7 +899,7 @@ export default function HistoricalRates() {
     hasSearched,
     data,
     selections.service_category,
-    selectedStates,
+    selections.state_name,
     selections.service_code,
     selections.service_description,
     selections.program,
@@ -1164,11 +969,87 @@ export default function HistoricalRates() {
     }
   };
 
-  // Authentication and subscription checks are now handled by useRequireSubscription hook
+  // Define checkSubscriptionAndSubUser before using it
+  const checkSubscriptionAndSubUser = async () => {
+    const userEmail = user?.email ?? "";
+    const kindeUserId = user?.id ?? "";
+    if (!userEmail || !kindeUserId) return;
+
+    try {
+      // Check if the user is a sub-user
+      const { data: subUserData, error: subUserError } = await supabase
+        .from("subscription_users")
+        .select("sub_users")
+        .contains("sub_users", JSON.stringify([userEmail]));
+
+      if (subUserError) {
+        return;
+      }
+
+      if (subUserData && subUserData.length > 0) {
+        // Check if the user already exists in the User table
+        const { data: existingUser, error: fetchError } = await supabase
+          .from("User")
+          .select("Email")
+          .eq("Email", userEmail)
+          .single();
+
+        if (fetchError && fetchError.code !== "PGRST116") { // Ignore "no rows found" error
+          return;
+        }
+
+        if (existingUser) {
+          // User exists, update their role to "sub-user"
+          const { error: updateError } = await supabase
+            .from("User")
+            .update({ Role: "sub-user", UpdatedAt: new Date().toISOString() })
+            .eq("Email", userEmail);
+
+          if (updateError) {
+            // Error handling
+          }
+        } else {
+          // User does not exist, insert them as a sub-user
+          const { error: insertError } = await supabase
+            .from("User")
+            .insert({
+              KindeUserID: kindeUserId,
+              Email: userEmail,
+              Role: "sub-user",
+              UpdatedAt: new Date().toISOString(),
+            });
+
+          if (insertError) {
+            // Error handling
+          }
+        }
+
+        // Allow sub-user to access the dashboard
+        setIsSubscriptionCheckComplete(true);
+        return;
+      }
+
+      // If not a sub-user, check for an active subscription
+      const response = await fetch("/api/stripe/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: userEmail }),
+      });
+
+      const data = await response.json();
+      if (data.error || !data.status || data.status !== "active") {
+        router.push("/subscribe");
+      } else {
+        setIsSubscriptionCheckComplete(true);
+      }
+    } catch (error) {
+      router.push("/subscribe");
+    }
+  };
 
   // Add periodic authentication check for long-running sessions
   useEffect(() => {
-    if (!auth.isAuthenticated) return;
+    if (!isAuthenticated) return;
 
     const checkAuthStatus = async () => {
       try {
@@ -1184,7 +1065,7 @@ export default function HistoricalRates() {
     const authCheckInterval = setInterval(checkAuthStatus, 5 * 60 * 1000);
 
     const handleVisibilityChange = () => {
-      if (!document.hidden && auth.isAuthenticated) {
+      if (!document.hidden && isAuthenticated) {
         checkAuthStatus();
         
         if (hasSearched && !authError && areFiltersApplied) {
@@ -1199,7 +1080,12 @@ export default function HistoricalRates() {
       clearInterval(authCheckInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [auth.isAuthenticated, router, hasSearched, authError, areFiltersApplied]);
+  }, [isAuthenticated, router, hasSearched, authError, areFiltersApplied]);
+
+  // Now the useEffect can safely use checkSubscriptionAndSubUser
+  useEffect(() => {
+    checkSubscriptionAndSubUser();
+  }, [router]);
 
   // Move all useEffect hooks here, before any conditional returns
   useEffect(() => {
@@ -1292,7 +1178,7 @@ export default function HistoricalRates() {
       if (selections.program) filters.program = selections.program;
       if (selections.location_region) filters.location_region = selections.location_region;
       if (selections.provider_type) filters.provider_type = selections.provider_type;
-      if (selections.duration_unit) filters.durationUnit = selections.duration_unit;
+      if (selections.duration_unit) filters.duration_unit = selections.duration_unit;
       if (selections.modifier_1) filters.modifier_1 = selections.modifier_1;
       filters.page = String(currentPage);
       filters.itemsPerPage = String(itemsPerPage);
@@ -1344,12 +1230,11 @@ export default function HistoricalRates() {
   };
 
   const getGraphData = useMemo(() => {
-    if (selectedEntries.length === 0) return { xAxis: [], series: [] };
+    if (!selectedEntry) return { xAxis: [], series: [] };
 
-    console.log('📊 CHART - Generating chart for', selectedEntries.length, 'selected entries');
+    console.log('📊 CHART - Generating chart for:', selectedEntry.service_description, 'Rate:', selectedEntry.rate);
 
     const filteredEntries = data.filter((item: ServiceData) => 
-      selectedEntries.some(selectedEntry => 
       item.state_name === selectedEntry.state_name &&
       item.service_category === selectedEntry.service_category &&
       (() => {
@@ -1374,7 +1259,6 @@ export default function HistoricalRates() {
       item.modifier_4_details === selectedEntry.modifier_4_details &&
       item.duration_unit === selectedEntry.duration_unit &&
       item.provider_type === selectedEntry.provider_type
-      )
     );
     
     console.log('📊 CHART - Before initial sort, filtered entries:', filteredEntries.map(e => ({ 
@@ -1391,16 +1275,16 @@ export default function HistoricalRates() {
       return result;
     });
 
-    console.log('📊 CHART - Selected Entries for filtering:', selectedEntries.map(entry => ({
-      service_description: entry.service_description,
-      rate: entry.rate,
-      date: entry.rate_effective_date,
-      program: entry.program,
-      location_region: entry.location_region,
-      modifier_1: entry.modifier_1,
-      provider_type: entry.provider_type,
-      duration_unit: entry.duration_unit
-    })));
+    console.log('📊 CHART - Selected Entry for filtering:', {
+      service_description: selectedEntry.service_description,
+      rate: selectedEntry.rate,
+      date: selectedEntry.rate_effective_date,
+      program: selectedEntry.program,
+      location_region: selectedEntry.location_region,
+      modifier_1: selectedEntry.modifier_1,
+      provider_type: selectedEntry.provider_type,
+      duration_unit: selectedEntry.duration_unit
+    });
 
     console.log('📊 CHART - Found', entries.length, 'matching entries (before deduplication)');
     console.log('📊 CHART - All entries:', entries.map(e => ({ 
@@ -1469,71 +1353,14 @@ export default function HistoricalRates() {
       setDataQualityWarning(null);
     }
 
-    // Generate multiple series for each selected entry
-    const allDates = new Set<string>();
-    const seriesData: any[] = [];
-    
-    selectedEntries.forEach((selectedEntry, index) => {
-      const color = colorPalette[index % colorPalette.length];
-      
-      // Filter entries for this specific selected entry
-      const entriesForThisSelection = filteredEntries.filter((item: ServiceData) => 
-        item.state_name === selectedEntry.state_name &&
-        item.service_category === selectedEntry.service_category &&
-        (() => {
-          // Handle multiple service codes for chart filtering
-          if (selectedEntry.service_code && selectedEntry.service_code.includes(',')) {
-            const selectedCodes = selectedEntry.service_code.split(',').map(code => code.trim());
-            return selectedCodes.includes(item.service_code?.trim() || '');
-          } else {
-            return item.service_code === selectedEntry.service_code;
-          }
-        })() &&
-        item.service_description === selectedEntry.service_description &&
-        item.program === selectedEntry.program &&
-        item.location_region === selectedEntry.location_region &&
-        item.modifier_1 === selectedEntry.modifier_1 &&
-        item.modifier_1_details === selectedEntry.modifier_1_details &&
-        item.modifier_2 === selectedEntry.modifier_2 &&
-        item.modifier_2_details === selectedEntry.modifier_2_details &&
-        item.modifier_3 === selectedEntry.modifier_3 &&
-        item.modifier_3_details === selectedEntry.modifier_3_details &&
-        item.modifier_4 === selectedEntry.modifier_4 &&
-        item.modifier_4_details === selectedEntry.modifier_4_details &&
-        item.duration_unit === selectedEntry.duration_unit &&
-        item.provider_type === selectedEntry.provider_type
-      );
-      
-      // Sort entries by date
-      const sortedEntries = entriesForThisSelection.sort((a, b) => {
-        const dateA = parseDateString(a.rate_effective_date);
-        const dateB = parseDateString(b.rate_effective_date);
-        return dateA.getTime() - dateB.getTime();
-      });
-      
-      // Group by date and handle duplicates
-      const entriesByDate = sortedEntries.reduce((acc, entry) => {
-        const date = entry.rate_effective_date;
-        if (!acc[date]) {
-          acc[date] = [];
-        }
-        acc[date].push(entry);
-        return acc;
-      }, {} as Record<string, ServiceData[]>);
-      
-      // Create series data for this selection
-      const seriesPoints = Object.entries(entriesByDate).map(([date, entries]) => {
-        // Use the entry with the highest rate if there are duplicates
-        const entry = entries.reduce((max, current) => 
-          parseRate(current.rate) > parseRate(max.rate) ? current : max
-        );
-        
-        allDates.add(date);
-        
+    let xAxis = finalEntries.map(entry => entry.rate_effective_date);
+    let series = finalEntries.map(entry => {
       const rateValue = parseRate(entry.rate);
       const durationUnit = entry.duration_unit?.toUpperCase();
       let value = rateValue;
       let displayValue: string | null = null;
+
+      // Use actual rate value without any conversion
 
       return {
         value: displayValue ? null : value,
@@ -1555,60 +1382,22 @@ export default function HistoricalRates() {
       };
     });
 
-      // Add extension to current date if there are data points
-      if (seriesPoints.length > 0) {
-        // Get the latest data point
-        const latestPoint = seriesPoints[seriesPoints.length - 1];
-        const latestDate = parseDateString(latestPoint.date);
-        const currentDate = new Date();
-        
-        // Only extend if the latest date is not today
-        if (latestDate.toDateString() !== currentDate.toDateString()) {
-          // Format current date to match the data format
-          const currentDateStr = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-          
-          // Add extension point to current date with same rate as latest point
-          seriesPoints.push({
-            value: latestPoint.value,
-            displayValue: latestPoint.displayValue,
-            state: latestPoint.state,
-            serviceCode: latestPoint.serviceCode,
-            program: latestPoint.program,
-            locationRegion: latestPoint.locationRegion,
-            durationUnit: latestPoint.durationUnit,
-            date: currentDateStr,
-            modifier1: latestPoint.modifier1,
-            modifier1Details: latestPoint.modifier1Details,
-            modifier2: latestPoint.modifier2,
-            modifier2Details: latestPoint.modifier2Details,
-            modifier3: latestPoint.modifier3,
-            modifier3Details: latestPoint.modifier3Details,
-            modifier4: latestPoint.modifier4,
-            modifier4Details: latestPoint.modifier4Details,
-            isExtended: true // Mark this as an extended point
-          } as any);
-          
-          // Add current date to all dates set
-          allDates.add(currentDateStr);
-        }
+    // Add a point for today if latest date is not today (ignore time)
+    if (series.length > 0) {
+      const latestDate = parseDateString(xAxis[xAxis.length - 1]);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStr = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+      // Only add if the latest date string is not today's string (MM/DD/YYYY)
+      if (formatDate(xAxis[xAxis.length - 1]) !== todayStr) {
+        xAxis = [...xAxis, todayStr];
+        const last = series[series.length - 1];
+        series = [...series, { ...last, date: todayStr }];
       }
+    }
 
-      seriesData.push({
-        data: seriesPoints,
-        color: color,
-        name: `${selectedEntry.state_name} - ${selectedEntry.service_description || selectedEntry.service_code}`
-      });
-    });
-    
-    // Create xAxis from all unique dates
-    const xAxis = Array.from(allDates).sort((a, b) => {
-      const dateA = parseDateString(a);
-      const dateB = parseDateString(b);
-      return dateA.getTime() - dateB.getTime();
-    });
-
-    return { xAxis, series: seriesData };
-  }, [selectedEntries, data, showRatePerHour, colorPalette]);
+    return { xAxis, series };
+  }, [selectedEntry, data, showRatePerHour]);
 
   // Derived loading state for service code options
   const serviceCodeOptionsLoading =
@@ -1666,124 +1455,8 @@ export default function HistoricalRates() {
     loadUltraFilterOptions();
   }, []);
 
-
-  // Add available options variables like dashboard
-  const availableServiceCategories = getAvailableOptionsForFilter('service_category', selections, filterOptionsData) as string[];
-  const availableStates = getAvailableOptionsForFilter('state_name', selections, filterOptionsData) as string[];
-  const availableServiceCodes = getAvailableOptionsForFilter('service_code', selections, filterOptionsData) as string[];
-  const availableServiceDescriptions = getAvailableOptionsForFilter('service_description', selections, filterOptionsData) as string[];
-  const availablePrograms = getAvailableOptionsForFilter('program', selections, filterOptionsData) as string[];
-  const availableLocationRegions = getAvailableOptionsForFilter('location_region', selections, filterOptionsData) as string[];
-  const availableProviderTypes = getAvailableOptionsForFilter('provider_type', selections, filterOptionsData) as string[];
-  const availableDurationUnits = getAvailableOptionsForFilter('duration_unit', selections, filterOptionsData) as string[];
-  
-  // Get modifiers from ALL modifier columns (modifier_1, modifier_2, modifier_3, modifier_4)
-  const availableModifiers = useMemo(() => {
-    if (!filterOptionsData || !filterOptionsData.combinations) return [];
-    
-    const modifierSet = new Set<string>();
-    
-    filterOptionsData.combinations.forEach((combo: any) => {
-      // Check if this combination matches current selections (excluding modifier_1)
-      const matches = Object.entries(selections).every(([key, value]) => {
-        if (key === 'modifier_1' || key === 'fee_schedule_date') return true; // skip current filter
-        if (!value) return true; // skip unset selections
-        
-        // Handle multi-select values (comma-separated strings) vs single values (strings)
-        if (typeof value === 'string' && value.includes(',')) {
-          const selectedValues = value.split(',').map(v => v.trim());
-          return selectedValues.includes(combo[key]);
-        } else if (Array.isArray(value)) {
-          return value.includes(combo[key]);
-        } else {
-          return combo[key] === value;
-        }
-      });
-      
-      if (matches) {
-        // Add modifiers from all columns if they exist
-        if (combo.modifier_1) modifierSet.add(combo.modifier_1);
-        if (combo.modifier_2) modifierSet.add(combo.modifier_2);
-        if (combo.modifier_3) modifierSet.add(combo.modifier_3);
-        if (combo.modifier_4) modifierSet.add(combo.modifier_4);
-      }
-    });
-    
-    return Array.from(modifierSet).sort();
-  }, [filterOptionsData, selections]);
-
-  // Create a key to track when we need to recalculate duration unit counts
-  const getCurrentCalculationKey = useMemo(() => {
-    return JSON.stringify({
-      service_category: selections.service_category,
-      state_name: selections.state_name,
-      service_code: selections.service_code,
-      service_description: selections.service_description,
-      program: selections.program,
-      location_region: selections.location_region,
-      provider_type: selections.provider_type,
-      modifier_1: selections.modifier_1,
-      availableDurationUnitsLength: availableDurationUnits.length
-    });
-  }, [selections, availableDurationUnits.length]);
-
-  // Function to calculate duration unit options with counts (only called when needed)
-  const calculateDurationUnitOptionsWithCounts = useCallback(() => {
-    if (!filterOptionsData || !filterOptionsData.combinations || !availableDurationUnits.length) {
-      setDurationUnitOptionsWithCounts(availableDurationUnits.map(unit => ({ value: unit, label: unit })));
-      setDurationUnitCalculated(true);
-      setDurationUnitCalculationKey(getCurrentCalculationKey);
-      return;
-    }
-    
-    const optionsWithCounts = availableDurationUnits.map(durationUnit => {
-      // Count unique states for this duration unit based on current selections
-      const stateCount = new Set(
-        filterOptionsData.combinations
-          .filter((combo: any) => {
-            // Apply current filter conditions (same logic as getAvailableOptionsForFilter)
-            if (selections.service_category && combo.service_category !== selections.service_category) return false;
-            if (selections.state_name && combo.state_name !== selections.state_name) return false;
-            if (selections.service_code && combo.service_code !== selections.service_code) return false;
-            if (selections.service_description && combo.service_description !== selections.service_description) return false;
-            if (selections.program && selections.program !== "-" && combo.program !== selections.program) return false;
-            if (selections.location_region && selections.location_region !== "-" && combo.location_region !== selections.location_region) return false;
-            if (selections.provider_type && selections.provider_type !== "-" && combo.provider_type !== selections.provider_type) return false;
-            if (selections.modifier_1 && selections.modifier_1 !== "-" && combo.modifier_1 !== selections.modifier_1) return false;
-            
-            return combo.duration_unit === durationUnit;
-          })
-          .map((combo: any) => combo.state_name)
-          .filter(Boolean)
-      ).size;
-      
-      return {
-        value: durationUnit,
-        label: `${durationUnit} (${stateCount})`
-      };
-    });
-    
-    setDurationUnitOptionsWithCounts(optionsWithCounts);
-    setDurationUnitCalculated(true);
-    setDurationUnitCalculationKey(getCurrentCalculationKey);
-  }, [filterOptionsData, availableDurationUnits, selections, getCurrentCalculationKey]);
-
-  // Reset calculation flag when dependencies change
-  useEffect(() => {
-    if (getCurrentCalculationKey !== durationUnitCalculationKey) {
-      setDurationUnitCalculated(false);
-    }
-  }, [getCurrentCalculationKey, durationUnitCalculationKey]);
-
-  // Handler for when duration unit dropdown is opened
-  const handleDurationUnitMenuOpen = useCallback(() => {
-    if (!durationUnitCalculated || getCurrentCalculationKey !== durationUnitCalculationKey) {
-      calculateDurationUnitOptionsWithCounts();
-    }
-  }, [durationUnitCalculated, getCurrentCalculationKey, durationUnitCalculationKey, calculateDurationUnitOptionsWithCounts]);
-
   // Don't render anything until the subscription check is complete
-  if (auth.isLoading || auth.shouldRedirect) {
+  if (isLoading || !isSubscriptionCheckComplete) {
     return (
       <div className="loader-overlay">
         <div className="cssloader">
@@ -1794,6 +1467,17 @@ export default function HistoricalRates() {
       </div>
     );
   }
+
+  // Add available options variables like dashboard
+  const availableServiceCategories = getAvailableOptionsForFilter('service_category', selections, filterOptionsData) as string[];
+  const availableStates = getAvailableOptionsForFilter('state_name', selections, filterOptionsData) as string[];
+  const availableServiceCodes = getAvailableOptionsForFilter('service_code', selections, filterOptionsData) as string[];
+  const availableServiceDescriptions = getAvailableOptionsForFilter('service_description', selections, filterOptionsData) as string[];
+  const availablePrograms = getAvailableOptionsForFilter('program', selections, filterOptionsData) as string[];
+  const availableLocationRegions = getAvailableOptionsForFilter('location_region', selections, filterOptionsData) as string[];
+  const availableProviderTypes = getAvailableOptionsForFilter('provider_type', selections, filterOptionsData) as string[];
+  const availableDurationUnits = getAvailableOptionsForFilter('duration_unit', selections, filterOptionsData) as string[];
+  const availableModifiers = getAvailableOptionsForFilter('modifier_1', selections, filterOptionsData) as string[];
 
   return (
     <AppLayout activeTab="historicalRates">
@@ -1868,45 +1552,22 @@ export default function HistoricalRates() {
                     </div>
                     {/* State */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">State(s)</label>
+                      <label className="text-sm font-medium text-gray-700">State</label>
                       <Select
                         instanceId="state_name_select"
                         options={availableStates.map((o: string) => ({ value: o, label: o }))}
-                        value={selectedStates.map(state => ({ value: state, label: state }))}
-                        onChange={options => {
-                          const newStates = options ? options.map(opt => opt.value) : [];
-                          setSelectedStates(newStates);
-                          // Update the legacy state_name for backward compatibility
-                          handleSelectionChange('state_name', newStates.length === 1 ? newStates[0] : null);
-                        }}
-                        placeholder="Select State(s)"
+                        value={selections.state_name ? { value: selections.state_name, label: selections.state_name } : null}
+                        onChange={option => handleSelectionChange('state_name', option?.value || null)}
+                        placeholder="Select State"
                         isClearable
-                        isMulti
                         isSearchable
                         filterOption={jumpToLetterFilterOption}
                         isDisabled={!selections.service_category || availableStates.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
                       />
-                      {selectedStates.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          <span className="text-xs text-gray-500">
-                            {selectedStates.length} state{selectedStates.length !== 1 ? 's' : ''} selected:
-                          </span>
-                          {selectedStates.map(state => (
-                            <button
-                              key={state}
-                              onClick={() => {
-                                const newStates = selectedStates.filter(s => s !== state);
-                                setSelectedStates(newStates);
-                                handleSelectionChange('state_name', newStates.length === 1 ? newStates[0] : null);
-                              }}
-                              className="text-xs text-blue-500 hover:text-red-500 hover:underline"
-                            >
-                              {state} ×
-                            </button>
-                          ))}
-                        </div>
+                      {selections.state_name && (
+                        <button onClick={() => handleSelectionChange('state_name', null)} className="text-xs text-blue-500 hover:underline mt-1">Clear</button>
                       )}
                     </div>
                     {/* Service Code */}
@@ -1920,7 +1581,7 @@ export default function HistoricalRates() {
                         placeholder="Select Service Code(s)"
                         isMulti
                         isClearable
-                        isDisabled={!selections.service_category || selectedStates.length === 0 || availableServiceCodes.length === 0}
+                        isDisabled={!selections.service_category || !selections.state_name || availableServiceCodes.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
                       />
@@ -1938,7 +1599,7 @@ export default function HistoricalRates() {
                         onChange={option => handleSelectionChange('service_description', option?.value || null)}
                         placeholder="Select Service Description"
                         isClearable
-                        isDisabled={!selections.service_category || selectedStates.length === 0 || availableServiceDescriptions.length === 0}
+                        isDisabled={!selections.service_category || !selections.state_name || availableServiceDescriptions.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
                       />
@@ -1952,14 +1613,14 @@ export default function HistoricalRates() {
                       <Select
                         instanceId="program_select"
                         options={getDropdownOptions(availablePrograms, false)}
-                        value={selections.program ? selections.program.split('|').map(p => ({ value: p.trim(), label: p.trim() })) : null}
-                        onChange={(options) => handleSelectionChange('program', options ? options.map(opt => opt.value).join('|') : null)}
+                        value={selections.program ? selections.program.split(',').map(p => ({ value: p.trim(), label: p.trim() })) : null}
+                        onChange={(options) => handleSelectionChange('program', options ? options.map(opt => opt.value).join(',') : null)}
                         placeholder="Select Program"
                         isMulti
                         isClearable
                         isSearchable
                         filterOption={jumpToLetterFilterOption}
-                        isDisabled={!selections.service_category || selectedStates.length === 0 || availablePrograms.length === 0}
+                        isDisabled={!selections.service_category || !selections.state_name || availablePrograms.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
                       />
@@ -1980,7 +1641,7 @@ export default function HistoricalRates() {
                         isClearable
                         isSearchable
                         filterOption={jumpToLetterFilterOption}
-                        isDisabled={!selections.service_category || selectedStates.length === 0 || availableLocationRegions.length === 0}
+                        isDisabled={!selections.service_category || !selections.state_name || availableLocationRegions.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
                       />
@@ -2001,7 +1662,7 @@ export default function HistoricalRates() {
                         isClearable
                         isSearchable
                         filterOption={jumpToLetterFilterOption}
-                        isDisabled={!selections.service_category || selectedStates.length === 0 || availableProviderTypes.length === 0}
+                        isDisabled={!selections.service_category || !selections.state_name || availableProviderTypes.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
                       />
@@ -2014,21 +1675,13 @@ export default function HistoricalRates() {
                       <label className="text-sm font-medium text-gray-700">Duration Unit</label>
                       <Select
                         instanceId="duration_unit_select"
-                        options={durationUnitCalculated 
-                          ? durationUnitOptionsWithCounts 
-                          : getDropdownOptions(availableDurationUnits, false)
-                        }
-                        value={selections.duration_unit ? selections.duration_unit.split(',').map(d => {
-                          const trimmedValue = d.trim();
-                          const optionWithCount = durationUnitOptionsWithCounts.find(opt => opt.value === trimmedValue);
-                          return optionWithCount || { value: trimmedValue, label: trimmedValue };
-                        }) : null}
+                        options={getDropdownOptions(availableDurationUnits, false)}
+                        value={selections.duration_unit ? selections.duration_unit.split(',').map(d => ({ value: d.trim(), label: d.trim() })) : null}
                         onChange={(options) => handleSelectionChange('duration_unit', options ? options.map(opt => opt.value).join(',') : null)}
-                        onMenuOpen={handleDurationUnitMenuOpen}
                         placeholder="Select Duration Unit"
                         isMulti
                         isClearable
-                        isDisabled={!selections.service_category || selectedStates.length === 0 || availableDurationUnits.length === 0}
+                        isDisabled={!selections.service_category || !selections.state_name || availableDurationUnits.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
                       />
@@ -2049,7 +1702,7 @@ export default function HistoricalRates() {
                             filterOptionsData?.combinations?.find((c: any) => c.modifier_4 === o)?.modifier_4_details;
                           return { value: o, label: def ? `${o} - ${def}` : o };
                         })]}
-                        value={selections.modifier_1 ? selections.modifier_1.split('|').map(m => {
+                        value={selections.modifier_1 ? selections.modifier_1.split(',').map(m => {
                           const mod = availableModifiers.find(opt => opt === m.trim());
                           if (mod) {
                             const def =
@@ -2061,13 +1714,13 @@ export default function HistoricalRates() {
                           }
                           return { value: m.trim(), label: m.trim() };
                         }) : null}
-                        onChange={(options) => handleSelectionChange('modifier_1', options ? options.map(opt => opt.value).join('|') : null)}
+                        onChange={(options) => handleSelectionChange('modifier_1', options ? options.map(opt => opt.value).join(',') : null)}
                         placeholder="Select Modifier"
                         isMulti
                         isClearable
                         isSearchable
                         filterOption={jumpToLetterFilterOption}
-                        isDisabled={!selections.service_category || selectedStates.length === 0 || availableModifiers.length === 0}
+                        isDisabled={!selections.service_category || !selections.state_name || availableModifiers.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
                       />
@@ -2080,26 +1733,21 @@ export default function HistoricalRates() {
                   <div className="mt-6 flex items-center justify-end space-x-4">
                     <button 
                       onClick={async () => {
-                        if (areFiltersApplied && selectedStates.length > 0) {
+                        if (areFiltersApplied) {
                           setHasSearched(true);
                           const filters: Record<string, string> = {};
                           if (selections.service_category) filters.service_category = selections.service_category;
+                          if (selections.state_name) filters.state_name = selections.state_name;
                           if (selections.service_code) filters.service_code = selections.service_code; // Already comma-separated from multi-select
                           if (selections.service_description) filters.service_description = selections.service_description;
                           if (selections.program) filters.program = selections.program;
                           if (selections.location_region) filters.location_region = selections.location_region;
                           if (selections.provider_type) filters.provider_type = selections.provider_type;
-                          if (selections.duration_unit) filters.durationUnit = selections.duration_unit;
+                          if (selections.duration_unit) filters.duration_unit = selections.duration_unit;
                           if (selections.modifier_1) filters.modifier_1 = selections.modifier_1;
                           filters.page = String(currentPage);
                           filters.itemsPerPage = String(itemsPerPage);
-                          
-                          const results = await fetchDataForStates(selectedStates, filters);
-                          setStateData(results);
-                          
-                          // For backward compatibility, also update the main data state with combined data
-                          const combinedData = results.flatMap(result => result.data);
-                          setData(combinedData);
+                          await refreshData(filters);
                         }
                       }}
                       disabled={!areFiltersApplied || loading} 
@@ -2126,35 +1774,8 @@ export default function HistoricalRates() {
               </div>
             )}
 
-             {selectedEntries.length > 0 && (
+            {selectedEntry && (
               <>
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-600">
-                      {selectedEntries.length} item{selectedEntries.length !== 1 ? 's' : ''} selected
-                    </span>
-                    {selectedEntries.map((entry, index) => {
-                      const color = colorPalette[index % colorPalette.length];
-                      return (
-                        <div key={index} className="flex items-center space-x-1">
-                          <div 
-                            className="w-3 h-3 rounded-full border"
-                            style={{ backgroundColor: color, borderColor: color }}
-                          ></div>
-                          <span className="text-xs text-gray-500">
-                            {entry.state_name} - {entry.service_description || entry.service_code}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <button
-                    onClick={() => setSelectedEntries([])}
-                    className="px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
-                  >
-                    Clear All
-                  </button>
-                </div>
                 {comment && (
                   <div className="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-200">
                     <p className="text-sm text-blue-700">
@@ -2169,30 +1790,9 @@ export default function HistoricalRates() {
                   {/* Helpful explanation */}
                   <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-700">
-                      <strong>📊 Chart Explanation:</strong> This chart shows how the rates for the selected items have changed over time. 
+                      <strong>📊 Chart Explanation:</strong> This chart shows how the rate for <strong>"{selectedEntry.service_description}"</strong> has changed over time. 
                       Each point represents a different effective date when the rate was updated.
-                      <br />
-                      <strong>📈 Extended Lines:</strong> Chart lines extend to today's date with dashed lines showing projected rates at the same level as the latest data point.
-                      <br />
-                      <strong>🔍 Overlap Handling:</strong> Use the legend to show/hide lines, hover for detailed tooltips, and zoom/pan for closer inspection of overlapping data.
                     </p>
-                  </div>
-                  
-                  {/* Chart Controls */}
-                  <div className="mb-4 flex flex-wrap gap-2 items-center">
-                    <button
-                      onClick={() => setShowLabels(!showLabels)}
-                      className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                        showLabels 
-                          ? 'bg-blue-500 text-white' 
-                          : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                      }`}
-                    >
-                      {showLabels ? '🔢 Hide Labels' : '🔢 Show Labels'}
-                    </button>
-                    <span className="text-xs text-gray-500">
-                      💡 Tip: Use legend to toggle lines, zoom to inspect overlaps
-                    </span>
                   </div>
                   
                   <div className="w-full h-80">
@@ -2200,77 +1800,30 @@ export default function HistoricalRates() {
                       option={{
                         tooltip: {
                           trigger: 'axis',
-                          axisPointer: {
-                            type: 'cross',
-                            crossStyle: {
-                              color: '#3B82F6'
-                            },
-                            lineStyle: {
-                              color: '#3B82F6',
-                              width: 2,
-                              type: 'solid'
-                            }
-                          },
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                          borderColor: '#E5E7EB',
-                          borderWidth: 1,
-                          borderRadius: 8,
-                          textStyle: {
-                            color: '#1F2937',
-                            fontSize: 13
-                          },
-                          padding: [12, 16],
                           formatter: (params: any) => {
-                            if (!params || params.length === 0) return '';
+                            const data = params[0].data;
+                            if (data.displayValue) {
+                              return data.displayValue;
+                            }
+                            const rate = data.value ? `$${data.value.toFixed(2)}` : '-';
                             
-                            const date = params[0].axisValue;
-                            let tooltipContent = `
-                              <div style="
-                                font-weight: 600; 
-                                color: #374151; 
-                                margin-bottom: 12px; 
-                                padding-bottom: 8px; 
-                                border-bottom: 1px solid #E5E7EB;
-                                font-size: 14px;
-                              ">
-                                ${formatDate(date)}
-                              </div>
+                            const modifiers = [
+                              data.modifier1 ? `${data.modifier1}${data.modifier1Details ? ` - ${data.modifier1Details}` : ''}` : null,
+                              data.modifier2 ? `${data.modifier2}${data.modifier2Details ? ` - ${data.modifier2Details}` : ''}` : null,
+                              data.modifier3 ? `${data.modifier3}${data.modifier3Details ? ` - ${data.modifier3Details}` : ''}` : null,
+                              data.modifier4 ? `${data.modifier4}${data.modifier4Details ? ` - ${data.modifier4Details}` : ''}` : null
+                            ].filter(Boolean).join('<br>');
+
+                            return `
+                              <b>State:</b> ${data.state || '-'}<br>
+                              <b>Service Code:</b> ${data.serviceCode || '-'}<br>
+                              <b>Program:</b> ${data.program || '-'}<br>
+                              <b>Location/Region:</b> ${data.locationRegion || '-'}<br>
+                              <b>${showRatePerHour ? 'Hourly Equivalent Rate' : 'Rate Per Base Unit'}:</b> ${rate}<br>
+                              <b>Duration Unit:</b> ${data.durationUnit || '-'}<br>
+                              <b>Effective Date:</b> ${formatDate(data.date) || '-'}<br>
+                              ${modifiers ? `<b>Modifiers:</b><br>${modifiers}` : ''}
                             `;
-                            
-                            params.forEach((param: any) => {
-                              const data = param.data;
-                              if (!data || data.value === null || data.value === undefined) return;
-                              
-                              const rate = data.value ? `$${data.value.toFixed(2)}` : '-';
-                              const isExtended = data.isExtended ? ' (Projected)' : '';
-                              
-                              tooltipContent += `
-                                <div style="
-                                  margin-bottom: 8px; 
-                                  padding: 10px; 
-                                  background: linear-gradient(135deg, ${param.color}15, ${param.color}08); 
-                                  border-radius: 6px; 
-                                  border-left: 3px solid ${param.color};
-                                ">
-                                  <div style="
-                                    color: ${param.color}; 
-                                    font-weight: 600; 
-                                    margin-bottom: 6px; 
-                                    font-size: 13px;
-                                  ">
-                                    ${param.seriesName}${isExtended}
-                                  </div>
-                                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px; color: #6B7280;">
-                                    <div><span style="font-weight: 500;">Rate:</span> <span style="color: #1F2937; font-weight: 600;">${rate}</span></div>
-                                    <div><span style="font-weight: 500;">State:</span> ${data.state || '-'}</div>
-                                    <div><span style="font-weight: 500;">Code:</span> ${data.serviceCode || '-'}</div>
-                                    <div><span style="font-weight: 500;">Provider:</span> ${data.providerType || '-'}</div>
-                                  </div>
-                                </div>
-                              `;
-                            });
-                            
-                            return tooltipContent;
                           }
                         },
                         xAxis: {
@@ -2295,157 +1848,35 @@ export default function HistoricalRates() {
                             formatter: (value: number) => value.toFixed(2)
                           }
                         },
-                        legend: {
-                          show: true,
-                          top: 10,
-                          left: 'center',
-                          type: 'scroll',
-                          textStyle: {
-                            fontSize: 12,
-                            color: '#374151'
-                          },
-                          itemWidth: 25,
-                          itemHeight: 14,
-                          itemGap: 20,
-                          backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                          borderColor: '#ccc',
-                          borderWidth: 1,
-                          borderRadius: 5,
-                          padding: [10, 15],
-                          shadowBlur: 10,
-                          shadowColor: 'rgba(0, 0, 0, 0.1)',
-                          shadowOffsetX: 0,
-                          shadowOffsetY: 2,
-                          formatter: (name: string) => {
-                            // Truncate long names for better legend display
-                            return name.length > 30 ? name.substring(0, 30) + '...' : name;
-                          },
-                          selectedMode: 'single', // Allow selecting multiple series
-                          selector: [
-                            {
-                              type: 'all',
-                              title: 'All'
-                            },
-                            {
-                              type: 'inverse',
-                              title: 'Inverse'
-                            }
-                          ],
-                          selectorLabel: {
-                            color: '#374151',
-                            fontSize: 12
-                          },
-                          selectorPosition: 'end',
-                          selectorItemGap: 7,
-                          selectorButtonGap: 10
-                        },
-                        dataZoom: [
+                        series: [
                           {
-                            type: 'inside',
-                            start: 0,
-                            end: 100,
-                            zoomOnMouseWheel: true,
-                            moveOnMouseMove: true,
-                            moveOnMouseWheel: false
-                          },
-                          {
-                            type: 'slider',
-                            show: true,
-                            start: 0,
-                            end: 100,
-                            bottom: 30,
-                            height: 20,
-                            handleStyle: {
-                              color: '#3b82f6'
+                            data: getGraphData.series,
+                            type: 'line',
+                            smooth: false,
+                            itemStyle: {
+                              color: showRatePerHour ? '#ef4444' : '#3b82f6'
                             },
-                            textStyle: {
+                            label: {
+                              show: true,
+                              position: 'top',
+                              formatter: (params: any) => {
+                                if (params.data.displayValue) {
+                                  return params.data.displayValue;
+                                }
+                                return `$${params.value.toFixed(2)}`;
+                              },
+                              fontSize: 12,
                               color: '#374151'
                             }
                           }
                         ],
-                        brush: {
-                          toolbox: ['lineX', 'clear'],
-                          xAxisIndex: 0
-                        },
-                        toolbox: {
-                          show: true,
-                          right: 20,
-                          top: 20,
-                          feature: {
-                            dataZoom: {
-                              yAxisIndex: 'none',
-                              title: {
-                                zoom: 'Zoom',
-                                back: 'Reset Zoom'
-                              }
-                            },
-                            restore: {
-                              title: 'Reset'
-                            },
-                            saveAsImage: {
-                              title: 'Save as Image'
-                            }
-                          }
-                        },
-                        series: getGraphData.series.map((seriesItem: any, index: number) => ({
-                          data: seriesItem.data,
-                          name: seriesItem.name,
-                          type: 'line',
-                          smooth: false,
-                          z: 10 - index, // Higher z-index for earlier series (they appear on top)
-                          emphasis: {
-                            focus: 'series',
-                            blurScope: 'coordinateSystem'
-                          },
-                          itemStyle: {
-                            color: (params: any) => {
-                              // Use different color for extended points
-                              return params.data?.isExtended ? seriesItem.color + '80' : seriesItem.color; // 80 = 50% opacity
-                            }
-                          },
-                          lineStyle: {
-                            color: seriesItem.color,
-                            width: 3, // Slightly thicker lines for better visibility
-                            opacity: 0.8,
-                            type: (params: any) => {
-                              // Use dashed line for extended portion
-                              return params.dataIndex > 0 && seriesItem.data[params.dataIndex]?.isExtended ? 'dashed' : 'solid';
-                            }
-                          },
-                          symbol: 'circle',
-                          symbolSize: (params: any) => {
-                            // Smaller symbol for extended points, larger for better visibility
-                            return params.data?.isExtended ? 5 : 8;
-                          },
-                          symbolKeepAspect: true,
-                          showSymbol: true,
-                          hoverAnimation: true,
-                          label: {
-                            show: showLabels, // Toggle labels based on state
-                            position: 'top',
-                            formatter: (params: any) => {
-                              if (params.data?.displayValue) {
-                                return params.data.displayValue;
-                              }
-                              const prefix = params.data?.isExtended ? '→ ' : '';
-                              return `${prefix}$${params.value.toFixed(2)}`;
-                            },
-                            fontSize: 10,
-                            color: '#374151',
-                            backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                            borderColor: '#ccc',
-                            borderWidth: 1,
-                            borderRadius: 3,
-                            padding: [2, 4]
-                          }
-                        })),
-                        graphic: getGraphData.series.some((seriesItem: any) => seriesItem.data.some((data: any) => data.displayValue)) ? [
+                        graphic: getGraphData.series.some(data => data.displayValue) ? [
                           {
                             type: 'text',
                             left: 'center',
                             top: 'middle',
                             style: {
-                              text: `Hourly equivalent rates not available as the duration unit is "${getGraphData.series.find((seriesItem: any) => seriesItem.data.some((data: any) => data.displayValue))?.data.find((data: any) => data.displayValue)?.durationUnit || 'Unknown'}"`,
+                              text: `Hourly equivalent rates not available as the duration unit is "${getGraphData.series.find(data => data.displayValue)?.durationUnit || 'Unknown'}"`,
                               fontSize: 16,
                               fontWeight: 'bold',
                               fill: '#666'
@@ -2491,26 +1922,16 @@ export default function HistoricalRates() {
               </div>
             )}
 
-            {/* Multi-State Tables */}
-            {areFiltersApplied && !loading && stateData.length > 0 && (
-              <div className="space-y-8">
-                {stateData.map((stateResult, stateIndex) => (
-                  <div key={stateResult.state} className="space-y-4">
-                    {/* State Header */}
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xl font-semibold text-gray-800 flex items-center">
-                        <span className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: colorPalette[stateIndex % colorPalette.length] }}></span>
-                        {stateResult.state} ({stateResult.totalCount} records)
-                      </h3>
-                    </div>
-                    
-                    {/* State Table */}
+            {areFiltersApplied && !loading && filteredData.length > 0 && (
               <div className="overflow-hidden rounded-lg shadow-lg">
                 <div className="overflow-x-auto">
                 <table className="min-w-full bg-white">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr>
                       <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider"></th>
+                      {getVisibleColumns.state_name && (
+                        <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">State</th>
+                      )}
                       {getVisibleColumns.service_category && (
                         <th className="px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider">Service Category</th>
                       )}
@@ -2551,46 +1972,27 @@ export default function HistoricalRates() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                      {stateResult.data.map((entry, index) => {
-                        const isSelected = selectedEntries.some(selected => 
-                          selected.state_name === entry.state_name &&
-                          selected.service_category === entry.service_category &&
-                          selected.service_code === entry.service_code &&
-                          selected.service_description === entry.service_description &&
-                          selected.program === entry.program &&
-                          selected.location_region === entry.location_region &&
-                          selected.modifier_1 === entry.modifier_1 &&
-                          selected.modifier_1_details === entry.modifier_1_details &&
-                          selected.modifier_2 === entry.modifier_2 &&
-                          selected.modifier_2_details === entry.modifier_2_details &&
-                          selected.modifier_3 === entry.modifier_3 &&
-                          selected.modifier_3_details === entry.modifier_3_details &&
-                          selected.modifier_4 === entry.modifier_4 &&
-                          selected.modifier_4_details === entry.modifier_4_details &&
-                          selected.duration_unit === entry.duration_unit &&
-                          selected.provider_type === entry.provider_type &&
-                          selected.rate_effective_date === entry.rate_effective_date
-                        );
-                        const selectionIndex = selectedEntries.findIndex(selected => 
-                          selected.state_name === entry.state_name &&
-                          selected.service_category === entry.service_category &&
-                          selected.service_code === entry.service_code &&
-                          selected.service_description === entry.service_description &&
-                          selected.program === entry.program &&
-                          selected.location_region === entry.location_region &&
-                          selected.modifier_1 === entry.modifier_1 &&
-                          selected.modifier_1_details === entry.modifier_1_details &&
-                          selected.modifier_2 === entry.modifier_2 &&
-                          selected.modifier_2_details === entry.modifier_2_details &&
-                          selected.modifier_3 === entry.modifier_3 &&
-                          selected.modifier_3_details === entry.modifier_3_details &&
-                          selected.modifier_4 === entry.modifier_4 &&
-                          selected.modifier_4_details === entry.modifier_4_details &&
-                          selected.duration_unit === entry.duration_unit &&
-                          selected.provider_type === entry.provider_type &&
-                          selected.rate_effective_date === entry.rate_effective_date
-                        );
-                        const selectionColor = selectionIndex >= 0 ? colorPalette[selectionIndex] : null;
+                      {tableData.map((item, index) => {
+                        const entry = item as ServiceData;
+                        const isSelected =
+                          selectedEntry &&
+                          selectedEntry.state_name === entry.state_name &&
+                          selectedEntry.service_category === entry.service_category &&
+                          selectedEntry.service_code === entry.service_code &&
+                          selectedEntry.service_description === entry.service_description &&
+                          selectedEntry.program === entry.program &&
+                          selectedEntry.location_region === entry.location_region &&
+                          selectedEntry.modifier_1 === entry.modifier_1 &&
+                          selectedEntry.modifier_1_details === entry.modifier_1_details &&
+                          selectedEntry.modifier_2 === entry.modifier_2 &&
+                          selectedEntry.modifier_2_details === entry.modifier_2_details &&
+                          selectedEntry.modifier_3 === entry.modifier_3 &&
+                          selectedEntry.modifier_3_details === entry.modifier_3_details &&
+                          selectedEntry.modifier_4 === entry.modifier_4 &&
+                          selectedEntry.modifier_4_details === entry.modifier_4_details &&
+                          selectedEntry.duration_unit === entry.duration_unit &&
+                          selectedEntry.provider_type === entry.provider_type &&
+                          selectedEntry.rate_effective_date === entry.rate_effective_date;
 
                         const rateValue = parseRate(entry.rate);
                         const durationUnit = entry.duration_unit?.toUpperCase();
@@ -2598,76 +2000,21 @@ export default function HistoricalRates() {
 
                       return (
                         <tr 
-                          key={`${stateResult.state}-${index}`} 
+                          key={index} 
                           className={`group relative transition-all duration-200 ease-in-out cursor-pointer ${
                             isSelected 
-                              ? 'shadow-[0_0_0_2px_rgba(0,0,0,0.1)] hover:scale-[1.01] hover:z-10' 
+                              ? 'bg-blue-50 shadow-[0_0_0_1px_rgba(59,130,246,0.2)]' 
                               : 'hover:bg-gray-50 hover:shadow-[0_2px_4px_rgba(0,0,0,0.05)] hover:scale-[1.01] hover:z-10'
                           }`}
-                          style={isSelected && selectionColor ? { backgroundColor: `${selectionColor}20`, borderLeft: `4px solid ${selectionColor}` } : {}}
-                          onClick={() => {
-                            if (isSelected) {
-                              setSelectedEntries(prev => prev.filter(selected => 
-                                !(selected.state_name === entry.state_name &&
-                                  selected.service_category === entry.service_category &&
-                                  selected.service_code === entry.service_code &&
-                                  selected.service_description === entry.service_description &&
-                                  selected.program === entry.program &&
-                                  selected.location_region === entry.location_region &&
-                                  selected.modifier_1 === entry.modifier_1 &&
-                                  selected.modifier_1_details === entry.modifier_1_details &&
-                                  selected.modifier_2 === entry.modifier_2 &&
-                                  selected.modifier_2_details === entry.modifier_2_details &&
-                                  selected.modifier_3 === entry.modifier_3 &&
-                                  selected.modifier_3_details === entry.modifier_3_details &&
-                                  selected.modifier_4 === entry.modifier_4 &&
-                                  selected.modifier_4_details === entry.modifier_4_details &&
-                                  selected.duration_unit === entry.duration_unit &&
-                                  selected.provider_type === entry.provider_type &&
-                                  selected.rate_effective_date === entry.rate_effective_date)
-                              ));
-                            } else {
-                              setSelectedEntries(prev => {
-                                const exists = prev.some(selected => 
-                                  selected.state_name === entry.state_name &&
-                                  selected.service_category === entry.service_category &&
-                                  selected.service_code === entry.service_code &&
-                                  selected.service_description === entry.service_description &&
-                                  selected.program === entry.program &&
-                                  selected.location_region === entry.location_region &&
-                                  selected.modifier_1 === entry.modifier_1 &&
-                                  selected.modifier_1_details === entry.modifier_1_details &&
-                                  selected.modifier_2 === entry.modifier_2 &&
-                                  selected.modifier_2_details === entry.modifier_2_details &&
-                                  selected.modifier_3 === entry.modifier_3 &&
-                                  selected.modifier_3_details === entry.modifier_3_details &&
-                                  selected.modifier_4 === entry.modifier_4 &&
-                                  selected.modifier_4_details === entry.modifier_4_details &&
-                                  selected.duration_unit === entry.duration_unit &&
-                                  selected.provider_type === entry.provider_type &&
-                                  selected.rate_effective_date === entry.rate_effective_date
-                                );
-                                if (!exists && prev.length < colorPalette.length) {
-                                  return [...prev, entry];
-                                }
-                                return prev;
-                              });
-                            }
-                          }}
+                          onClick={() => setSelectedEntry(entry)}
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div 
-                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
                                 isSelected 
-                                    ? 'shadow-[0_0_0_3px_rgba(0,0,0,0.2)]' 
+                                  ? 'border-blue-500 bg-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.2)]' 
                                   : 'border-gray-300 group-hover:border-blue-300 group-hover:shadow-[0_0_0_2px_rgba(59,130,246,0.1)]'
-                                }`}
-                                style={isSelected && selectionColor ? { 
-                                  backgroundColor: selectionColor, 
-                                  borderColor: selectionColor 
-                                } : {}}
-                              >
+                              }`}>
                                 {isSelected && (
                                   <svg 
                                     className="w-3 h-3 text-white transition-transform duration-200" 
@@ -2686,28 +2033,7 @@ export default function HistoricalRates() {
                               </div>
                               {isSelected && (
                                 <button
-                                  onClick={e => { 
-                                    e.stopPropagation(); 
-                                    setSelectedEntries(prev => prev.filter(selected => 
-                                      !(selected.state_name === entry.state_name &&
-                                        selected.service_category === entry.service_category &&
-                                        selected.service_code === entry.service_code &&
-                                        selected.service_description === entry.service_description &&
-                                        selected.program === entry.program &&
-                                        selected.location_region === entry.location_region &&
-                                        selected.modifier_1 === entry.modifier_1 &&
-                                        selected.modifier_1_details === entry.modifier_1_details &&
-                                        selected.modifier_2 === entry.modifier_2 &&
-                                        selected.modifier_2_details === entry.modifier_2_details &&
-                                        selected.modifier_3 === entry.modifier_3 &&
-                                        selected.modifier_3_details === entry.modifier_3_details &&
-                                        selected.modifier_4 === entry.modifier_4 &&
-                                        selected.modifier_4_details === entry.modifier_4_details &&
-                                        selected.duration_unit === entry.duration_unit &&
-                                        selected.provider_type === entry.provider_type &&
-                                        selected.rate_effective_date === entry.rate_effective_date)
-                                    )); 
-                                  }}
+                                  onClick={e => { e.stopPropagation(); setSelectedEntry(null); }}
                                   className="ml-2 text-gray-400 hover:text-red-500 transition-colors duration-200"
                                   title="Deselect"
                                 >
@@ -2718,6 +2044,11 @@ export default function HistoricalRates() {
                               )}
                             </div>
                           </td>
+                          {getVisibleColumns.state_name && (
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {STATE_ABBREVIATIONS[entry.state_name?.toUpperCase() || ""] || entry.state_name || '-'}
+                              </td>
+                          )}
                           {getVisibleColumns.service_category && (
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 {SERVICE_CATEGORY_ABBREVIATIONS[entry.service_category?.trim().toUpperCase() || ""] || entry.service_category || '-'}
@@ -2783,13 +2114,18 @@ export default function HistoricalRates() {
                   </tbody>
                 </table>
                 </div>
-                    </div>
-                  </div>
-                ))}
+                {totalCount > 0 && (
+                  <PaginationControls 
+                    currentPage={currentPage}
+                    setCurrentPage={setCurrentPage}
+                    totalCount={totalCount}
+                    itemsPerPage={itemsPerPage}
+                  />
+                )}
               </div>
             )}
 
-            {areFiltersApplied && selectedEntries.length === 0 && (
+            {areFiltersApplied && !selectedEntry && (
               <div className="p-6 bg-white rounded-xl shadow-lg text-center">
                 <div className="flex justify-center items-center mb-4">
                   <FaChartLine className="h-8 w-8 text-blue-500" />
