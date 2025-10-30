@@ -416,6 +416,7 @@ export default function Dashboard() {
   ]);
   const [pendingFilters, setPendingFilters] = useState<Set<keyof Selections>>(new Set());
   const [displayedItems, setDisplayedItems] = useState(50); // Adjust this number based on your needs
+  const [isTableExpanded, setIsTableExpanded] = useState(false);
   
   const itemsPerPage = 50; // Adjust this number based on your needs
 
@@ -2059,15 +2060,38 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsTableExpanded(prev => !prev)}
+                className="px-3 py-2 text-sm rounded-md border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 transition-colors"
+                title={isTableExpanded ? 'Shrink table' : 'Expand table to full screen'}
+              >
+                {isTableExpanded ? 'Shrink Table' : 'Expand Table'}
+              </button>
+            </div>
           </div>
           
           <div 
-            className="rounded-lg shadow-lg bg-white relative z-30 overflow-x-auto"
+            className={clsx(
+              isTableExpanded 
+                ? 'fixed inset-0 z-[1000] bg-white p-4 overflow-x-auto'
+                : 'rounded-lg shadow-lg bg-white relative z-30 overflow-x-auto'
+            )}
             style={{ 
-              maxHeight: 'calc(100vh - 5.5rem)', 
+              maxHeight: isTableExpanded ? 'calc(100vh - 2rem)' : 'calc(100vh - 5.5rem)', 
               overflow: 'auto'
             }}
           >
+            {isTableExpanded && (
+              <div className="flex justify-end mb-2">
+                <button
+                  onClick={() => setIsTableExpanded(false)}
+                  className="px-3 py-1 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Close Full Screen
+                </button>
+              </div>
+            )}
               <table className="min-w-full" style={{ width: '100%', tableLayout: 'auto' }}>
                 <thead className="bg-gray-50 sticky top-0 z-20">
                 <tr>
