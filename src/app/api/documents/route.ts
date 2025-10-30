@@ -63,29 +63,11 @@ function getDocumentTypeFromPath(pathname: string): string {
 }
 
 function extractStateFromPath(pathname: string): string | undefined {
-  const pathParts = pathname.split('/');
-  
-  // Look for state names in the path (case-insensitive)
-  // Using actual folder names from Vercel Blob storage (with spaces, not underscores)
-  const stateNames = [
-    'ALABAMA', 'ALASKA', 'ARIZONA', 'ARKANSAS', 'CALIFORNIA', 'COLORADO', 'CONNECTICUT',
-    'DELAWARE', 'FLORIDA', 'GEORGIA', 'HAWAII', 'IDAHO', 'ILLINOIS', 'INDIANA', 'IOWA',
-    'KANSAS', 'KENTUCKY', 'LOUISIANA', 'MAINE', 'MARYLAND', 'MASSACHUSETTS', 'MICHIGAN',
-    'MINNESOTA', 'MISSISSIPPI', 'MISSOURI', 'MONTANA', 'NEBRASKA', 'NEVADA', 'NEW HAMPSHIRE',
-    'NEW JERSEY', 'NEW MEXICO', 'NEW YORK', 'NORTH CAROLINA', 'NORTH DAKOTA', 'OHIO',
-    'OKLAHOMA', 'OREGON', 'PENNSYLVANIA', 'RHODE ISLAND', 'SOUTH CAROLINA', 'SOUTH DAKOTA',
-    'TENNESSEE', 'TEXAS', 'UTAH', 'VERMONT', 'VIRGINIA', 'WASHINGTON', 'WEST VIRGINIA',
-    'WISCONSIN', 'WYOMING', 'DC'
-  ];
-  
-  for (const part of pathParts) {
-    const upperPart = part.toUpperCase();
-    if (stateNames.includes(upperPart)) {
-      return upperPart; // Return as-is since we're already using spaces
-    }
-  }
-  
-  return undefined;
+  // Derive the state dynamically from the top-level folder name.
+  // Example: "CALIFORNIA/ABA/file.pdf" -> "CALIFORNIA"
+  // Works for any new/renamed folders without maintaining a fixed list.
+  const parts = pathname.split('/').filter(Boolean);
+  return parts.length > 0 ? parts[0] : undefined;
 }
 
 function getCategoryFromPath(pathname: string): string {
