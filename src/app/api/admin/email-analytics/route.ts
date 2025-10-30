@@ -149,8 +149,8 @@ function processUniqueFromEvents(events: any[], startDate: Date, endDate: Date) 
     const type = (e.event || '').toLowerCase();
     if (type === 'sent' || type === 'delivered') { perDay[dateKey].sent.add(id); overall.sent.add(id); }
     else if (type === 'opened') { perDay[dateKey].opened.add(id); overall.opened.add(id); }
-    else if (type === 'clicked') { perDay[dateKey].clicked.add(id); overall.clicked.add(id); }
-    else if (type.includes('bounce') || type === 'blocked') { perDay[dateKey].bounced.add(id); overall.bounced.add(id); }
+    else if (type === 'click' || type === 'clicked') { perDay[dateKey].clicked.add(id); overall.clicked.add(id); }
+    else if (type.includes('bounce') || type === 'blocked' || type === 'hardbounce' || type === 'softbounce') { perDay[dateKey].bounced.add(id); overall.bounced.add(id); }
   });
 
   // Initialize missing days
