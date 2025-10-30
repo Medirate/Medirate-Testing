@@ -2074,26 +2074,28 @@ export default function Dashboard() {
           <div 
             className={clsx(
               isTableExpanded 
-                ? 'fixed inset-0 z-[1000] bg-white p-4 overflow-x-auto'
-                : 'rounded-lg shadow-lg bg-white relative z-30 overflow-x-auto'
+                ? 'fixed inset-0 z-[1000] bg-white flex flex-col'
+                : 'rounded-lg shadow-lg bg-white relative z-30'
             )}
-            style={{ 
-              maxHeight: isTableExpanded ? 'calc(100vh - 2rem)' : 'calc(100vh - 5.5rem)', 
-              overflow: 'auto'
-            }}
           >
             {isTableExpanded && (
-              <div className="flex justify-end mb-2">
+              <div className="flex justify-end p-4 pb-2 border-b border-gray-200 bg-white z-50">
                 <button
                   onClick={() => setIsTableExpanded(false)}
-                  className="px-3 py-1 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
+                  className="px-4 py-2 text-sm font-medium rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 shadow-sm"
                 >
-                  Close Full Screen
+                  ✕ Close Full Screen
                 </button>
               </div>
             )}
+            <div 
+              className="overflow-auto flex-1"
+              style={{ 
+                maxHeight: isTableExpanded ? 'calc(100vh - 4rem)' : 'calc(100vh - 5.5rem)'
+              }}
+            >
               <table className="min-w-full" style={{ width: '100%', tableLayout: 'auto' }}>
-                <thead className="bg-gray-50 sticky top-0 z-20">
+                <thead className="bg-gray-50 sticky top-0 z-40 shadow-sm">
                 <tr>
                     <th className={clsx(
                       'px-6 py-3 text-left text-sm font-medium text-gray-500 uppercase tracking-wider cursor-pointer',
@@ -2203,6 +2205,7 @@ export default function Dashboard() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
             {/* Always show both controls after a search */}
             <div className="flex flex-col items-center mt-4">
