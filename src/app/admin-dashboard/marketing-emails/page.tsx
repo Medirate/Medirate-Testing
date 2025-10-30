@@ -696,7 +696,7 @@ export default function MarketingEmailsAdminPage() {
     }
   };
 
-  const fetchContactStats = async (days: number = 30) => {
+  const fetchContactStats = async (days: number = 90) => {
     setContactStatsLoading(true);
     setContactStatsError(null);
     
@@ -733,7 +733,8 @@ export default function MarketingEmailsAdminPage() {
   useEffect(() => {
     fetchAnalytics(analyticsDays);
     fetchBouncedEmails(analyticsDays);
-    fetchContactStats(analyticsDays);
+    // Contact stats always fetch 90 days (Brevo's API limit)
+    fetchContactStats(90);
   }, [analyticsDays]);
 
   return (
@@ -2233,7 +2234,7 @@ export default function MarketingEmailsAdminPage() {
                   <div>
                     <h4 className="text-lg font-semibold text-blue-800 mb-2">📊 Contact Performance Summary</h4>
                     <p className="text-sm text-blue-700">
-                      Showing email engagement data for <strong>{contactStats.length}</strong> unique contacts in the last {analyticsDays} days.
+                      Showing email engagement data for <strong>{contactStats.length}</strong> unique contacts in the last 90 days (Brevo's maximum history).
                     </p>
                   </div>
                   <div className="text-blue-500 text-4xl">📈</div>
