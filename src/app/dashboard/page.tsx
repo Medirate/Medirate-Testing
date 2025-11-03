@@ -13,6 +13,7 @@ import clsx from 'clsx';
 import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
 import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
+import * as XLSX from 'xlsx';
 
 // --- NEW: Types for client-side filtering ---
 interface FilterOptionsData {
@@ -1105,6 +1106,179 @@ export default function Dashboard() {
   // Update hasMoreItems logic for Load More mode
   const hasMoreItems = data.length < totalCount;
 
+  // Export function to fetch ALL data and convert to Excel with protection
+  const handleExportExcel = async () => {
+    if (!hasSearched || data.length === 0) {
+      alert('Please search for data first before exporting.');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      // Build filters from current selections
+      const filters: Record<string, string> = {};
+      for (const [key, value] of Object.entries(selections)) {
+        if (value) filters[key] = value;
+      }
+      if (startDate) filters.start_date = startDate.toISOString().split('T')[0];
+      if (endDate) filters.end_date = endDate.toISOString().split('T')[0];
+
+      // Apply sorting if present
+      if (sortConfig.length > 0) {
+        const sortParts = sortConfig.map(config => `${config.key}:${config.direction}`).join(',');
+        filters.sort = sortParts;
+      }
+
+      // Fetch all pages of data
+      const allData: ServiceData[] = [];
+      let currentPageNum = 1;
+      let hasMore = true;
+      const exportPageSize = 1000;
+
+      console.log('📥 Starting Excel export - fetching all pages...');
+      
+      while (hasMore) {
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value && typeof value === 'string') params.append(key, value);
+        });
+        params.append('page', String(currentPageNum));
+        params.append('itemsPerPage', String(exportPageSize));
+        
+        const url = `/api/state-payment-comparison?${params.toString()}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch page ${currentPageNum}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        
+        if (result && Array.isArray(result.data) && result.data.length > 0) {
+          allData.push(...result.data);
+          console.log(`📥 Fetched page ${currentPageNum}: ${result.data.length} records (Total: ${allData.length})`);
+          
+          if (allData.length >= (result.totalCount || 0) || result.data.length < exportPageSize) {
+            hasMore = false;
+          } else {
+            currentPageNum++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      console.log(`✅ Excel export complete: ${allData.length} total records`);
+
+      // Prepare data for Excel
+      const excelData = allData.map(item => ({
+        'State': item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || '',
+        'Service Category': SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || '',
+        'Service Code': item.service_code || '',
+        'Service Description': item.service_description || '',
+        'Rate per Base Unit': formatRate(item.rate) === '-' ? '' : formatRate(item.rate),
+        'Duration Unit': item.duration_unit || '',
+        'Effective Date': formatDate(item.rate_effective_date) === '-' ? '' : formatDate(item.rate_effective_date),
+        'Provider Type': item.provider_type || '',
+        'Modifier 1': item.modifier_1 ? (item.modifier_1_details ? `${item.modifier_1} - ${item.modifier_1_details}` : item.modifier_1) : '',
+        'Modifier 2': item.modifier_2 ? (item.modifier_2_details ? `${item.modifier_2} - ${item.modifier_2_details}` : item.modifier_2) : '',
+        'Modifier 3': item.modifier_3 ? (item.modifier_3_details ? `${item.modifier_3} - ${item.modifier_3_details}` : item.modifier_3) : '',
+        'Modifier 4': item.modifier_4 ? (item.modifier_4_details ? `${item.modifier_4} - ${item.modifier_4_details}` : item.modifier_4) : '',
+        'Program': item.program || '',
+        'Location/Region': item.location_region || ''
+      }));
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      
+      // Create watermark sheet
+      const watermarkData = [
+        ['MEDIRATE - PROPRIETARY DATA'],
+        ['Copyright © ' + new Date().getFullYear() + ' MediRate. All Rights Reserved.'],
+        ['This file contains proprietary and confidential information.'],
+        ['Unauthorized copying, distribution, or modification is prohibited.'],
+        [''],
+        ['Export Date: ' + new Date().toLocaleString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric', 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })],
+        ['Total Records: ' + allData.length],
+        [''],
+      ];
+      const watermarkWS = XLSX.utils.aoa_to_sheet(watermarkData);
+      XLSX.utils.book_append_sheet(wb, watermarkWS, 'Notice');
+
+      // Create main data sheet
+      const ws = XLSX.utils.json_to_sheet(excelData);
+      
+      // Lock all cells by setting protection on each cell
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ c: C, r: R });
+          if (!ws[cellAddress]) continue;
+          // Set cell to locked
+          ws[cellAddress].s = ws[cellAddress].s || {};
+          ws[cellAddress].s.protection = { locked: true };
+        }
+      }
+      
+      // Protect worksheet - prevents editing locked cells
+      // Note: xlsx library has limited protection support, but this will mark the sheet as protected
+      ws['!protect'] = {
+        selectLockedCells: true,
+        selectUnlockedCells: false,
+        formatCells: false,
+        formatColumns: false,
+        formatRows: false,
+        insertColumns: false,
+        insertRows: false,
+        insertHyperlinks: false,
+        deleteColumns: false,
+        deleteRows: false,
+        sort: false,
+        autoFilter: false,
+        pivotTables: false,
+      };
+
+      // Set column widths
+      const colWidths = [
+        { wch: 10 }, // State
+        { wch: 20 }, // Service Category
+        { wch: 15 }, // Service Code
+        { wch: 40 }, // Service Description
+        { wch: 18 }, // Rate
+        { wch: 15 }, // Duration Unit
+        { wch: 15 }, // Effective Date
+        { wch: 20 }, // Provider Type
+        { wch: 20 }, // Modifier 1
+        { wch: 20 }, // Modifier 2
+        { wch: 20 }, // Modifier 3
+        { wch: 20 }, // Modifier 4
+        { wch: 30 }, // Program
+        { wch: 25 }, // Location/Region
+      ];
+      ws['!cols'] = colWidths;
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Data');
+
+      // Generate Excel file
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `MediRate-export-${timestamp}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      
+      console.log(`✅ Excel export downloaded: ${filename} (${allData.length} records)`);
+      setIsExporting(false);
+    } catch (err) {
+      console.error('❌ Excel export error:', err);
+      alert(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setIsExporting(false);
+    }
+  };
+
   // Export function to fetch ALL data and convert to CSV
   const handleExport = async () => {
     if (!hasSearched || data.length === 0) {
@@ -1218,8 +1392,26 @@ export default function Dashboard() {
         return details ? `${modifier} - ${details}` : modifier;
       };
 
-      // Build CSV rows
+      // Build CSV rows with MEDIRATE watermark header
+      const watermarkHeader = [
+        'MEDIRATE - PROPRIETARY DATA',
+        'Copyright © ' + new Date().getFullYear() + ' MediRate. All Rights Reserved.',
+        'This file contains proprietary and confidential information.',
+        'Unauthorized copying, distribution, or modification is prohibited.',
+        '', // Empty row separator
+        `Export Date: ${new Date().toLocaleString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric', 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })}`,
+        `Total Records: ${allData.length}`,
+        '', // Empty row separator
+      ];
+      
       const csvRows = [
+        ...watermarkHeader.map(row => escapeCSV(row)),
         headers.join(',')
       ];
 
@@ -1243,7 +1435,20 @@ export default function Dashboard() {
         csvRows.push(row.join(','));
       }
 
-      const csvContent = csvRows.join('\n');
+      // Add footer watermark
+      const watermarkFooter = [
+        '', // Empty row separator
+        'MEDIRATE - PROPRIETARY DATA',
+        'Copyright © ' + new Date().getFullYear() + ' MediRate. All Rights Reserved.',
+        'Generated by MediRate Dashboard'
+      ];
+      
+      const csvRowsWithFooter = [
+        ...csvRows,
+        ...watermarkFooter.map(row => escapeCSV(row))
+      ];
+      
+      const csvContent = csvRowsWithFooter.join('\n');
       
       // Create blob and download
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1252,7 +1457,7 @@ export default function Dashboard() {
       
       // Generate filename with timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `dashboard-export-${timestamp}.csv`;
+      const filename = `MediRate-export-${timestamp}.csv`;
       
       link.setAttribute('href', url);
       link.setAttribute('download', filename);
@@ -2227,8 +2432,38 @@ export default function Dashboard() {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <div className="relative group">
+                <button
+                  onClick={handleExport}
+                  disabled={isExporting || !hasSearched || data.length === 0}
+                  className={clsx(
+                    "px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 border",
+                    isExporting || !hasSearched || data.length === 0
+                      ? "bg-gray-50 text-gray-400 cursor-not-allowed border-gray-200"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm"
+                  )}
+                  title={isExporting ? 'Exporting all data...' : 'Export all data to CSV with watermark (includes all pages)'}
+                >
+                  {isExporting ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Exporting...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Export CSV
+                    </span>
+                  )}
+                </button>
+              </div>
               <button
-                onClick={handleExport}
+                onClick={handleExportExcel}
                 disabled={isExporting || !hasSearched || data.length === 0}
                 className={clsx(
                   "px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 border",
@@ -2236,7 +2471,7 @@ export default function Dashboard() {
                     ? "bg-gray-50 text-gray-400 cursor-not-allowed border-gray-200"
                     : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm"
                 )}
-                title={isExporting ? 'Exporting all data...' : 'Export all data to CSV (includes all pages)'}
+                title={isExporting ? 'Exporting all data...' : 'Export all data to Excel with protection (locked cells, includes all pages)'}
               >
                 {isExporting ? (
                   <span className="flex items-center gap-2">
@@ -2251,7 +2486,7 @@ export default function Dashboard() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    Export CSV
+                    Export Excel (Protected)
                   </span>
                 )}
               </button>
