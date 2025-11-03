@@ -14,6 +14,7 @@ import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
 import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 // --- NEW: Types for client-side filtering ---
 interface FilterOptionsData {
@@ -1170,65 +1171,85 @@ export default function Dashboard() {
 
       console.log(`✅ Excel export complete: ${allData.length} total records`);
 
-      // Prepare data for Excel
-      const excelData = allData.map(item => ({
-        'State': item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || '',
-        'Service Category': SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || '',
-        'Service Code': item.service_code || '',
-        'Service Description': item.service_description || '',
-        'Rate per Base Unit': formatRate(item.rate) === '-' ? '' : formatRate(item.rate),
-        'Duration Unit': item.duration_unit || '',
-        'Effective Date': formatDate(item.rate_effective_date) === '-' ? '' : formatDate(item.rate_effective_date),
-        'Provider Type': item.provider_type || '',
-        'Modifier 1': item.modifier_1 ? (item.modifier_1_details ? `${item.modifier_1} - ${item.modifier_1_details}` : item.modifier_1) : '',
-        'Modifier 2': item.modifier_2 ? (item.modifier_2_details ? `${item.modifier_2} - ${item.modifier_2_details}` : item.modifier_2) : '',
-        'Modifier 3': item.modifier_3 ? (item.modifier_3_details ? `${item.modifier_3} - ${item.modifier_3_details}` : item.modifier_3) : '',
-        'Modifier 4': item.modifier_4 ? (item.modifier_4_details ? `${item.modifier_4} - ${item.modifier_4_details}` : item.modifier_4) : '',
-        'Program': item.program || '',
-        'Location/Region': item.location_region || ''
-      }));
+      // Create Excel workbook with ExcelJS (supports password protection)
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'MediRate';
+      workbook.created = new Date();
 
-      // Create workbook
-      const wb = XLSX.utils.book_new();
-      
-      // Create watermark sheet
-      const watermarkData = [
-        ['MEDIRATE - PROPRIETARY DATA'],
-        ['Copyright © ' + new Date().getFullYear() + ' MediRate. All Rights Reserved.'],
-        ['This file contains proprietary and confidential information.'],
-        ['Unauthorized copying, distribution, or modification is prohibited.'],
-        [''],
-        ['Export Date: ' + new Date().toLocaleString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric', 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        })],
-        ['Total Records: ' + allData.length],
-        [''],
-      ];
-      const watermarkWS = XLSX.utils.aoa_to_sheet(watermarkData);
-      XLSX.utils.book_append_sheet(wb, watermarkWS, 'Notice');
+      // Create watermark/notice sheet
+      const noticeSheet = workbook.addWorksheet('Notice');
+      noticeSheet.getColumn(1).width = 60;
+      noticeSheet.getRow(1).getCell(1).value = 'MEDIRATE - PROPRIETARY DATA';
+      noticeSheet.getRow(1).getCell(1).font = { bold: true, size: 14 };
+      noticeSheet.getRow(2).getCell(1).value = `Copyright © ${new Date().getFullYear()} MediRate. All Rights Reserved.`;
+      noticeSheet.getRow(3).getCell(1).value = 'This file contains proprietary and confidential information.';
+      noticeSheet.getRow(4).getCell(1).value = 'Unauthorized copying, distribution, or modification is prohibited.';
+      noticeSheet.getRow(6).getCell(1).value = `Export Date: ${new Date().toLocaleString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      })}`;
+      noticeSheet.getRow(7).getCell(1).value = `Total Records: ${allData.length}`;
 
       // Create main data sheet
-      const ws = XLSX.utils.json_to_sheet(excelData);
+      const dataSheet = workbook.addWorksheet('Data');
       
-      // Lock all cells by setting protection on each cell
-      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-      for (let R = range.s.r; R <= range.e.r; ++R) {
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-          const cellAddress = XLSX.utils.encode_cell({ c: C, r: R });
-          if (!ws[cellAddress]) continue;
-          // Set cell to locked
-          ws[cellAddress].s = ws[cellAddress].s || {};
-          ws[cellAddress].s.protection = { locked: true };
-        }
-      }
-      
-      // Protect worksheet - prevents editing locked cells
-      // Note: xlsx library has limited protection support, but this will mark the sheet as protected
-      ws['!protect'] = {
+      // Define columns
+      dataSheet.columns = [
+        { header: 'State', key: 'state', width: 10 },
+        { header: 'Service Category', key: 'serviceCategory', width: 20 },
+        { header: 'Service Code', key: 'serviceCode', width: 15 },
+        { header: 'Service Description', key: 'serviceDescription', width: 40 },
+        { header: 'Rate per Base Unit', key: 'rate', width: 18 },
+        { header: 'Duration Unit', key: 'durationUnit', width: 15 },
+        { header: 'Effective Date', key: 'effectiveDate', width: 15 },
+        { header: 'Provider Type', key: 'providerType', width: 20 },
+        { header: 'Modifier 1', key: 'modifier1', width: 20 },
+        { header: 'Modifier 2', key: 'modifier2', width: 20 },
+        { header: 'Modifier 3', key: 'modifier3', width: 20 },
+        { header: 'Modifier 4', key: 'modifier4', width: 20 },
+        { header: 'Program', key: 'program', width: 30 },
+        { header: 'Location/Region', key: 'locationRegion', width: 25 },
+      ];
+
+      // Style header row
+      dataSheet.getRow(1).font = { bold: true };
+      dataSheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+
+      // Add data rows
+      allData.forEach(item => {
+        const row = dataSheet.addRow({
+          state: item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || '',
+          serviceCategory: SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || '',
+          serviceCode: item.service_code || '',
+          serviceDescription: item.service_description || '',
+          rate: formatRate(item.rate) === '-' ? '' : formatRate(item.rate),
+          durationUnit: item.duration_unit || '',
+          effectiveDate: formatDate(item.rate_effective_date) === '-' ? '' : formatDate(item.rate_effective_date),
+          providerType: item.provider_type || '',
+          modifier1: item.modifier_1 ? (item.modifier_1_details ? `${item.modifier_1} - ${item.modifier_1_details}` : item.modifier_1) : '',
+          modifier2: item.modifier_2 ? (item.modifier_2_details ? `${item.modifier_2} - ${item.modifier_2_details}` : item.modifier_2) : '',
+          modifier3: item.modifier_3 ? (item.modifier_3_details ? `${item.modifier_3} - ${item.modifier_3_details}` : item.modifier_3) : '',
+          modifier4: item.modifier_4 ? (item.modifier_4_details ? `${item.modifier_4} - ${item.modifier_4_details}` : item.modifier_4) : '',
+          program: item.program || '',
+          locationRegion: item.location_region || ''
+        });
+
+        // Lock all cells in this row
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          cell.protection = { locked: true };
+        });
+      });
+
+      // Protect the data sheet with password
+      // Password: "MEDIRATE2025" (users will need this to unprotect)
+      dataSheet.protect('MEDIRATE2025', {
         selectLockedCells: true,
         selectUnlockedCells: false,
         formatCells: false,
@@ -1242,35 +1263,29 @@ export default function Dashboard() {
         sort: false,
         autoFilter: false,
         pivotTables: false,
-      };
-
-      // Set column widths
-      const colWidths = [
-        { wch: 10 }, // State
-        { wch: 20 }, // Service Category
-        { wch: 15 }, // Service Code
-        { wch: 40 }, // Service Description
-        { wch: 18 }, // Rate
-        { wch: 15 }, // Duration Unit
-        { wch: 15 }, // Effective Date
-        { wch: 20 }, // Provider Type
-        { wch: 20 }, // Modifier 1
-        { wch: 20 }, // Modifier 2
-        { wch: 20 }, // Modifier 3
-        { wch: 20 }, // Modifier 4
-        { wch: 30 }, // Program
-        { wch: 25 }, // Location/Region
-      ];
-      ws['!cols'] = colWidths;
-
-      XLSX.utils.book_append_sheet(wb, ws, 'Data');
+      });
 
       // Generate Excel file
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
       const filename = `MediRate-export-${timestamp}.xlsx`;
-      XLSX.writeFile(wb, filename);
+      
+      // Write to buffer and download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
       
       console.log(`✅ Excel export downloaded: ${filename} (${allData.length} records)`);
+      console.log(`🔒 Password-protected - Password: MEDIRATE2025`);
       setIsExporting(false);
     } catch (err) {
       console.error('❌ Excel export error:', err);
