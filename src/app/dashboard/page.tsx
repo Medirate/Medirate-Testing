@@ -417,6 +417,7 @@ export default function Dashboard() {
   const [pendingFilters, setPendingFilters] = useState<Set<keyof Selections>>(new Set());
   const [displayedItems, setDisplayedItems] = useState(50); // Adjust this number based on your needs
   const [isTableExpanded, setIsTableExpanded] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   
   const itemsPerPage = 50; // Adjust this number based on your needs
 
@@ -1103,6 +1104,171 @@ export default function Dashboard() {
 
   // Update hasMoreItems logic for Load More mode
   const hasMoreItems = data.length < totalCount;
+
+  // Export function to fetch ALL data and convert to CSV
+  const handleExport = async () => {
+    if (!hasSearched || data.length === 0) {
+      alert('Please search for data first before exporting.');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      // Build filters from current selections
+      const filters: Record<string, string> = {};
+      for (const [key, value] of Object.entries(selections)) {
+        if (value) filters[key] = value;
+      }
+      if (startDate) filters.start_date = startDate.toISOString().split('T')[0];
+      if (endDate) filters.end_date = endDate.toISOString().split('T')[0];
+
+      // Apply sorting if present
+      if (sortConfig.length > 0) {
+        const sortParts = sortConfig.map(config => `${config.key}:${config.direction}`).join(',');
+        filters.sort = sortParts;
+      }
+
+      // Fetch all pages of data
+      const allData: ServiceData[] = [];
+      let currentPageNum = 1;
+      let hasMore = true;
+      const exportPageSize = 1000; // Larger page size for exports to reduce API calls
+
+      console.log('📥 Starting export - fetching all pages...');
+      
+      while (hasMore) {
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value && typeof value === 'string') params.append(key, value);
+        });
+        params.append('page', String(currentPageNum));
+        params.append('itemsPerPage', String(exportPageSize));
+        
+        const url = `/api/state-payment-comparison?${params.toString()}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch page ${currentPageNum}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        
+        if (result && Array.isArray(result.data) && result.data.length > 0) {
+          allData.push(...result.data);
+          console.log(`📥 Fetched page ${currentPageNum}: ${result.data.length} records (Total: ${allData.length})`);
+          
+          // Check if we've fetched all data
+          if (allData.length >= (result.totalCount || 0) || result.data.length < exportPageSize) {
+            hasMore = false;
+          } else {
+            currentPageNum++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      console.log(`✅ Export complete: ${allData.length} total records`);
+
+      // Convert to CSV
+      const headers = [
+        'State',
+        'Service Category',
+        'Service Code',
+        'Service Description',
+        'Rate per Base Unit',
+        'Duration Unit',
+        'Effective Date',
+        'Provider Type',
+        'Modifier 1',
+        'Modifier 2',
+        'Modifier 3',
+        'Modifier 4',
+        'Program',
+        'Location/Region'
+      ];
+
+      // Helper function to escape CSV fields
+      const escapeCSV = (value: string | null | undefined): string => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      // Helper function to format rate (returns formatted string, remove $ for CSV if needed, or keep it)
+      const formatRateForExport = (rate: string | undefined): string => {
+        if (!rate) return '';
+        const formatted = formatRate(rate);
+        return formatted === '-' ? '' : formatted;
+      };
+
+      // Helper function to format date
+      const formatDateForExport = (date: string | undefined): string => {
+        if (!date) return '';
+        const formatted = formatDate(date);
+        return formatted === '-' ? '' : formatted;
+      };
+
+      // Helper function to format modifier
+      const formatModifierForExport = (modifier: string | undefined, details: string | undefined): string => {
+        if (!modifier) return '';
+        return details ? `${modifier} - ${details}` : modifier;
+      };
+
+      // Build CSV rows
+      const csvRows = [
+        headers.join(',')
+      ];
+
+      for (const item of allData) {
+        const row = [
+          escapeCSV(item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || ''),
+          escapeCSV(SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || ''),
+          escapeCSV(item.service_code || ''),
+          escapeCSV(item.service_description || ''),
+          escapeCSV(formatRateForExport(item.rate)),
+          escapeCSV(item.duration_unit || ''),
+          escapeCSV(formatDateForExport(item.rate_effective_date)),
+          escapeCSV(item.provider_type || ''),
+          escapeCSV(formatModifierForExport(item.modifier_1, item.modifier_1_details)),
+          escapeCSV(formatModifierForExport(item.modifier_2, item.modifier_2_details)),
+          escapeCSV(formatModifierForExport(item.modifier_3, item.modifier_3_details)),
+          escapeCSV(formatModifierForExport(item.modifier_4, item.modifier_4_details)),
+          escapeCSV(item.program || ''),
+          escapeCSV(item.location_region || '')
+        ];
+        csvRows.push(row.join(','));
+      }
+
+      const csvContent = csvRows.join('\n');
+      
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `dashboard-export-${timestamp}.csv`;
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log(`✅ Export downloaded: ${filename} (${allData.length} records)`);
+      setIsExporting(false);
+    } catch (err) {
+      console.error('❌ Export error:', err);
+      alert(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setIsExporting(false);
+    }
+  };
 
 
 
@@ -2061,6 +2227,28 @@ export default function Dashboard() {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={handleExport}
+                disabled={isExporting || !hasSearched || data.length === 0}
+                className={clsx(
+                  "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                  isExporting || !hasSearched || data.length === 0
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+                    : "bg-green-600 text-white hover:bg-green-700 border border-green-700 shadow-sm"
+                )}
+                title={isExporting ? 'Exporting all data...' : 'Export all data to CSV (includes all pages)'}
+              >
+                {isExporting ? (
+                  <>
+                    <span className="inline-block animate-spin mr-2">⏳</span>
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    📥 Export to CSV
+                  </>
+                )}
+              </button>
               <button
                 onClick={() => setIsTableExpanded(prev => !prev)}
                 className="px-3 py-2 text-sm rounded-md border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 transition-colors"
