@@ -109,58 +109,61 @@ export async function POST(req: Request) {
           .select("primary_user, sub_users");
 
         if (!searchError && allRecords) {
-          // Check if user is a sub-user
+          // Check if user is a sub-user (case-insensitive)
           for (const record of allRecords) {
-            if (
-              record.sub_users &&
-              Array.isArray(record.sub_users) &&
-              record.sub_users.includes(emailLower)
-            ) {
-              result.details.isSubUser = true;
-              result.details.primaryUserEmail = record.primary_user;
-              result.details.inSubscriptionUsersTable = true;
-              result.details.subscriptionUsersRole = "sub-user";
+            if (record.sub_users && Array.isArray(record.sub_users)) {
+              // Case-insensitive check: compare lowercase versions
+              const isSubUser = record.sub_users.some(sub => 
+                typeof sub === 'string' && sub.toLowerCase() === emailLower
+              );
+              
+              if (isSubUser) {
+                result.details.isSubUser = true;
+                result.details.primaryUserEmail = record.primary_user;
+                result.details.inSubscriptionUsersTable = true;
+                result.details.subscriptionUsersRole = "sub-user";
 
-              // Check if primary user has active subscription
-              try {
-                const primaryCustomers = await stripe.customers.list({
-                  email: record.primary_user,
-                  limit: 1,
-                });
+                // Check if primary user has active subscription
+                try {
+                  const primaryCustomers = await stripe.customers.list({
+                    email: record.primary_user,
+                    limit: 1,
+                  });
 
-                if (primaryCustomers.data.length > 0) {
-                  const primaryCustomer = primaryCustomers.data[0];
-                  const primarySubscriptions =
-                    await stripe.subscriptions.list({
-                      customer: primaryCustomer.id,
-                      status: "all",
-                    });
+                  if (primaryCustomers.data.length > 0) {
+                    const primaryCustomer = primaryCustomers.data[0];
+                    const primarySubscriptions =
+                      await stripe.subscriptions.list({
+                        customer: primaryCustomer.id,
+                        status: "all",
+                      });
 
-                  const validPrimarySubscriptions =
-                    primarySubscriptions.data.filter((sub) => {
-                      if (sub.status === "canceled") {
-                        const now = Math.floor(Date.now() / 1000);
-                        return sub.current_period_end > now;
-                      }
-                      return ["active", "trialing", "past_due", "incomplete"].includes(
-                        sub.status
-                      );
-                    });
+                    const validPrimarySubscriptions =
+                      primarySubscriptions.data.filter((sub) => {
+                        if (sub.status === "canceled") {
+                          const now = Math.floor(Date.now() / 1000);
+                          return sub.current_period_end > now;
+                        }
+                        return ["active", "trialing", "past_due", "incomplete"].includes(
+                          sub.status
+                        );
+                      });
 
-                  if (validPrimarySubscriptions.length > 0) {
-                    result.details.primaryUserHasActiveSubscription = true;
-                    result.hasAccess = true;
-                    result.accessReason = `Sub-user with access through primary user ${record.primary_user} (active subscription)`;
+                    if (validPrimarySubscriptions.length > 0) {
+                      result.details.primaryUserHasActiveSubscription = true;
+                      result.hasAccess = true;
+                      result.accessReason = `Sub-user with access through primary user ${record.primary_user} (active subscription)`;
+                    }
                   }
+                } catch (primaryStripeError) {
+                  console.error(
+                    `Error checking primary user Stripe:`,
+                    primaryStripeError
+                  );
                 }
-              } catch (primaryStripeError) {
-                console.error(
-                  `Error checking primary user Stripe:`,
-                  primaryStripeError
-                );
-              }
 
-              break;
+                break;
+              }
             }
           }
 

@@ -32,12 +32,20 @@ export async function GET() {
     let primaryUserEmail = null;
 
     if (allRecords) {
+      const userEmailLower = user.email.toLowerCase();
       for (const record of allRecords) {
-        if (record.sub_users && Array.isArray(record.sub_users) && record.sub_users.includes(user.email)) {
-          isSubUser = true;
-          primaryUserEmail = record.primary_user;
-          console.log(`✅ User ${user.email} found as sub-user under primary user: ${primaryUserEmail}`);
-          break;
+        if (record.sub_users && Array.isArray(record.sub_users)) {
+          // Case-insensitive check: compare lowercase versions
+          const isSubUserMatch = record.sub_users.some(sub => 
+            typeof sub === 'string' && sub.toLowerCase() === userEmailLower
+          );
+          
+          if (isSubUserMatch) {
+            isSubUser = true;
+            primaryUserEmail = record.primary_user;
+            console.log(`✅ User ${user.email} found as sub-user under primary user: ${primaryUserEmail}`);
+            break;
+          }
         }
       }
     }
@@ -117,8 +125,13 @@ export async function POST(request: Request) {
         currentSubUsers = Array.isArray(currentRecord.sub_users) ? currentRecord.sub_users : [];
       }
 
-      // Check if user is already added
-      if (currentSubUsers.includes(email)) {
+      // Check if user is already added (case-insensitive)
+      const emailLower = email.toLowerCase();
+      const isAlreadyAdded = currentSubUsers.some(sub => 
+        typeof sub === 'string' && sub.toLowerCase() === emailLower
+      );
+      
+      if (isAlreadyAdded) {
         return NextResponse.json({ error: "User is already added to this subscription" }, { status: 400 });
       }
 
@@ -200,13 +213,20 @@ export async function DELETE(request: Request) {
       currentSubUsers = Array.isArray(currentRecord.sub_users) ? currentRecord.sub_users : [];
     }
 
-    // Check if user exists in the list
-    if (!currentSubUsers.includes(email)) {
+    // Check if user exists in the list (case-insensitive)
+    const emailLower = email.toLowerCase();
+    const userIndex = currentSubUsers.findIndex(sub => 
+      typeof sub === 'string' && sub.toLowerCase() === emailLower
+    );
+    
+    if (userIndex === -1) {
       return NextResponse.json({ error: "User is not in this subscription" }, { status: 404 });
     }
 
-    // Remove the user
-    const updatedSubUsers = currentSubUsers.filter(userEmail => userEmail !== email);
+    // Remove the user (case-insensitive)
+    const updatedSubUsers = currentSubUsers.filter(userEmail => 
+      typeof userEmail === 'string' && userEmail.toLowerCase() !== emailLower
+    );
 
     // Update the record
     const { error } = await supabase
