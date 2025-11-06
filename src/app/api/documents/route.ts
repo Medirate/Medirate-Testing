@@ -15,8 +15,31 @@ export async function GET(request: NextRequest) {
     console.log('📁 Found blobs:', blobs.length);
     console.log('📁 Blob details:', blobs.map(b => ({ pathname: b.pathname, size: b.size })));
     
+    // Locate metadata JSON with external links
+    const linksMeta = blobs.find(b => (b.pathname || '').startsWith('_metadata/') && b.pathname.endsWith('manual_billing_links.json'));
+    let stateLinks: Record<string, string[]> = {};
+    if (linksMeta) {
+      try {
+        const res = await fetch(linksMeta.url);
+        if (res.ok) {
+          const json = await res.json();
+          stateLinks = (json && json.stateLinks) || {};
+        }
+      } catch (e) {
+        console.warn('Failed to load state links JSON:', e);
+      }
+    }
+
     // Transform blob data to show actual storage structure
-    const documents = blobs.map(blob => {
+    const documents = blobs
+      // exclude metadata and json helper files from UI
+      .filter(blob => {
+        const p = (blob.pathname || '');
+        if (p.startsWith('_metadata/')) return false;
+        if (p.toLowerCase().endsWith('.json')) return false;
+        return true;
+      })
+      .map(blob => {
       const fileName = blob.pathname.split('/').pop() || 'Document';
       const filePath = blob.pathname;
       const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
@@ -47,7 +70,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ documents });
+    return NextResponse.json({ documents, stateLinks });
   } catch (error) {
     console.error('Error fetching documents:', error);
     return NextResponse.json({ error: 'Failed to fetch documents' }, { status: 500 });

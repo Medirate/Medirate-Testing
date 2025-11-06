@@ -1,1 +1,11 @@
- 
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Models can be added below as needed. Prisma Client can still be
+// generated without models for raw SQL usage against the datasource.

@@ -45,6 +45,7 @@ export default function Documents() {
   const router = useRouter();
   
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [stateLinks, setStateLinks] = useState<Record<string, Array<string | { title: string; url: string }>>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,6 +69,7 @@ export default function Documents() {
         console.log('📄 Documents API response:', data);
         console.log('📄 Documents count:', data.documents?.length || 0);
         setDocuments(data.documents || []);
+        setStateLinks(data.stateLinks || {});
       } catch (err) {
         setError('Failed to load documents');
         console.error('Error fetching documents:', err);
@@ -114,7 +116,7 @@ export default function Documents() {
     key: state,
     label: state,
     icon: Folder,
-    description: `${Object.keys(subfolders).length} categories • ${Object.values(subfolders).flat().length} documents`,
+    description: `${Object.keys(subfolders).length} categories • ${Object.values(subfolders).flat().length} documents${stateLinks[state]?.length ? ` • ${stateLinks[state].length} links` : ''}`,
     subfolders: Object.entries(subfolders).map(([subfolder, docs]) => ({
       key: `${state}/${subfolder}`,
       label: subfolder,
@@ -307,6 +309,23 @@ export default function Documents() {
                     {isExpanded && (
                       <CardContent>
                         <div className="space-y-6">
+                          {stateLinks[stateInfo.key]?.length ? (
+                            <div className="border border-blue-200 rounded-lg">
+                              <div className="p-4">
+                                <h3 className="text-md font-semibold text-blue-900 mb-2">External Manuals & Billing Links</h3>
+                                <ul className="list-disc ml-6 space-y-1">
+                                  {stateLinks[stateInfo.key].map((item, idx) => {
+                                    const linkObj = typeof item === 'string' ? { title: item, url: item } : item;
+                                    return (
+                                      <li key={idx}>
+                                        <a href={linkObj.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{linkObj.title || linkObj.url}</a>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            </div>
+                          ) : null}
                           {stateInfo.subfolders.map(subfolderInfo => {
                             const isSubfolderExpanded = expandedSections.has(subfolderInfo.key);
                             
