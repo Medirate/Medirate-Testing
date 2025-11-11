@@ -2569,12 +2569,12 @@ export default function Dashboard() {
                     )}
                     {startDate && (
                       <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
-                        Start Date: {startDate.toLocaleDateString()}
+                        Start Date: {startDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
                       </span>
                     )}
                     {endDate && (
                       <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
-                        End Date: {endDate.toLocaleDateString()}
+                        End Date: {endDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
                       </span>
                     )}
                   </div>
@@ -2693,7 +2693,7 @@ export default function Dashboard() {
                 </span>
               </div>
               <div className="mt-1 text-xs text-blue-600">
-                Resets on {new Date(exportUsage.currentPeriodEnd).toLocaleDateString()}
+                Resets on {new Date(exportUsage.currentPeriodEnd).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
               </div>
             </div>
           )}
@@ -2751,9 +2751,9 @@ export default function Dashboard() {
                   {exportUsage.currentPeriodEnd && (
                     <p className="text-xs text-gray-500 text-center">
                       Usage limit resets on {new Date(exportUsage.currentPeriodEnd).toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
+                        month: '2-digit', 
+                        day: '2-digit', 
+                        year: 'numeric' 
                       })}
                     </p>
                   )}
@@ -2808,9 +2808,9 @@ export default function Dashboard() {
                   {exportUsage?.currentPeriodEnd && (
                     <p className="text-sm text-gray-500">
                       Your limit will reset on {new Date(exportUsage.currentPeriodEnd).toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
+                        month: '2-digit', 
+                        day: '2-digit', 
+                        year: 'numeric' 
                       })}.
                     </p>
                   )}
