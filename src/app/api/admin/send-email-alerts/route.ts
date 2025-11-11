@@ -327,6 +327,12 @@ export async function POST(req: NextRequest) {
     
     logs.push(`✅ Processed ${processedAlerts.length} total alerts for matching`);
     
+    // Debug: Log breakdown by type
+    const billsCount = processedAlerts.filter(pa => pa.source === 'bill').length;
+    const providerAlertsCount = processedAlerts.filter(pa => pa.source === 'provider_alert').length;
+    const spaCount = processedAlerts.filter(pa => pa.source === 'state_plan_amendment').length;
+    logs.push(`📊 Alert breakdown: ${billsCount} bills, ${providerAlertsCount} provider alerts, ${spaCount} state plan amendments`);
+    
     // 4. Generate email preview or send personalized emails
     if (mode === 'preview') {
       // Preview mode: generate a sample email for the first user with relevant alerts
@@ -372,12 +378,23 @@ export async function POST(req: NextRequest) {
           previewUser = user;
           // Generate email HTML for this user
           const alertCards: string[] = [];
+          
+          // Debug: Log what types of alerts are in relevantAlerts
+          const alertTypes = relevantAlerts.map(pa => pa.source);
+          logs.push(`📊 Preview: Found ${relevantAlerts.length} relevant alerts - Types: ${alertTypes.join(', ')}`);
+          
           for (const pa of relevantAlerts) {
             const alert = pa.alert;
             const source = pa.source;
             const state = getFullStateName(alert.state);
-            const url = alert.url || alert.link || "#";
+            // For state plan amendments, use 'link' field; for bills/provider alerts, use 'url' field
+            const url = source === 'state_plan_amendment' 
+              ? (alert.link || "#")
+              : (alert.url || alert.link || "#");
             const serviceLines = pa.serviceLines.size > 0 ? Array.from(pa.serviceLines).join(', ') : "N/A";
+            
+            // Debug: Log each alert being processed
+            logs.push(`📋 Preview: Processing ${source} - State: ${state}, Service Lines: ${serviceLines}`);
             
             if (source === 'bill') {
               const title = alert.name || alert.bill_number || "No Title";
