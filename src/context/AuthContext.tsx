@@ -57,7 +57,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("🔍 AuthContext: Checking user status for:", userEmail);
 
     try {
-      // FIRST: Check registration form to get user role
+      // FIRST: Check if user is an admin - admins bypass all subscription checks
+      console.log("🔍 AuthContext: Checking if user is admin...");
+      const adminResponse = await fetch("/api/admin-users");
+      if (adminResponse.ok) {
+        const adminData = await adminResponse.json();
+        if (adminData.isAdmin && adminData.adminUser?.is_active !== false) {
+          console.log("✅ AuthContext: User is admin - GRANTING FULL ACCESS (no subscription check)");
+          
+          // Initialize email preferences for fresh login
+          try {
+            console.log("🔍 AuthContext: Initializing email preferences for admin user...");
+            const prefResponse = await fetch("/api/user/initialize-email-preferences", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ user_email: userEmail }),
+            });
+            
+            if (prefResponse.ok) {
+              const prefData = await prefResponse.json();
+              console.log("✅ AuthContext: Email preferences initialized:", prefData.message);
+            } else {
+              console.log("⚠️ AuthContext: Email preferences initialization failed, but continuing...");
+            }
+          } catch (prefError) {
+            console.log("⚠️ AuthContext: Email preferences initialization error, but continuing:", prefError);
+          }
+          
+          setAuthState({
+            isPrimaryUser: true, // Admins are treated as primary users
+            isSubUser: false,
+            hasActiveSubscription: true, // Grant access
+            hasFormData: true,
+            isCheckComplete: true,
+            subscriptionData: {
+              status: 'active',
+              plan: 'Admin Account',
+              amount: 0,
+              currency: 'USD',
+              billingInterval: 'admin'
+            }
+          });
+          return; // Exit early - no subscription checks needed
+        }
+      }
+      console.log("🔍 AuthContext: User is not an admin, proceeding with subscription checks...");
+
+      // SECOND: Check registration form to get user role
       console.log("🔍 AuthContext: Checking registration form for role...");
       const formResponse = await fetch(`/api/registrationform?email=${encodeURIComponent(userEmail)}`);
       let userRole = null;
@@ -72,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // SECOND: Check Stripe subscription
+      // THIRD: Check Stripe subscription
       console.log("🔍 AuthContext: Checking Stripe subscription...");
       const stripeResponse = await fetch("/api/stripe/subscription", {
         method: "POST",
@@ -116,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // THIRD: If no Stripe subscription, check if user is a sub user
+      // FOURTH: If no Stripe subscription, check if user is a sub user
       console.log("❌ AuthContext: No active Stripe subscription found, checking if user is a sub user...");
       
       const subUserResponse = await fetch("/api/subscription-users");
@@ -208,7 +254,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // FOURTH: If not a regular sub user, check if user is a wire transfer subscription user
+      // FIFTH: If not a regular sub user, check if user is a wire transfer subscription user
       console.log("❌ AuthContext: Not a regular sub user, checking if user is a wire transfer subscription user...");
       
       const wireTransferResponse = await fetch("/api/wire-transfer-subscriptions");
@@ -330,19 +376,57 @@ export function useProtectedPage() {
   const auth = useAuth();
   const router = useRouter();
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!auth.isAuthenticated || !auth.userEmail) {
+        setIsCheckingAdmin(false);
+        return;
+      }
+
+      try {
+        const adminResponse = await fetch("/api/admin-users");
+        if (adminResponse.ok) {
+          const adminData = await adminResponse.json();
+          setIsAdmin(adminData.isAdmin && adminData.adminUser?.is_active !== false);
+        }
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+        setIsAdmin(false);
+      } finally {
+        setIsCheckingAdmin(false);
+      }
+    };
+
+    if (auth.isAuthenticated && auth.userEmail) {
+      checkAdmin();
+    } else {
+      setIsCheckingAdmin(false);
+    }
+  }, [auth.isAuthenticated, auth.userEmail]);
 
   useEffect(() => {
-    if (!auth.isLoading && auth.isCheckComplete) {
+    if (!auth.isLoading && auth.isCheckComplete && !isCheckingAdmin) {
       console.log("🔍 ProtectedPage: Auth check complete:", {
         isAuthenticated: auth.isAuthenticated,
         hasActiveSubscription: auth.hasActiveSubscription,
         isSubUser: auth.isSubUser,
-        hasFormData: auth.hasFormData
+        hasFormData: auth.hasFormData,
+        isAdmin: isAdmin
       });
 
       if (!auth.isAuthenticated) {
         console.log("❌ ProtectedPage: Not authenticated, redirecting to login");
         router.push("/api/auth/login");
+        return;
+      }
+
+      // Admins have full access, bypass all subscription checks
+      if (isAdmin) {
+        console.log("✅ ProtectedPage: Admin user - GRANTING FULL ACCESS");
         return;
       }
 
@@ -364,11 +448,12 @@ export function useProtectedPage() {
           auth.hasActiveSubscription ? "Primary user with subscription" : "Sub user with access");
       }
     }
-  }, [auth, router]);
+  }, [auth, router, isAdmin, isCheckingAdmin]);
 
   return {
     ...auth,
     shouldRedirect,
-    isLoading: auth.isLoading || !auth.isCheckComplete,
+    isLoading: auth.isLoading || !auth.isCheckComplete || isCheckingAdmin,
+    isAdmin,
   };
 }
