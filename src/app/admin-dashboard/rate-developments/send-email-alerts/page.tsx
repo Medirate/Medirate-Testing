@@ -1,6 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AppLayout from "@/app/components/applayout";
+
+interface EmailRow {
+  id: number;
+  email: string;
+  firstname: string;
+  lastname: string;
+  company_name?: string;
+}
 
 export default function SendEmailAlertsPage() {
   const [loading, setLoading] = useState(false);
@@ -15,6 +23,22 @@ export default function SendEmailAlertsPage() {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewSubject, setPreviewSubject] = useState<string | null>(null);
   const [previewUser, setPreviewUser] = useState<string | null>(null);
+  
+  // Test email list state
+  const [testEmailList, setTestEmailList] = useState<EmailRow[]>([]);
+  const [testEmailSearch, setTestEmailSearch] = useState<string>("");
+  const [newTestEmail, setNewTestEmail] = useState({
+    email: "",
+    firstname: "",
+    lastname: "",
+    company_name: ""
+  });
+  const [editingEmail, setEditingEmail] = useState<{
+    table: "test_email_list";
+    email: string;
+    data: { email: string; firstname: string; lastname: string; company_name?: string };
+  } | null>(null);
+  const [loadingEmailList, setLoadingEmailList] = useState(false);
 
   const handleGeneratePreview = async () => {
     setSendingTo("preview");
@@ -83,6 +107,158 @@ export default function SendEmailAlertsPage() {
       setLoading(false);
       setSendingTo(null);
     }
+  };
+
+  // Load test email list
+  useEffect(() => {
+    loadEmailLists();
+  }, []);
+
+  const loadEmailLists = async () => {
+    try {
+      setLoadingEmailList(true);
+      const response = await fetch("/api/admin/marketing-emails/list");
+      
+      if (!response.ok) {
+        console.error("Failed to load email lists");
+        setLoadingEmailList(false);
+        return;
+      }
+      
+      const json = await response.json();
+      setTestEmailList(json.testEmailList || []);
+      setLoadingEmailList(false);
+    } catch (error) {
+      console.error("Failed to load email lists:", error);
+      setLoadingEmailList(false);
+    }
+  };
+
+  // Search filtering
+  const getFilteredTestEmails = () => {
+    if (!testEmailSearch.trim()) return testEmailList;
+    
+    const searchTerm = testEmailSearch.toLowerCase();
+    return testEmailList.filter(item => 
+      item.email.toLowerCase().includes(searchTerm) ||
+      item.firstname.toLowerCase().includes(searchTerm) ||
+      item.lastname.toLowerCase().includes(searchTerm) ||
+      (item.company_name && item.company_name.toLowerCase().includes(searchTerm))
+    );
+  };
+
+  // Add email
+  const handleAddEmail = async (emailData: {email: string, firstname: string, lastname: string, company_name: string}) => {
+    if (!emailData.email.trim()) return;
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailData.email)) {
+      alert("Please enter a valid email address");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/admin/marketing-emails/rows", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          table: "test_email_list",
+          email: emailData.email.trim(),
+          firstname: emailData.firstname.trim(),
+          lastname: emailData.lastname.trim(),
+          company_name: emailData.company_name?.trim() || ""
+        }),
+      });
+
+      if (response.ok) {
+        await loadEmailLists();
+        setNewTestEmail({ email: "", firstname: "", lastname: "", company_name: "" });
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to add email: ${errorData.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Error adding email:", error);
+      alert("Failed to add email. Please try again.");
+    }
+  };
+
+  // Delete email
+  const handleDeleteEmail = async (email: string) => {
+    if (!confirm(`Are you sure you want to delete ${email} from the test list?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/admin/marketing-emails/rows", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          table: "test_email_list",
+          email
+        }),
+      });
+
+      if (response.ok) {
+        await loadEmailLists();
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to delete email: ${errorData.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Error deleting email:", error);
+      alert("Failed to delete email. Please try again.");
+    }
+  };
+
+  // Edit email
+  const handleEditEmail = (item: EmailRow) => {
+    setEditingEmail({
+      table: "test_email_list",
+      email: item.email,
+      data: { ...item }
+    });
+  };
+
+  // Save edit
+  const handleSaveEdit = async () => {
+    if (!editingEmail) return;
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editingEmail.data.email)) {
+      alert("Please enter a valid email address");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/admin/marketing-emails/rows", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          table: editingEmail.table,
+          email: editingEmail.data.email.trim(),
+          firstname: editingEmail.data.firstname.trim(),
+          lastname: editingEmail.data.lastname.trim(),
+          company_name: editingEmail.data.company_name?.trim() || ""
+        }),
+      });
+
+      if (response.ok) {
+        await loadEmailLists();
+        setEditingEmail(null);
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to update email: ${errorData.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Error updating email:", error);
+      alert("Failed to update email. Please try again.");
+    }
+  };
+
+  // Cancel edit
+  const handleCancelEdit = () => {
+    setEditingEmail(null);
   };
 
   return (
@@ -156,6 +332,205 @@ export default function SendEmailAlertsPage() {
               )}
             </button>
           </div>
+        </div>
+
+        {/* Test Email List Section */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold text-[#012C61] mb-4">
+            Test Email List ({testEmailSearch ? `${getFilteredTestEmails().length}/${testEmailList.length}` : testEmailList.length} emails)
+          </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            These emails will receive alerts when you click "Send to Test Users". Click on any field to edit.
+          </p>
+          
+          {/* Add New Email Form */}
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-4">
+            <h5 className="text-sm font-medium text-blue-800 mb-3">➕ Add New Test Email</h5>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <input
+                type="email"
+                placeholder="Enter email address"
+                className="px-3 py-2 border border-blue-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={newTestEmail.email}
+                onChange={(e) => setNewTestEmail({...newTestEmail, email: e.target.value})}
+              />
+              <input
+                type="text"
+                placeholder="First name"
+                className="px-3 py-2 border border-blue-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={newTestEmail.firstname}
+                onChange={(e) => setNewTestEmail({...newTestEmail, firstname: e.target.value})}
+              />
+              <input
+                type="text"
+                placeholder="Last name"
+                className="px-3 py-2 border border-blue-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={newTestEmail.lastname}
+                onChange={(e) => setNewTestEmail({...newTestEmail, lastname: e.target.value})}
+              />
+              <input
+                type="text"
+                placeholder="Company name"
+                className="px-3 py-2 border border-blue-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={newTestEmail.company_name}
+                onChange={(e) => setNewTestEmail({...newTestEmail, company_name: e.target.value})}
+              />
+              <button
+                onClick={() => handleAddEmail(newTestEmail)}
+                disabled={!newTestEmail.email}
+                className={`px-4 py-2 rounded-md text-sm font-medium ${
+                  newTestEmail.email
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                Add Email
+              </button>
+            </div>
+          </div>
+
+          {/* Search Test Email List */}
+          <div className="mb-4">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="🔍 Search test emails by email, first name, last name, or company name..."
+                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={testEmailSearch}
+                onChange={(e) => setTestEmailSearch(e.target.value)}
+              />
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              {testEmailSearch && (
+                <button
+                  onClick={() => setTestEmailSearch("")}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {testEmailSearch && (
+              <div className="mt-2 text-sm text-gray-600">
+                Showing {getFilteredTestEmails().length} of {testEmailList.length} test emails
+              </div>
+            )}
+          </div>
+
+          {/* Test Email List Table */}
+          {loadingEmailList ? (
+            <div className="flex flex-col justify-center items-center h-32 bg-gray-50 rounded-lg">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-3 text-gray-600 mt-2">Loading email list...</span>
+            </div>
+          ) : (
+            <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">First Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {getFilteredTestEmails().map((item) => (
+                  <tr key={item.email} className="hover:bg-gray-50">
+                    {editingEmail?.table === "test_email_list" && editingEmail?.email === item.email ? (
+                      // Edit mode
+                      <>
+                        <td className="px-4 py-3">
+                          <input
+                            type="email"
+                            value={editingEmail.data.email}
+                            onChange={(e) => setEditingEmail({...editingEmail, data: {...editingEmail.data, email: e.target.value}})}
+                            className="w-full px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="text"
+                            value={editingEmail.data.firstname}
+                            onChange={(e) => setEditingEmail({...editingEmail, data: {...editingEmail.data, firstname: e.target.value}})}
+                            className="w-full px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="text"
+                            value={editingEmail.data.lastname}
+                            onChange={(e) => setEditingEmail({...editingEmail, data: {...editingEmail.data, lastname: e.target.value}})}
+                            className="w-full px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="text"
+                            value={editingEmail.data.company_name || ""}
+                            onChange={(e) => setEditingEmail({...editingEmail, data: {...editingEmail.data, company_name: e.target.value}})}
+                            className="w-full px-2 py-1 border border-blue-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleSaveEdit}
+                              className="text-green-600 hover:text-green-800 text-sm font-medium"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="text-gray-600 hover:text-gray-800 text-sm"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      // View mode
+                      <>
+                        <td className="px-4 py-3 text-sm text-gray-900 cursor-pointer hover:bg-blue-50" onClick={() => handleEditEmail(item)}>{item.email}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900 cursor-pointer hover:bg-blue-50" onClick={() => handleEditEmail(item)}>{item.firstname}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900 cursor-pointer hover:bg-blue-50" onClick={() => handleEditEmail(item)}>{item.lastname}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900 cursor-pointer hover:bg-blue-50" onClick={() => handleEditEmail(item)}>{item.company_name || "-"}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => handleEditEmail(item)}
+                              className="text-blue-600 hover:text-blue-800 text-sm"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEmail(item.email)}
+                              className="text-red-600 hover:text-red-800 text-sm"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+                {getFilteredTestEmails().length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                      {testEmailSearch ? `No test emails found matching "${testEmailSearch}"` : "No test emails yet. Add one using the form above."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Email Preview Section */}
