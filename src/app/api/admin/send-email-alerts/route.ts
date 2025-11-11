@@ -148,6 +148,7 @@ export async function POST(req: NextRequest) {
       alerts = alertsResult.data || [];
       
       // Fetch state plan amendments (handle case where is_new column might not exist yet)
+      logs.push("🔍 Fetching state plan amendments with is_new = 'yes'...");
       const spaResult = await supabase
         .from("state_plan_amendments")
         .select("*")
@@ -159,10 +160,22 @@ export async function POST(req: NextRequest) {
           logs.push(`⚠️ is_new column does not exist in state_plan_amendments yet. Skipping state plan amendments.`);
         } else {
           logs.push(`❌ Error fetching state plan amendments: ${spaResult.error.message}`);
+          logs.push(`❌ Error details: ${JSON.stringify(spaResult.error)}`);
           // Don't throw, just log the error and continue
         }
       } else {
         statePlanAmendments = spaResult.data || [];
+        logs.push(`✅ State plan amendments query returned ${statePlanAmendments.length} rows`);
+        
+        // Debug: Check if there are any state plan amendments at all (regardless of is_new)
+        const allSpaResult = await supabase
+          .from("state_plan_amendments")
+          .select("id, is_new, state, subject")
+          .limit(5);
+        
+        if (!allSpaResult.error && allSpaResult.data) {
+          logs.push(`🔍 Debug: Sample state plan amendments in DB (first 5): ${JSON.stringify(allSpaResult.data.map(r => ({ id: r.id, is_new: r.is_new, state: r.state })))}`);
+        }
       }
       
       logs.push(`✅ Found ${bills.length} new bills, ${alerts.length} new provider alerts, and ${statePlanAmendments.length} new state plan amendments`);
