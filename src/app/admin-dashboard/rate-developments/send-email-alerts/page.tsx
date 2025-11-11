@@ -4,6 +4,7 @@ import AppLayout from "@/app/components/applayout";
 
 export default function SendEmailAlertsPage() {
   const [loading, setLoading] = useState(false);
+  const [sendingTo, setSendingTo] = useState<"test" | "production" | "preview" | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [success, setSuccess] = useState<boolean | null>(null);
   const [summary, setSummary] = useState<{
@@ -11,8 +12,47 @@ export default function SendEmailAlertsPage() {
     usersWithAlerts: number;
     totalUsers: number;
   } | null>(null);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewSubject, setPreviewSubject] = useState<string | null>(null);
+  const [previewUser, setPreviewUser] = useState<string | null>(null);
 
-  const handleSendEmails = async () => {
+  const handleGeneratePreview = async () => {
+    setSendingTo("preview");
+    setLoading(true);
+    setLogs([]);
+    setSuccess(null);
+    setSummary(null);
+    setPreviewHtml(null);
+    setPreviewSubject(null);
+    setPreviewUser(null);
+    
+    try {
+      const response = await fetch("/api/admin/send-email-alerts", { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "preview" })
+      });
+      const data = await response.json();
+      
+      setLogs(data.logs || []);
+      setSuccess(data.success);
+      
+      if (data.success && data.previewHtml) {
+        setPreviewHtml(data.previewHtml);
+        setPreviewSubject(data.previewSubject);
+        setPreviewUser(data.previewUser);
+      }
+    } catch (error: any) {
+      setLogs([`❌ Error: ${error.message}`]);
+      setSuccess(false);
+    } finally {
+      setLoading(false);
+      setSendingTo(null);
+    }
+  };
+
+  const handleSendEmails = async (mode: "test" | "production") => {
+    setSendingTo(mode);
     setLoading(true);
     setLogs([]);
     setSuccess(null);
@@ -20,7 +60,9 @@ export default function SendEmailAlertsPage() {
     
     try {
       const response = await fetch("/api/admin/send-email-alerts", { 
-        method: "POST" 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode })
       });
       const data = await response.json();
       
@@ -39,6 +81,7 @@ export default function SendEmailAlertsPage() {
       setSuccess(false);
     } finally {
       setLoading(false);
+      setSendingTo(null);
     }
   };
 
@@ -55,25 +98,100 @@ export default function SendEmailAlertsPage() {
             and the new alerts (is_new = 'yes') in the database.
           </p>
           
-          <button
-            onClick={handleSendEmails}
-            disabled={loading}
-            className={`px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 ${
-              loading 
-                ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transform hover:scale-105'
-            }`}
-          >
-            {loading ? (
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Sending Email Notifications...
-              </div>
-            ) : (
-              '📧 Send Email Notifications'
-            )}
-          </button>
+          <div className="flex flex-wrap gap-4">
+            <button
+              onClick={handleGeneratePreview}
+              disabled={loading}
+              className={`px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 ${
+                loading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 transform hover:scale-105'
+              }`}
+            >
+              {loading && sendingTo === "preview" ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Generating Preview...
+                </div>
+              ) : (
+                '👁️ Generate Email Preview'
+              )}
+            </button>
+            
+            <button
+              onClick={() => handleSendEmails("test")}
+              disabled={loading}
+              className={`px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 ${
+                loading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 transform hover:scale-105'
+              }`}
+            >
+              {loading && sendingTo === "test" ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Sending to Test Users...
+                </div>
+              ) : (
+                '📧 Send to Test Users'
+              )}
+            </button>
+            
+            <button
+              onClick={() => handleSendEmails("production")}
+              disabled={loading}
+              className={`px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 ${
+                loading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transform hover:scale-105'
+              }`}
+            >
+              {loading && sendingTo === "production" ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Sending to All Users...
+                </div>
+              ) : (
+                '📢 Send to All Users'
+              )}
+            </button>
+          </div>
         </div>
+
+        {/* Email Preview Section */}
+        {previewHtml && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 className="text-xl font-semibold text-[#012C61] mb-4 flex items-center">
+              👁️ Email Preview
+              {previewUser && (
+                <span className="ml-2 text-sm text-gray-500 font-normal">
+                  (Sample for: {previewUser})
+                </span>
+              )}
+            </h2>
+            {previewSubject && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm font-semibold text-blue-800 mb-1">Subject Line:</div>
+                <div className="text-blue-900">{previewSubject}</div>
+              </div>
+            )}
+            <div className="border border-gray-300 rounded-md overflow-hidden bg-white shadow-lg">
+              <div className="bg-gray-100 px-4 py-2 border-b border-gray-300 flex items-center justify-between">
+                <span className="text-sm text-gray-600 font-medium">Email Preview</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                </div>
+              </div>
+              <div className="p-8 min-h-[500px] overflow-auto">
+                <div 
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Summary Card */}
         {summary && (

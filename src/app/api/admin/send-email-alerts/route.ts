@@ -84,7 +84,11 @@ export async function POST(req: NextRequest) {
   const logs: string[] = [];
   
   try {
-    logs.push("🔍 Starting email notification process...");
+    // Get mode from request body (preview, test, or production)
+    const body = await req.json().catch(() => ({}));
+    const mode = body.mode || 'production'; // preview, test, or production
+    
+    logs.push(`🔍 Starting email notification process (mode: ${mode})...`);
     
     // SECURITY: Validate admin authentication and authorization
     const { validateAdminAuth } = await import("@/lib/admin-auth");
@@ -188,7 +192,21 @@ export async function POST(req: NextRequest) {
     logs.push("👥 Fetching users and preferences...");
     
     let users: any[] = [];
+    let testEmails: Set<string> = new Set();
+    
     try {
+      // Fetch test email list if in test mode
+      if (mode === 'test') {
+        const testResult = await supabase
+          .from("test_email_list")
+          .select("email");
+        
+        if (!testResult.error && testResult.data) {
+          testEmails = new Set(testResult.data.map((row: any) => row.email.toLowerCase()));
+          logs.push(`✅ Found ${testEmails.size} test emails`);
+        }
+      }
+      
       const usersResult = await supabase
         .from("user_email_preferences")
         .select("*");
@@ -197,13 +215,22 @@ export async function POST(req: NextRequest) {
         logs.push(`❌ Error fetching users: ${usersResult.error.message}`);
         throw new Error(`Error fetching users: ${usersResult.error.message}`);
       }
-      users = usersResult.data || [];
+      
+      let allUsers = usersResult.data || [];
+      
+      // Filter users based on mode
+      if (mode === 'test') {
+        users = allUsers.filter((u: any) => testEmails.has(u.user_email.toLowerCase()));
+        logs.push(`✅ Filtered to ${users.length} test users out of ${allUsers.length} total users`);
+      } else {
+        users = allUsers;
+      }
       
       logs.push(`✅ Found ${users.length} users with preferences`);
       
       if (users.length === 0) {
-        logs.push("⚠️ No users found to send emails to");
-        return NextResponse.json({ success: true, logs, emailsSent: 0 });
+        logs.push(`⚠️ No users found to send emails to (mode: ${mode})`);
+        return NextResponse.json({ success: true, logs, emailsSent: 0, mode });
       }
     } catch (dbError: unknown) {
       const errorMsg =
@@ -299,6 +326,249 @@ export async function POST(req: NextRequest) {
     }
     
     logs.push(`✅ Processed ${processedAlerts.length} total alerts for matching`);
+    
+    // 4. Generate email preview or send personalized emails
+    if (mode === 'preview') {
+      // Preview mode: generate a sample email for the first user with relevant alerts
+      logs.push("👁️ Generating email preview...");
+      
+      // Find first user with relevant alerts for preview
+      let previewUser: any = null;
+      let previewHtml = '';
+      let previewSubject = '';
+      
+      for (const user of users) {
+        const email = user.user_email;
+        const preferences = user.preferences as any;
+        
+        if (!preferences) continue;
+        
+        const userStatesRaw = Array.isArray(preferences.states)
+          ? preferences.states.filter((s: any) => typeof s === "string" && s.trim())
+          : [];
+        const userStates = new Set<string>();
+        for (const s of userStatesRaw) {
+          normalizeState(String(s)).forEach(state => userStates.add(state));
+        }
+        
+        const userCategories = new Set<string>();
+        if (Array.isArray(preferences.categories)) {
+          for (const c of preferences.categories) {
+            if (typeof c === "string" && c.trim()) {
+              userCategories.add(c.trim().toUpperCase());
+            }
+          }
+        }
+        
+        if (userStates.size === 0 || userCategories.size === 0) continue;
+        
+        const relevantAlerts = processedAlerts.filter(pa => {
+          const stateMatch = Array.from(pa.stateNorm).some(state => userStates.has(state));
+          const categoryMatch = Array.from(pa.serviceLines).some(category => userCategories.has(category));
+          return stateMatch && categoryMatch;
+        });
+        
+        if (relevantAlerts.length > 0) {
+          previewUser = user;
+          // Generate email HTML for this user
+          const alertCards: string[] = [];
+          for (const pa of relevantAlerts) {
+            const alert = pa.alert;
+            const source = pa.source;
+            const state = getFullStateName(alert.state);
+            const url = alert.url || alert.link || "#";
+            const serviceLines = pa.serviceLines.size > 0 ? Array.from(pa.serviceLines).join(', ') : "N/A";
+            
+            if (source === 'bill') {
+              const title = alert.name || alert.bill_number || "No Title";
+              const summary = alert.ai_summary || "No summary available.";
+              const status = alert.bill_progress;
+              const lastAction = alert.last_action;
+              const actionDate = alert.action_date;
+              const sponsors = alert.sponsor_list;
+              
+              const details: string[] = [];
+              if (status) details.push(`<b>Status:</b> ${status}`);
+              if (lastAction) details.push(`<b>Last Action:</b> ${lastAction}`);
+              if (actionDate) details.push(`<b>Action Date:</b> ${formatExcelOrStringDate(actionDate)}`);
+              if (sponsors) details.push(`<b>Sponsors:</b> ${sponsors}`);
+              
+              alertCards.push(`
+                <div class="alert-card" style="background:#f8fafc; border-radius:0; box-shadow:none; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:32px 40px; font-family:Arial,sans-serif; color:#0F3557; box-sizing:border-box; margin:32px 48px;">
+                  <div style="font-size:16px; font-weight:bold; margin-bottom:8px; color:#0F3557;">
+                    ${state}: ${title}
+                  </div>
+                  <div style="font-size:14px; margin-bottom:4px;">
+                    <span style="font-weight:600; color:#1e293b;">Service Lines:</span>
+                    <span style="color:#334155;">${serviceLines}</span>
+                  </div>
+                  <div style="font-size:14px; margin-bottom:12px;">
+                    <span style="font-weight:600; color:#1e293b;">Summary:</span>
+                    <span style="color:#334155;">${summary}</span>
+                  </div>
+                  ${details.length > 0 ? `<div style="font-size:13px; margin-bottom:8px;">${details.join('<br>')}</div>` : ''}
+                  <a href="${url}" style="display:inline-block; background:#0F3557; color:#fff; text-decoration:none; padding:10px 20px; border-radius:6px; font-weight:bold; font-size:14px; margin-top:8px;">
+                    View Details
+                  </a>
+                </div>
+              `);
+            } else if (source === 'provider_alert') {
+              const subject = alert.subject || "No Title";
+              const summary = alert.summary || "";
+              const announcementDate = alert.announcement_date;
+              
+              const details: string[] = [];
+              if (announcementDate) details.push(`<b>Announcement Date:</b> ${formatExcelOrStringDate(announcementDate)}`);
+              
+              alertCards.push(`
+                <div class="alert-card" style="background:#f8fafc; border-radius:0; box-shadow:none; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:32px 40px; font-family:Arial,sans-serif; color:#0F3557; box-sizing:border-box; margin:32px 48px;">
+                  <div style="font-size:16px; font-weight:bold; margin-bottom:8px; color:#0F3557;">
+                    ${state}: ${subject}
+                  </div>
+                  <div style="font-size:14px; margin-bottom:4px;">
+                    <span style="font-weight:600; color:#1e293b;">Service Lines:</span>
+                    <span style="color:#334155;">${serviceLines}</span>
+                  </div>
+                  ${summary ? `<div style="font-size:14px; margin-bottom:12px;"><span style="font-weight:600; color:#1e293b;">Summary:</span> <span style="color:#334155;">${summary}</span></div>` : ''}
+                  ${details.length > 0 ? `<div style="font-size:13px; margin-bottom:8px;">${details.join('<br>')}</div>` : ''}
+                  <a href="${url}" style="display:inline-block; background:#0F3557; color:#fff; text-decoration:none; padding:10px 20px; border-radius:6px; font-weight:bold; font-size:14px; margin-top:8px;">
+                    View Details
+                  </a>
+                </div>
+              `);
+            } else if (source === 'state_plan_amendment') {
+              const subject = alert.subject || alert['Transmittal Number'] || alert.transmittal_number || "No Title";
+              const transmittalNumber = alert['Transmittal Number'] || alert.transmittal_number || "";
+              const effectiveDate = alert['Effective Date'] || alert.effective_date;
+              const approvalDate = alert['Approval Date'] || alert.approval_date;
+              
+              const details: string[] = [];
+              if (transmittalNumber) details.push(`<b>Transmittal Number:</b> ${transmittalNumber}`);
+              if (effectiveDate) details.push(`<b>Effective Date:</b> ${formatExcelOrStringDate(effectiveDate)}`);
+              if (approvalDate) details.push(`<b>Approval Date:</b> ${formatExcelOrStringDate(approvalDate)}`);
+              
+              alertCards.push(`
+                <div class="alert-card" style="background:#f8fafc; border-radius:0; box-shadow:none; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:32px 40px; font-family:Arial,sans-serif; color:#0F3557; box-sizing:border-box; margin:32px 48px;">
+                  <div style="font-size:16px; font-weight:bold; margin-bottom:8px; color:#0F3557;">
+                    ${state}: ${subject}
+                  </div>
+                  <div style="font-size:14px; margin-bottom:4px;">
+                    <span style="font-weight:600; color:#1e293b;">Service Lines:</span>
+                    <span style="color:#334155;">${serviceLines}</span>
+                  </div>
+                  ${details.length > 0 ? `<div style="font-size:13px; margin-bottom:8px;">${details.join('<br>')}</div>` : ''}
+                  <a href="${url}" style="display:inline-block; background:#0F3557; color:#fff; text-decoration:none; padding:10px 20px; border-radius:6px; font-weight:bold; font-size:14px; margin-top:8px;">
+                    View Details
+                  </a>
+                </div>
+              `);
+            }
+          }
+          
+          const alertCardsHtml = alertCards.join("\n");
+          previewHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Medicaid Alerts</title>
+                <style>
+                @media only screen and (max-width: 600px) {
+                    .alert-card {
+                    padding: 16px 4% !important;
+                    font-size: 15px !important;
+                    margin: 16px 2% !important;
+                  }
+                  .main-content {
+                    padding: 0 !important;
+                        }
+                    }
+                </style>
+            </head>
+            <body style="margin:0; padding:0; background:#f4f4f4; font-family: Arial, sans-serif;">
+              <table width="100%" bgcolor="#f4f4f4" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <!-- Header -->
+                    <div style="background:#0F3557; padding:30px 0 20px 0; border-radius:0;">
+                      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                        <tr>
+                          <td align="left" style="padding-left:30px;">
+                            <img src="https://raw.githubusercontent.com/Medirate/Medirate-Developement/main/public/top-black-just-word.png" alt="MediRate Wordmark" style="max-width:200px; width:90%; display:block;">
+                          </td>
+                          <td align="right" style="padding-right:30px;">
+                            <img src="https://raw.githubusercontent.com/Medirate/Medirate-Developement/main/public/top-black-just-logo.png" alt="MediRate Logo" style="max-width:80px; width:80px; display:block;">
+                          </td>
+                        </tr>
+                      </table>
+                    </div>
+                    <!-- Main Content -->
+                    <div class="main-content" style="padding:0; margin:0;">
+                      <h2 style="color:#0F3557; font-size:22px; margin:30px 0 10px 0; text-align:center;">New Medicaid Alerts Available</h2>
+                      <p style="color:#555; text-align:center; margin:0 0 20px 0;">Here are the latest updates related to Medicaid provider changes:</p>
+                      <!-- Dynamic Alert Cards -->
+                      ${alertCardsHtml}
+                      <div style="text-align:center; margin:30px 0;">
+                        <a href="https://MediRate-developement.vercel.app/rate-developments" style="background:#0F3557; color:#fff; text-decoration:none; padding:14px 28px; border-radius:5px; font-weight:bold; font-size:16px; display:inline-block;">View Full Rate Developments</a>
+                        </div>
+                    </div>
+                    <!-- Footer -->
+                    <div style="background:#0F3557; color:#fff; font-size:13px; padding:12px; border-radius:0; text-align:center;">
+                      © 2024 MediRate. All rights reserved.
+                </div>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+          `;
+          previewSubject = `New Medicaid Alerts Relevant to You - ${relevantAlerts.length} Updates`;
+          break;
+        }
+      }
+      
+      if (!previewUser) {
+        logs.push("⚠️ No users with relevant alerts found for preview");
+        return NextResponse.json({ 
+          success: true, 
+          logs, 
+          mode: 'preview',
+          previewHtml: null,
+          previewSubject: null,
+          message: "No users with relevant alerts found for preview"
+        });
+      }
+      
+      logs.push(`✅ Generated preview for user: ${previewUser.user_email} with ${processedAlerts.filter(pa => {
+        const preferences = previewUser.preferences as any;
+        const userStatesRaw = Array.isArray(preferences.states) ? preferences.states.filter((s: any) => typeof s === "string" && s.trim()) : [];
+        const userStates = new Set<string>();
+        for (const s of userStatesRaw) {
+          normalizeState(String(s)).forEach(state => userStates.add(state));
+        }
+        const userCategories = new Set<string>();
+        if (Array.isArray(preferences.categories)) {
+          for (const c of preferences.categories) {
+            if (typeof c === "string" && c.trim()) {
+              userCategories.add(c.trim().toUpperCase());
+            }
+          }
+        }
+        const stateMatch = Array.from(pa.stateNorm).some(state => userStates.has(state));
+        const categoryMatch = Array.from(pa.serviceLines).some(category => userCategories.has(category));
+        return stateMatch && categoryMatch;
+      }).length} relevant alerts`);
+      
+      return NextResponse.json({ 
+        success: true, 
+        logs, 
+        mode: 'preview',
+        previewHtml,
+        previewSubject,
+        previewUser: previewUser.user_email,
+        totalAlerts: processedAlerts.length
+      });
+    }
     
     // 4. Send personalized emails (same logic as Python code)
     logs.push("📧 Sending personalized email notifications...");
@@ -589,7 +859,8 @@ export async function POST(req: NextRequest) {
       logs, 
       emailsSent,
       usersWithAlerts,
-      totalUsers: users.length
+      totalUsers: users.length,
+      mode
     });
     
   } catch (error: unknown) {
