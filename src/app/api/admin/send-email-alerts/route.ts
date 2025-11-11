@@ -384,19 +384,36 @@ export async function POST(req: NextRequest) {
         const relevantAlerts = processedAlerts.filter(pa => {
           const stateMatch = Array.from(pa.stateNorm).some(state => userStates.has(state));
           const categoryMatch = Array.from(pa.serviceLines).some(category => userCategories.has(category));
-          return stateMatch && categoryMatch;
+          const isRelevant = stateMatch && categoryMatch;
+          
+          // Debug: Log why each alert is or isn't relevant
+          if (pa.source === 'state_plan_amendment') {
+            const alertState = getFullStateName(pa.alert.state);
+            const alertServiceLines = Array.from(pa.serviceLines).join(', ') || 'N/A';
+            logs.push(`🔍 SPA Match Check: State="${alertState}" (normalized: ${Array.from(pa.stateNorm).join(', ')}), ServiceLines="${alertServiceLines}"`);
+            logs.push(`   User States: ${Array.from(userStates).join(', ')}`);
+            logs.push(`   User Categories: ${Array.from(userCategories).join(', ')}`);
+            logs.push(`   State Match: ${stateMatch}, Category Match: ${categoryMatch}, Relevant: ${isRelevant}`);
+          }
+          
+          return isRelevant;
         });
         
         if (relevantAlerts.length > 0) {
           previewUser = user;
           // Generate email HTML for this user
-          const alertCards: string[] = [];
+          // Group alerts by type
+          const billsAlerts = relevantAlerts.filter(pa => pa.source === 'bill');
+          const providerAlerts = relevantAlerts.filter(pa => pa.source === 'provider_alert');
+          const spaAlerts = relevantAlerts.filter(pa => pa.source === 'state_plan_amendment');
           
           // Debug: Log what types of alerts are in relevantAlerts
           const alertTypes = relevantAlerts.map(pa => pa.source);
           logs.push(`📊 Preview: Found ${relevantAlerts.length} relevant alerts - Types: ${alertTypes.join(', ')}`);
+          logs.push(`📊 Preview: Breakdown - ${billsAlerts.length} bills, ${providerAlerts.length} provider alerts, ${spaAlerts.length} state plan amendments`);
           
-          for (const pa of relevantAlerts) {
+          // Helper function to generate alert card HTML
+          const generateAlertCard = (pa: ProcessedAlert) => {
             const alert = pa.alert;
             const source = pa.source;
             const state = getFullStateName(alert.state);
@@ -423,7 +440,7 @@ export async function POST(req: NextRequest) {
               if (actionDate) details.push(`<b>Action Date:</b> ${formatExcelOrStringDate(actionDate)}`);
               if (sponsors) details.push(`<b>Sponsors:</b> ${sponsors}`);
               
-              alertCards.push(`
+              return `
                 <div class="alert-card" style="background:#f8fafc; border-radius:0; box-shadow:none; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:32px 40px; font-family:Arial,sans-serif; color:#0F3557; box-sizing:border-box; margin:32px 48px;">
                   <div style="font-size:16px; font-weight:bold; margin-bottom:8px; color:#0F3557;">
                     ${state}: ${title}
@@ -441,7 +458,7 @@ export async function POST(req: NextRequest) {
                     View Details
                   </a>
                 </div>
-              `);
+              `;
             } else if (source === 'provider_alert') {
               const subject = alert.subject || "No Title";
               const summary = alert.summary || "";
@@ -450,7 +467,7 @@ export async function POST(req: NextRequest) {
               const details: string[] = [];
               if (announcementDate) details.push(`<b>Announcement Date:</b> ${formatExcelOrStringDate(announcementDate)}`);
               
-              alertCards.push(`
+              return `
                 <div class="alert-card" style="background:#f8fafc; border-radius:0; box-shadow:none; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:32px 40px; font-family:Arial,sans-serif; color:#0F3557; box-sizing:border-box; margin:32px 48px;">
                   <div style="font-size:16px; font-weight:bold; margin-bottom:8px; color:#0F3557;">
                     ${state}: ${subject}
@@ -465,7 +482,7 @@ export async function POST(req: NextRequest) {
                     View Details
                   </a>
                 </div>
-              `);
+              `;
             } else if (source === 'state_plan_amendment') {
               const subject = alert.subject || alert['Transmittal Number'] || alert.transmittal_number || "No Title";
               const transmittalNumber = alert['Transmittal Number'] || alert.transmittal_number || "";
@@ -477,7 +494,7 @@ export async function POST(req: NextRequest) {
               if (effectiveDate) details.push(`<b>Effective Date:</b> ${formatExcelOrStringDate(effectiveDate)}`);
               if (approvalDate) details.push(`<b>Approval Date:</b> ${formatExcelOrStringDate(approvalDate)}`);
               
-              alertCards.push(`
+              return `
                 <div class="alert-card" style="background:#f8fafc; border-radius:0; box-shadow:none; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:32px 40px; font-family:Arial,sans-serif; color:#0F3557; box-sizing:border-box; margin:32px 48px;">
                   <div style="font-size:16px; font-weight:bold; margin-bottom:8px; color:#0F3557;">
                     ${state}: ${subject}
@@ -491,11 +508,53 @@ export async function POST(req: NextRequest) {
                     View Details
                   </a>
                 </div>
-              `);
+              `;
             }
+            return '';
+          };
+          
+          // Generate cards for each category
+          const billsCards = billsAlerts.map(generateAlertCard).join("\n");
+          const providerCards = providerAlerts.map(generateAlertCard).join("\n");
+          const spaCards = spaAlerts.map(generateAlertCard).join("\n");
+          
+          // Build category sections
+          const categorySections: string[] = [];
+          
+          if (billsAlerts.length > 0) {
+            categorySections.push(`
+              <div style="margin:40px 48px 20px 48px;">
+                <h3 style="color:#0F3557; font-size:20px; font-weight:bold; margin-bottom:16px; border-bottom:2px solid #0F3557; padding-bottom:8px;">
+                  📜 Legislative Updates (${billsAlerts.length})
+                </h3>
+                ${billsCards}
+              </div>
+            `);
           }
           
-          const alertCardsHtml = alertCards.join("\n");
+          if (providerAlerts.length > 0) {
+            categorySections.push(`
+              <div style="margin:40px 48px 20px 48px;">
+                <h3 style="color:#0F3557; font-size:20px; font-weight:bold; margin-bottom:16px; border-bottom:2px solid #0F3557; padding-bottom:8px;">
+                  📢 Provider Alerts (${providerAlerts.length})
+                </h3>
+                ${providerCards}
+              </div>
+            `);
+          }
+          
+          if (spaAlerts.length > 0) {
+            categorySections.push(`
+              <div style="margin:40px 48px 20px 48px;">
+                <h3 style="color:#0F3557; font-size:20px; font-weight:bold; margin-bottom:16px; border-bottom:2px solid #0F3557; padding-bottom:8px;">
+                  📋 State Plan Amendments (${spaAlerts.length})
+                </h3>
+                ${spaCards}
+              </div>
+            `);
+          }
+          
+          const alertCardsHtml = categorySections.join("\n");
           previewHtml = `
             <!DOCTYPE html>
             <html>
