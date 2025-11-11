@@ -160,7 +160,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               });
               return;
             } else {
-              console.log("❌ AuthContext: Primary user does not have active subscription");
+              console.log("❌ AuthContext: Primary user does not have active Stripe subscription, checking wire transfer...");
+              
+              // Check if primary user has wire transfer subscription
+              const primaryUserWireTransferResponse = await fetch(`/api/wire-transfer-subscriptions?email=${encodeURIComponent(primaryUserEmail)}`);
+              
+              if (primaryUserWireTransferResponse.ok) {
+                const primaryUserWireTransferData = await primaryUserWireTransferResponse.json();
+                const primaryUserHasWireTransfer = primaryUserWireTransferData.isWireTransferUser;
+                
+                console.log("🔍 AuthContext: Primary user wire transfer check result:", { 
+                  primaryUserEmail, 
+                  hasWireTransfer: primaryUserHasWireTransfer 
+                });
+                
+                if (primaryUserHasWireTransfer && primaryUserWireTransferData.wireTransferData) {
+                  console.log("✅ AuthContext: Sub user has access through primary user's wire transfer subscription");
+                  setAuthState({
+                    isPrimaryUser: false,
+                    isSubUser: true,
+                    hasActiveSubscription: true, // Treat as having active subscription for access
+                    hasFormData: hasFormData,
+                    isCheckComplete: true,
+                    subscriptionData: {
+                      status: 'active',
+                      plan: 'Wire Transfer Subscription (via Primary User)',
+                      amount: 0,
+                      currency: 'USD',
+                      billingInterval: 'wire_transfer',
+                      startDate: primaryUserWireTransferData.wireTransferData.subscriptionStartDate,
+                      endDate: primaryUserWireTransferData.wireTransferData.subscriptionEndDate
+                    },
+                    primaryUserEmail: primaryUserEmail,
+                    isWireTransferUser: false // Sub-user themselves is not wire transfer user
+                  });
+                  return;
+                } else {
+                  console.log("❌ AuthContext: Primary user does not have wire transfer subscription either");
+                }
+              } else {
+                console.log("⚠️ AuthContext: Failed to check primary user's wire transfer subscription");
+              }
               // Will fall through to show appropriate message
             }
           }

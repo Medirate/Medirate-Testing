@@ -5,26 +5,40 @@ import { getKindeServerSession } from "@kinde-oss/kinde-auth-nextjs/server";
 // Initialize Supabase Client
 const supabase = createServiceClient();
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { getUser } = getKindeServerSession();
-    const user = await getUser();
+    const { searchParams } = new URL(request.url);
+    const checkEmail = searchParams.get("email"); // Optional email parameter to check
+    
+    let emailToCheck: string;
+    
+    if (checkEmail) {
+      // If email parameter is provided, use it (for checking primary user's wire transfer)
+      emailToCheck = checkEmail;
+      console.log("🔵 Wire Transfer API: Checking wire transfer for specified email:", emailToCheck);
+    } else {
+      // Otherwise, check the logged-in user
+      const { getUser } = getKindeServerSession();
+      const user = await getUser();
 
-    console.log("🔵 Wire Transfer API: getUser result:", { user: user ? { email: user.email, id: user.id } : null });
+      console.log("🔵 Wire Transfer API: getUser result:", { user: user ? { email: user.email, id: user.id } : null });
 
-    if (!user || !user.email) {
-      console.error("❌ Unauthorized: User or email is missing.");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      if (!user || !user.email) {
+        console.error("❌ Unauthorized: User or email is missing.");
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      
+      emailToCheck = user.email;
     }
 
-    console.log("🔵 Checking wire transfer subscription status for:", user.email);
+    console.log("🔵 Checking wire transfer subscription status for:", emailToCheck);
 
-    // Check if the current user exists in wire_transfer_subscriptions table
-    console.log("🔵 Querying wire_transfer_subscriptions for:", user.email);
+    // Check if the specified user exists in wire_transfer_subscriptions table
+    console.log("🔵 Querying wire_transfer_subscriptions for:", emailToCheck);
     const { data: wireTransferData, error: wireTransferError } = await supabase
       .from("wire_transfer_subscriptions")
       .select("*")
-      .eq("user_email", user.email)
+      .eq("user_email", emailToCheck)
       .eq("status", "active")
       .single();
 
@@ -33,7 +47,7 @@ export async function GET() {
     if (wireTransferError) {
       if (wireTransferError.code === 'PGRST116') {
         // No rows found - user is not in wire transfer subscriptions
-        console.log(`❌ User ${user.email} not found in wire transfer subscriptions`);
+        console.log(`❌ User ${emailToCheck} not found in wire transfer subscriptions`);
         return NextResponse.json({ 
           isWireTransferUser: false,
           wireTransferData: null
@@ -44,14 +58,14 @@ export async function GET() {
     }
 
     if (wireTransferData) {
-      console.log(`✅ User ${user.email} found in wire transfer subscriptions`);
+      console.log(`✅ User ${emailToCheck} found in wire transfer subscriptions`);
       
       // Check if subscription is still active (not expired)
       const now = new Date();
       const endDate = wireTransferData.subscription_end_date ? new Date(wireTransferData.subscription_end_date) : null;
       
       if (endDate && endDate < now) {
-        console.log(`❌ Wire transfer subscription for ${user.email} has expired`);
+        console.log(`❌ Wire transfer subscription for ${emailToCheck} has expired`);
         return NextResponse.json({ 
           isWireTransferUser: false,
           wireTransferData: null,
