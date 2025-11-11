@@ -781,16 +781,9 @@ export async function POST(req: NextRequest) {
       let insertedSpa = [];
       if (finalNewSpaEntries.length > 0) {
         // Include all columns including id for new insertions
-        // Only add is_new if the column exists (will be handled by database default if column exists)
+        // Set is_new = 'yes' for new entries (same as provider_alerts)
         const batchToInsertSpa = finalNewSpaEntries.map((entry) => {
-          const obj = { ...entry };
-          // Try to add is_new, but don't fail if column doesn't exist
-          // The database will use default value if column exists
-          try {
-            obj.is_new = 'yes';
-          } catch (e) {
-            // Column might not exist yet, that's okay
-          }
+          const obj = { ...entry, is_new: 'yes' };
           return obj;
         });
         
