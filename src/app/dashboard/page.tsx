@@ -431,7 +431,8 @@ export default function Dashboard() {
   const [showUsageModal, setShowUsageModal] = useState(false);
   const [pendingExportRowCount, setPendingExportRowCount] = useState(0);
   const [showCsvWarningModal, setShowCsvWarningModal] = useState(false);
-  const [pendingCsvExport, setPendingCsvExport] = useState<{ rowCount: number; proceed: () => void } | null>(null);
+  const [pendingCsvExport, setPendingCsvExport] = useState<{ rowCount: number; proceed: () => void; primaryUserEmail?: string } | null>(null);
+  const [isPreparingExport, setIsPreparingExport] = useState(false);
   
   const itemsPerPage = 50; // Adjust this number based on your needs
 
@@ -1141,6 +1142,20 @@ export default function Dashboard() {
     return null;
   };
 
+  // Get primary user email for the current user
+  const getPrimaryUserEmail = async (): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/excel-export/check-usage');
+      if (response.ok) {
+        const data = await response.json();
+        return data.primaryUserEmail || null;
+      }
+    } catch (error) {
+      console.error('Error getting primary user email:', error);
+    }
+    return null;
+  };
+
   // Export function to fetch ALL data and convert to Excel with protection
   const handleExportExcel = async () => {
     if (!hasSearched || data.length === 0) {
@@ -1403,6 +1418,8 @@ export default function Dashboard() {
       return;
     }
 
+    setIsPreparingExport(true);
+
     // First, get the total row count to show in warning
     try {
       // Build filters from current selections
@@ -1439,13 +1456,19 @@ export default function Dashboard() {
 
       if (totalRowCount === 0) {
         alert('No data available to export.');
+        setIsPreparingExport(false);
         return;
       }
 
-      // Check usage
-      const usage = await checkExportUsage();
+      // Check usage and get primary user email in parallel
+      const [usage, primaryUserEmail] = await Promise.all([
+        checkExportUsage(),
+        getPrimaryUserEmail()
+      ]);
+
       if (!usage) {
         alert('Failed to check export limits. Please try again.');
+        setIsPreparingExport(false);
         return;
       }
 
@@ -1453,18 +1476,22 @@ export default function Dashboard() {
       if (totalRowCount > usage.rowsRemaining) {
         setPendingExportRowCount(totalRowCount);
         setShowUsageModal(true);
+        setIsPreparingExport(false);
         return;
       }
 
       // Show warning modal with usage info
       setPendingCsvExport({
         rowCount: totalRowCount,
-        proceed: () => performCsvExport(filters, totalRowCount)
+        proceed: () => performCsvExport(filters, totalRowCount),
+        primaryUserEmail: primaryUserEmail || undefined
       });
       setShowCsvWarningModal(true);
+      setIsPreparingExport(false);
     } catch (err) {
       console.error('❌ Error preparing export:', err);
       alert(`Failed to prepare export: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setIsPreparingExport(false);
     }
   };
 
@@ -2644,22 +2671,22 @@ export default function Dashboard() {
               <div className="relative group">
                 <button
                   onClick={handleExport}
-                  disabled={isExporting || !hasSearched || data.length === 0}
+                  disabled={isExporting || isPreparingExport || !hasSearched || data.length === 0}
                   className={clsx(
                     "px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 border",
-                    isExporting || !hasSearched || data.length === 0
+                    isExporting || isPreparingExport || !hasSearched || data.length === 0
                       ? "bg-gray-50 text-gray-400 cursor-not-allowed border-gray-200"
                       : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm"
                   )}
-                  title={isExporting ? 'Exporting all data...' : 'Export all data to CSV with watermark (includes all pages)'}
+                  title={isExporting ? 'Exporting all data...' : isPreparingExport ? 'Preparing export...' : 'Export all data to CSV with watermark (includes all pages)'}
                 >
-                  {isExporting ? (
+                  {isExporting || isPreparingExport ? (
                     <span className="flex items-center gap-2">
                       <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Exporting...
+                      {isExporting ? 'Exporting...' : 'Preparing...'}
                     </span>
                   ) : (
                     <span className="flex items-center gap-2">
@@ -2720,6 +2747,21 @@ export default function Dashboard() {
                         <span className="font-semibold text-gray-900">{pendingCsvExport.rowCount.toLocaleString()} rows</span>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <p className="text-xs font-medium text-amber-900 mb-2">📋 Important Note</p>
+                    <p className="text-xs text-amber-800">
+                      This limit is shared across <strong>all users</strong> in your subscription (primary user and sub-users combined).
+                      {pendingCsvExport.primaryUserEmail && (
+                        <>
+                          <br />
+                          <span className="mt-1 block">
+                            <strong>Subscription Manager:</strong> {pendingCsvExport.primaryUserEmail}
+                          </span>
+                        </>
+                      )}
+                    </p>
                   </div>
 
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">

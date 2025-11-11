@@ -119,6 +119,7 @@ async function getBillingPeriod(
     }
   } else {
     // Wire transfer: calculate monthly cycles from subscription dates
+    // Resets on the same day each month (anniversary date)
     const { data: wireTransferData } = await supabase
       .from("wire_transfer_subscriptions")
       .select("subscription_start_date, subscription_end_date")
@@ -130,21 +131,36 @@ async function getBillingPeriod(
       const startDate = new Date(wireTransferData.subscription_start_date);
       const now = new Date();
       
-      // Calculate which month we're in (from start date)
-      const monthsSinceStart = (now.getFullYear() - startDate.getFullYear()) * 12 + 
-                               (now.getMonth() - startDate.getMonth());
+      // Get the day of month from the start date (anniversary day)
+      const anniversaryDay = startDate.getDate();
       
-      // Calculate period start (beginning of current month cycle)
-      const periodStart = new Date(startDate);
-      periodStart.setMonth(startDate.getMonth() + monthsSinceStart);
-      periodStart.setDate(1);
+      // Calculate current period start (same day of month as start date, in current or previous month)
+      const periodStart = new Date(now.getFullYear(), now.getMonth(), anniversaryDay);
       periodStart.setHours(0, 0, 0, 0);
       
-      // Calculate period end (end of current month cycle)
+      // If the anniversary day hasn't occurred yet this month, use previous month
+      if (now.getDate() < anniversaryDay) {
+        periodStart.setMonth(periodStart.getMonth() - 1);
+      }
+      
+      // Ensure period start is not before subscription start date
+      if (periodStart < startDate) {
+        periodStart.setTime(startDate.getTime());
+        periodStart.setHours(0, 0, 0, 0);
+      }
+      
+      // Calculate period end (one month from period start, same day of month)
       const periodEnd = new Date(periodStart);
       periodEnd.setMonth(periodEnd.getMonth() + 1);
-      periodEnd.setDate(0); // Last day of month
+      periodEnd.setDate(anniversaryDay);
       periodEnd.setHours(23, 59, 59, 999);
+      
+      // Handle months with fewer days (e.g., Jan 31 -> Feb 28/29)
+      // If the target day doesn't exist in the next month, use last day of that month
+      if (periodEnd.getDate() !== anniversaryDay) {
+        periodEnd.setDate(0); // Last day of previous month (which is the target month)
+        periodEnd.setHours(23, 59, 59, 999);
+      }
       
       // If subscription has an end date and period end exceeds it, use subscription end
       if (wireTransferData.subscription_end_date) {
@@ -272,13 +288,14 @@ export async function GET() {
 
     const rowsRemaining = Math.max(0, usage.rowsLimit - usage.rowsUsed);
 
-    const response: UsageInfo = {
+    const response: UsageInfo & { primaryUserEmail?: string } = {
       rowsUsed: usage.rowsUsed,
       rowsLimit: usage.rowsLimit,
       rowsRemaining,
       currentPeriodStart: usage.periodStart.toISOString(),
       currentPeriodEnd: usage.periodEnd.toISOString(),
       canExport: rowsRemaining > 0,
+      primaryUserEmail,
     };
 
     return NextResponse.json(response);
