@@ -121,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const subUserResponse = await fetch("/api/subscription-users");
       let isSubUser = false;
-      let primaryUserEmail = null;
+      let primaryUserEmail: string | null = null;
       
       if (subUserResponse.ok) {
         const subUserData = await subUserResponse.json();
@@ -155,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           
           // If no Stripe subscription, check wire transfer subscription for primary user
-          if (!primaryUserHasActiveSubscription) {
+          if (!primaryUserHasActiveSubscription && primaryUserEmail) {
             console.log("🔍 AuthContext: Primary user has no Stripe subscription, checking wire transfer...");
             
             // Check wire transfer via check-email-access API which accepts email parameter
@@ -169,7 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (wireTransferCheckResponse.ok) {
                 const wireTransferCheckData = await wireTransferCheckResponse.json();
                 const primaryUserResult = wireTransferCheckData.results?.find((r: any) => 
-                  r.email.toLowerCase() === primaryUserEmail.toLowerCase()
+                  r.email.toLowerCase() === primaryUserEmail!.toLowerCase()
                 );
                 
                 if (primaryUserResult?.details?.isWireTransferUser && primaryUserResult?.hasAccess) {
