@@ -568,10 +568,10 @@ export default function SendEmailAlertsPage() {
           </div>
         )}
 
-        {/* Summary Card */}
-        {summary && (
+        {/* Summary Card - Only show when emails were actually sent (not preview) */}
+        {summary && !previewHtml && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-            <h3 className="text-lg font-semibold text-green-800 mb-2">Email Summary</h3>
+            <h3 className="text-lg font-semibold text-green-800 mb-2">Email Sent Summary</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">{summary.totalUsers}</div>
@@ -596,7 +596,7 @@ export default function SendEmailAlertsPage() {
               <div className="text-green-600 mr-2">✅</div>
               <span className="text-green-800 font-semibold">
                 {previewHtml 
-                  ? "Email preview generated successfully! No emails were sent." 
+                  ? "Email preview generated successfully. No emails have been sent yet." 
                   : "Email notifications sent successfully!"}
               </span>
             </div>
