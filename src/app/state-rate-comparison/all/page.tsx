@@ -2004,7 +2004,15 @@ export default function StatePaymentComparison() {
               if (!filterSet.states.includes(combo.state_name)) return false;
             }
             
-            if (filterSet.serviceCode && combo.service_code !== filterSet.serviceCode) return false;
+            // Handle multiple service codes (comma-separated)
+            if (filterSet.serviceCode) {
+              if (filterSet.serviceCode.includes(',')) {
+                const selectedCodes = filterSet.serviceCode.split(',').map(code => code.trim());
+                if (!selectedCodes.includes(combo.service_code?.trim() || '')) return false;
+              } else {
+                if (combo.service_code !== filterSet.serviceCode) return false;
+              }
+            }
             if (filterSet.serviceDescription && combo.service_description !== filterSet.serviceDescription) return false;
             if (filterSet.program && filterSet.program !== "-" && combo.program !== filterSet.program) return false;
             if (filterSet.locationRegion && filterSet.locationRegion !== "-" && combo.location_region !== filterSet.locationRegion) return false;
