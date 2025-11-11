@@ -611,6 +611,216 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (type === 'state_plan_amendments') {
+      // 1. Reset is_new flags ONLY in state_plan_amendments
+      log('Resetting is_new flags in state_plan_amendments...', 'info', 'reset');
+      const { error: resetError } = await supabase.from('state_plan_amendments').update({ is_new: 'no' }).neq('id', null);
+      if (resetError) {
+        log(`Error resetting is_new flags in state_plan_amendments: ${resetError.message}`, 'error', 'reset');
+      } else {
+        log(`Reset is_new flags in state_plan_amendments. Update attempted for all rows.`, 'success', 'reset');
+      }
+      log('✅ State plan amendments update will NOT affect other tables is_new flags', 'info', 'reset');
+
+      // 2. Download the state plan amendments file
+      log('Downloading state plan amendments file...', 'info', 'download');
+      const spaFileName = "state_plan_amendments.xlsx";
+      const spaContainerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
+      const spaBlobClient = spaContainerClient.getBlobClient(spaFileName);
+      const spaDownloadResponse = await spaBlobClient.download();
+      const spaStream = spaDownloadResponse.readableStreamBody;
+      if (!spaStream) throw new Error("Failed to get state plan amendments file stream from blob");
+      const spaBuffer = await toBufferFromStream(spaStream as any);
+      log(`Downloaded state plan amendments file (${spaBuffer.length} bytes)`, 'success', 'download');
+
+      // 3. Parse state plan amendments Excel file
+      log('Parsing state plan amendments Excel file...', 'info', 'parse');
+      const spaWorkbook = XLSX.read(spaBuffer, { type: "buffer" });
+      const spaSheetName = 'Sheet1';
+      if (!spaWorkbook.SheetNames.includes(spaSheetName)) {
+        throw new Error(`State plan amendments sheet '${spaSheetName}' not found in file`);
+      }
+      log(`Using state plan amendments sheet: ${spaSheetName}`, 'success', 'parse');
+      
+      const rawSpaRows = XLSX.utils.sheet_to_json(spaWorkbook.Sheets[spaSheetName], { defval: "" });
+      // Lowercase and trim column names, replace spaces with underscores
+      const spaRows = rawSpaRows.map((row: any) => {
+        const newRow: any = {};
+        Object.keys(row).forEach(key => {
+          const cleanKey = key.trim().toLowerCase().replace(/\s+/g, '_');
+          newRow[cleanKey] = row[key];
+        });
+        return newRow;
+      });
+      
+      // Map Excel columns to DB columns for state_plan_amendments
+      // Note: Database columns may use spaces (e.g., "Transmittal Number") or snake_case (transmittal_number)
+      // The mapping handles both Excel variations (with/without spaces) and maps to database column names
+      const spaColumnMap: Record<string, string> = {
+        'id': 'id',
+        'link': 'link',
+        'state': 'state',
+        'subject': 'subject',
+        'service_lines_impacted': 'service_lines_impacted',
+        'service_lines_impacted_1': 'service_lines_impacted_1',
+        'service_lines_impacted_2': 'service_lines_impacted_2',
+        // Handle both "Transmittal Number" (with space) and "transmittal_number" (snake_case)
+        'transmittal_number': 'Transmittal Number',
+        'transmittal number': 'Transmittal Number',
+        // Handle both "Effective Date" (with space) and "effective_date" (snake_case)
+        'effective_date': 'Effective Date',
+        'effective date': 'Effective Date',
+        // Handle both "Approval Date" (with space) and "approval_date" (snake_case)
+        'approval_date': 'Approval Date',
+        'approval date': 'Approval Date',
+      };
+      
+      function mapSpaToDbColumns(obj: any) {
+        const mapped: any = {};
+        for (const excelKey in spaColumnMap) {
+          const dbKey = spaColumnMap[excelKey];
+          // Find the Excel key in obj (case-insensitive, trim)
+          const foundKey = Object.keys(obj).find(k => k.trim().toLowerCase() === excelKey);
+          if (foundKey !== undefined) {
+            mapped[dbKey] = obj[foundKey];
+          } else if (dbKey === 'service_lines_impacted_2') {
+            mapped[dbKey] = null;
+          } else {
+            mapped[dbKey] = "";
+          }
+        }
+        return mapped;
+      }
+      
+      // Helper to clean out __empty and empty keys
+      function cleanSpaRow(row: any) {
+        const cleaned: any = {};
+        Object.keys(row).forEach(key => {
+          if (
+            key &&
+            key.trim() !== '' &&
+            !key.toLowerCase().startsWith('__empty')
+          ) {
+            cleaned[key] = row[key];
+          }
+        });
+        return cleaned;
+      }
+      
+      const mappedSpaRows = spaRows.map(mapSpaToDbColumns);
+      const cleanedSpaRows = mappedSpaRows.map(cleanSpaRow);
+      log(`Parsed ${mappedSpaRows.length} rows from state plan amendments sheet.`, 'success', 'parse');
+
+      // 4. Fetch all rows from state_plan_amendments
+      log('Fetching all rows from state_plan_amendments...', 'info', 'fetch');
+      const { data: dbSpaRows, error: dbSpaError } = await supabase.from('state_plan_amendments').select('*');
+      if (dbSpaError) {
+        log(`Supabase fetch error: ${dbSpaError.message}`, 'error', 'fetch');
+        throw new Error(`Supabase fetch error: ${dbSpaError.message}`);
+      }
+      log(`Fetched ${dbSpaRows?.length || 0} rows from state_plan_amendments.`, 'success', 'fetch');
+      const dbSpaById = new Map<string, any>();
+      (dbSpaRows || []).forEach(r => {
+        // Use Excel ID as unique identifier
+        if (r.id) dbSpaById.set(r.id.toString(), r);
+      });
+      
+      // Debug logging
+      log(`Database has ${dbSpaById.size} entries with IDs: ${Array.from(dbSpaById.keys()).slice(0, 10).join(', ')}${dbSpaById.size > 10 ? '...' : ''}`, 'info', 'debug');
+      
+      const excelSpaIds = cleanedSpaRows.map(r => r.id).filter(id => id).slice(0, 10);
+      log(`Excel has ${cleanedSpaRows.length} entries, first 10 IDs: ${excelSpaIds.join(', ')}`, 'info', 'debug');
+      
+      // 5. Insert new entries (BATCHED)
+      // NOTE: State plan amendments currently only does inserts, no updates
+      // Service line fields are preserved since we don't overwrite existing entries
+      const today = new Date().toISOString().slice(0, 10);
+      // Only process entries that have valid, non-empty IDs
+      const validSpaEntries = cleanedSpaRows.filter(r => r.id && r.id.toString().trim() !== '');
+      const newSpaEntries = validSpaEntries.filter(r => !dbSpaById.has(r.id.toString()));
+      
+      log(`Found ${validSpaEntries.length} entries with valid IDs out of ${cleanedSpaRows.length} total`, 'info', 'debug');
+      log(`Skipped ${cleanedSpaRows.length - validSpaEntries.length} entries with empty/missing IDs`, 'warning', 'debug');
+      
+      log(`Found ${newSpaEntries.length} entries that appear to be new out of ${cleanedSpaRows.length} total`, 'info', 'debug');
+      if (newSpaEntries.length > 0) {
+        log(`First few 'new' entry IDs: ${newSpaEntries.slice(0, 5).map(r => r.id).join(', ')}`, 'info', 'debug');
+      }
+      
+      // Check for duplicate IDs within the Excel file itself
+      const excelSpaIdSet = new Set();
+      const duplicateSpaIds = new Set();
+      cleanedSpaRows.forEach(r => {
+        if (r.id) {
+          const idStr = r.id.toString();
+          if (excelSpaIdSet.has(idStr)) {
+            duplicateSpaIds.add(idStr);
+          } else {
+            excelSpaIdSet.add(idStr);
+          }
+        }
+      });
+      
+      if (duplicateSpaIds.size > 0) {
+        log(`Warning: Found duplicate IDs in Excel file: ${Array.from(duplicateSpaIds).join(', ')}`, 'warning', 'parse');
+      }
+      
+      // Remove entries with duplicate IDs from newSpaEntries
+      const finalNewSpaEntries = newSpaEntries.filter(r => !duplicateSpaIds.has(r.id?.toString()));
+      
+      if (finalNewSpaEntries.length !== newSpaEntries.length) {
+        log(`Removed ${newSpaEntries.length - finalNewSpaEntries.length} entries with duplicate IDs`, 'warning', 'insert');
+      }
+      
+      let insertedSpa = [];
+      if (finalNewSpaEntries.length > 0) {
+        // Include all columns including id for new insertions
+        const batchToInsertSpa = finalNewSpaEntries.map((entry) => {
+          const obj = { ...entry, is_new: 'yes' };
+          return obj;
+        });
+        
+        // Log what we're about to insert
+        log(`Attempting to insert ${batchToInsertSpa.length} new entries with IDs: ${batchToInsertSpa.map(e => e.id).join(', ')}`, 'info', 'insert');
+        
+        const { data, error } = await supabase.from('state_plan_amendments').insert(batchToInsertSpa);
+        if (!error) {
+          insertedSpa = batchToInsertSpa;
+          batchToInsertSpa.forEach(obj => {
+            log(`Inserted new entry: ${obj.subject || obj['Transmittal Number'] || 'Unknown'}`, 'success', 'insert');
+          });
+        } else {
+          log(`Failed to batch insert: ${error.message}`, 'error', 'insert');
+          log(`Error details: ${JSON.stringify(error)}`, 'error', 'insert');
+          
+          // Try inserting one by one to identify the problematic entry
+          log(`Attempting individual inserts to identify problematic entry...`, 'info', 'insert');
+          for (const entry of batchToInsertSpa) {
+            const { error: singleError } = await supabase.from('state_plan_amendments').insert([entry]);
+            if (singleError) {
+              log(`Failed to insert entry with ID ${entry.id}: ${singleError.message}`, 'error', 'insert');
+            } else {
+              insertedSpa.push(entry);
+              log(`Successfully inserted entry with ID ${entry.id}`, 'success', 'insert');
+            }
+          }
+        }
+      }
+      log(`Inserted ${insertedSpa.length} new entries.`, 'success', 'insert');
+      return NextResponse.json({
+        success: true,
+        fileName: spaFileName,
+        fileSize: spaBuffer.length,
+        spaSheetName,
+        insertedCount: insertedSpa.length,
+        updatedCount: 0,
+        insertedPreview: insertedSpa.slice(0, 5),
+        updatedPreview: [],
+        logs,
+        message: `Updated state_plan_amendments: ${insertedSpa.length} inserted, 0 updated.`
+      });
+    }
+
     return NextResponse.json({
       success: false,
       logs,

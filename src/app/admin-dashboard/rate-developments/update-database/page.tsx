@@ -7,6 +7,8 @@ export default function UpdateDatabase() {
   const [logs, setLogs] = useState<{ message: string; type: string; phase: string }[]>([]);
   const [isUpdatingProviderAlerts, setIsUpdatingProviderAlerts] = useState(false);
   const [providerLogs, setProviderLogs] = useState<{ message: string; type: string; phase: string }[]>([]);
+  const [isUpdatingStatePlanAmendments, setIsUpdatingStatePlanAmendments] = useState(false);
+  const [spaLogs, setSpaLogs] = useState<{ message: string; type: string; phase: string }[]>([]);
   return (
     <AppLayout activeTab="adminDashboard">
       <div className="p-8 min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
@@ -108,6 +110,55 @@ export default function UpdateDatabase() {
                       log.type === 'success' ? 'text-blue-700' :
                       log.type === 'error' ? 'text-red-600' :
                       'text-blue-800'
+                    }>
+                      <span className="font-mono">[{log.phase}]</span> {log.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          {/* Update State Plan Amendments Button */}
+          <div className="bg-purple-50 rounded-xl shadow-lg p-6 mb-8 max-w-xl flex-1">
+            <h2 className="text-xl font-semibold text-purple-900 mb-2">Update State Plan Amendments</h2>
+            <button
+              onClick={async () => {
+                setIsUpdatingStatePlanAmendments(true);
+                setSpaLogs([]);
+                try {
+                  const response = await fetch('/api/admin/update-database?type=state_plan_amendments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                  });
+                  const result = await response.json();
+                  if (result.logs) setSpaLogs(result.logs);
+                  if (result.success) {
+                    alert(`✅ Success!\nInserted: ${result.insertedCount}\nUpdated: ${result.updatedCount}`);
+                  } else {
+                    alert(`❌ Error: ${result.error || result.message}`);
+                  }
+                } catch (error) {
+                  setSpaLogs([{ message: String(error), type: 'error', phase: 'network' }]);
+                  alert(`❌ Network Error: ${error}`);
+                } finally {
+                  setIsUpdatingStatePlanAmendments(false);
+                }
+              }}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded transition"
+              disabled={isUpdatingStatePlanAmendments}
+            >
+              {isUpdatingStatePlanAmendments ? 'Updating...' : 'Update State Plan Amendments'}
+            </button>
+            {/* State Plan Amendments Logs Display */}
+            {spaLogs.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-2">Logs</h3>
+                <ul className="space-y-1 text-sm">
+                  {spaLogs.map((log, idx) => (
+                    <li key={idx} className={
+                      log.type === 'success' ? 'text-purple-700' :
+                      log.type === 'error' ? 'text-red-600' :
+                      'text-purple-800'
                     }>
                       <span className="font-mono">[{log.phase}]</span> {log.message}
                     </li>
