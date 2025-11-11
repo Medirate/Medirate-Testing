@@ -420,6 +420,16 @@ export default function Dashboard() {
   const [displayedItems, setDisplayedItems] = useState(50); // Adjust this number based on your needs
   const [isTableExpanded, setIsTableExpanded] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportUsage, setExportUsage] = useState<{
+    rowsUsed: number;
+    rowsLimit: number;
+    rowsRemaining: number;
+    currentPeriodStart: string;
+    currentPeriodEnd: string;
+    canExport: boolean;
+  } | null>(null);
+  const [showUsageModal, setShowUsageModal] = useState(false);
+  const [pendingExportRowCount, setPendingExportRowCount] = useState(0);
   
   const itemsPerPage = 50; // Adjust this number based on your needs
 
@@ -657,6 +667,13 @@ export default function Dashboard() {
 
   // All useEffect hooks
   // Authentication is now handled by useProtectedPage hook
+  
+  // Load export usage on mount and when auth changes
+  useEffect(() => {
+    if (auth.isAuthenticated && auth.isCheckComplete) {
+      checkExportUsage();
+    }
+  }, [auth.isAuthenticated, auth.isCheckComplete]);
 
   useEffect(() => {
     if (!auth.isAuthenticated) return;
@@ -1107,6 +1124,21 @@ export default function Dashboard() {
   // Update hasMoreItems logic for Load More mode
   const hasMoreItems = data.length < totalCount;
 
+  // Check Excel export usage
+  const checkExportUsage = async () => {
+    try {
+      const response = await fetch('/api/excel-export/check-usage');
+      if (response.ok) {
+        const usage = await response.json();
+        setExportUsage(usage);
+        return usage;
+      }
+    } catch (error) {
+      console.error('Error checking export usage:', error);
+    }
+    return null;
+  };
+
   // Export function to fetch ALL data and convert to Excel with protection
   const handleExportExcel = async () => {
     if (!hasSearched || data.length === 0) {
@@ -1116,7 +1148,7 @@ export default function Dashboard() {
 
     setIsExporting(true);
     try {
-      // Build filters from current selections
+      // Build filters to get total count first
       const filters: Record<string, string> = {};
       for (const [key, value] of Object.entries(selections)) {
         if (value) filters[key] = value;
@@ -1130,7 +1162,69 @@ export default function Dashboard() {
         filters.sort = sortParts;
       }
 
-      // Fetch all pages of data
+      // Get total count first
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value && typeof value === 'string') params.append(key, value);
+      });
+      params.append('page', '1');
+      params.append('itemsPerPage', '1');
+      
+      const countResponse = await fetch(`/api/state-payment-comparison?${params.toString()}`);
+      if (!countResponse.ok) {
+        throw new Error('Failed to get total count');
+      }
+      const countResult = await countResponse.json();
+      const totalRowCount = countResult.totalCount || 0;
+
+      // Check usage and validate
+      const usage = await checkExportUsage();
+      if (!usage) {
+        alert('Failed to check export limits. Please try again.');
+        setIsExporting(false);
+        return;
+      }
+
+      // Check if export is allowed
+      if (totalRowCount > usage.rowsRemaining) {
+        setPendingExportRowCount(totalRowCount);
+        setShowUsageModal(true);
+        setIsExporting(false);
+        return;
+      }
+
+      // Reserve the rows
+      const reserveResponse = await fetch('/api/excel-export/check-usage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rowCount: totalRowCount }),
+      });
+
+      if (!reserveResponse.ok) {
+        const errorData = await reserveResponse.json();
+        alert(errorData.message || 'Failed to reserve rows for export. Please try again.');
+        setIsExporting(false);
+        return;
+      }
+
+      const reserveData = await reserveResponse.json();
+      if (!reserveData.canExport) {
+        alert(reserveData.message || 'Export limit exceeded. Please try again later.');
+        setIsExporting(false);
+        return;
+      }
+
+      // Update usage display
+      setExportUsage({
+        rowsUsed: reserveData.rowsUsed,
+        rowsLimit: reserveData.rowsLimit,
+        rowsRemaining: reserveData.rowsRemaining,
+        currentPeriodStart: usage.currentPeriodStart,
+        currentPeriodEnd: usage.currentPeriodEnd,
+        canExport: true,
+      });
+
+      // Now fetch all pages of data
       const allData: ServiceData[] = [];
       let currentPageNum = 1;
       let hasMore = true;
@@ -1139,14 +1233,14 @@ export default function Dashboard() {
       console.log('📥 Starting Excel export - fetching all pages...');
       
       while (hasMore) {
-        const params = new URLSearchParams();
+        const fetchParams = new URLSearchParams();
         Object.entries(filters).forEach(([key, value]) => {
-          if (value && typeof value === 'string') params.append(key, value);
+          if (value && typeof value === 'string') fetchParams.append(key, value);
         });
-        params.append('page', String(currentPageNum));
-        params.append('itemsPerPage', String(exportPageSize));
+        fetchParams.append('page', String(currentPageNum));
+        fetchParams.append('itemsPerPage', String(exportPageSize));
         
-        const url = `/api/state-payment-comparison?${params.toString()}`;
+        const url = `/api/state-payment-comparison?${fetchParams.toString()}`;
         const response = await fetch(url);
         
         if (!response.ok) {
@@ -1286,6 +1380,12 @@ export default function Dashboard() {
       
       console.log(`✅ Excel export downloaded: ${filename} (${allData.length} records)`);
       console.log(`🔒 Password-protected - Password: MEDIRATE2025`);
+      
+      // Show success message with usage info
+      if (exportUsage) {
+        alert(`✅ Export successful!\n\n${allData.length.toLocaleString()} rows exported.\n${exportUsage.rowsRemaining.toLocaleString()} rows remaining in your subscription.`);
+      }
+      
       setIsExporting(false);
     } catch (err) {
       console.error('❌ Excel export error:', err);
@@ -2478,6 +2578,34 @@ export default function Dashboard() {
                 </button>
               </div>
               <button
+                onClick={handleExportExcel}
+                disabled={isExporting || !hasSearched || data.length === 0}
+                className={clsx(
+                  "px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 border",
+                  isExporting || !hasSearched || data.length === 0
+                    ? "bg-gray-50 text-gray-400 cursor-not-allowed border-gray-200"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm"
+                )}
+                title={isExporting ? 'Exporting all data...' : 'Export all data to Excel with protection (includes all pages)'}
+              >
+                {isExporting ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Exporting...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export Excel
+                  </span>
+                )}
+              </button>
+              <button
                 onClick={() => setIsTableExpanded(prev => !prev)}
                 className="px-3 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                 title={isTableExpanded ? 'Shrink table' : 'Expand table to full screen'}
@@ -2486,6 +2614,54 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
+          
+          {/* Usage Info Display */}
+          {exportUsage && (
+            <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-blue-800">
+                  <strong>Excel Export Usage:</strong> {exportUsage.rowsUsed.toLocaleString()} / {exportUsage.rowsLimit.toLocaleString()} rows used
+                </span>
+                <span className="text-blue-600">
+                  {exportUsage.rowsRemaining.toLocaleString()} rows remaining
+                </span>
+              </div>
+              <div className="mt-1 text-xs text-blue-600">
+                Resets on {new Date(exportUsage.currentPeriodEnd).toLocaleDateString()}
+              </div>
+            </div>
+          )}
+          
+          {/* Usage Limit Exceeded Modal */}
+          {showUsageModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+                <h3 className="text-lg font-bold text-red-600 mb-4">Export Limit Exceeded</h3>
+                <div className="space-y-2 mb-4">
+                  <p className="text-gray-700">
+                    You are trying to export <strong>{pendingExportRowCount.toLocaleString()} rows</strong>, but you only have <strong>{exportUsage?.rowsRemaining.toLocaleString() || 0} rows</strong> remaining in your subscription.
+                  </p>
+                  <p className="text-gray-700">
+                    <strong>Current Usage:</strong> {exportUsage?.rowsUsed.toLocaleString() || 0} / {exportUsage?.rowsLimit.toLocaleString() || 0} rows
+                  </p>
+                  <p className="text-sm text-gray-500 mt-3">
+                    Your limit will reset on {exportUsage ? new Date(exportUsage.currentPeriodEnd).toLocaleDateString() : 'N/A'}.
+                  </p>
+                </div>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => {
+                      setShowUsageModal(false);
+                      setPendingExportRowCount(0);
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           
           <div 
             className={clsx(

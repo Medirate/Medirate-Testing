@@ -130,39 +130,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("🔍 AuthContext: Sub user check result:", { isSubUser, primaryUserEmail });
         
         // If user is a sub user, check if their primary user has an active subscription
+        // Check BOTH Stripe subscription AND wire transfer subscription
         if (isSubUser && primaryUserEmail) {
-          console.log("🔍 AuthContext: Checking primary user's subscription status...");
+          console.log("🔍 AuthContext: Checking primary user's subscription status (both Stripe and wire transfer)...");
+          
+          // Check Stripe subscription for primary user
           const primaryUserStripeResponse = await fetch("/api/stripe/subscription", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: primaryUserEmail }),
           });
           
+          let primaryUserHasActiveSubscription = false;
+          let primaryUserSubscriptionData = null;
+          
           if (primaryUserStripeResponse.ok) {
             const primaryUserStripeData = await primaryUserStripeResponse.json();
-            const primaryUserHasActiveSubscription = primaryUserStripeData.status === 'active';
-            
-            console.log("🔍 AuthContext: Primary user subscription status:", { 
+            primaryUserHasActiveSubscription = primaryUserStripeData.status === 'active';
+            primaryUserSubscriptionData = primaryUserStripeData;
+            console.log("🔍 AuthContext: Primary user Stripe subscription status:", { 
               primaryUserEmail, 
               hasActiveSubscription: primaryUserHasActiveSubscription 
             });
+          }
+          
+          // If no Stripe subscription, check wire transfer subscription for primary user
+          if (!primaryUserHasActiveSubscription) {
+            console.log("🔍 AuthContext: Primary user has no Stripe subscription, checking wire transfer...");
             
-            if (primaryUserHasActiveSubscription) {
-              console.log("✅ AuthContext: Sub user has access through primary user's active subscription");
-              setAuthState({
-                isPrimaryUser: false,
-                isSubUser: true,
-                hasActiveSubscription: false, // Sub user doesn't have their own subscription
-                hasFormData: hasFormData,
-                isCheckComplete: true,
-                subscriptionData: primaryUserStripeData,
-                primaryUserEmail: primaryUserEmail
+            // Check wire transfer via check-email-access API which accepts email parameter
+            try {
+              const wireTransferCheckResponse = await fetch("/api/check-email-access", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ emails: [primaryUserEmail] }),
               });
-              return;
-            } else {
-              console.log("❌ AuthContext: Primary user does not have active subscription");
-              // Will fall through to show appropriate message
+              
+              if (wireTransferCheckResponse.ok) {
+                const wireTransferCheckData = await wireTransferCheckResponse.json();
+                const primaryUserResult = wireTransferCheckData.results?.find((r: any) => 
+                  r.email.toLowerCase() === primaryUserEmail.toLowerCase()
+                );
+                
+                if (primaryUserResult?.details?.isWireTransferUser && primaryUserResult?.hasAccess) {
+                  primaryUserHasActiveSubscription = true;
+                  primaryUserSubscriptionData = {
+                    status: 'active',
+                    plan: 'Wire Transfer Subscription',
+                    amount: 0,
+                    currency: 'USD',
+                    billingInterval: 'wire_transfer'
+                  };
+                  console.log("✅ AuthContext: Primary user has active wire transfer subscription");
+                }
+              }
+            } catch (wireTransferError) {
+              console.log("⚠️ AuthContext: Error checking wire transfer for primary user, continuing...");
             }
+          }
+          
+          if (primaryUserHasActiveSubscription) {
+            console.log("✅ AuthContext: Sub user has access through primary user's active subscription (Stripe or Wire Transfer)");
+            setAuthState({
+              isPrimaryUser: false,
+              isSubUser: true,
+              hasActiveSubscription: false, // Sub user doesn't have their own subscription
+              hasFormData: hasFormData,
+              isCheckComplete: true,
+              subscriptionData: primaryUserSubscriptionData,
+              primaryUserEmail: primaryUserEmail
+            });
+            return;
+          } else {
+            console.log("❌ AuthContext: Primary user does not have active subscription (neither Stripe nor wire transfer)");
+            // Will fall through to show appropriate message
           }
         }
       }
