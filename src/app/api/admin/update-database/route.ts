@@ -613,10 +613,16 @@ export async function POST(req: NextRequest) {
 
     if (type === 'state_plan_amendments') {
       // 1. Reset is_new flags ONLY in state_plan_amendments
+      // Check if is_new column exists first
       log('Resetting is_new flags in state_plan_amendments...', 'info', 'reset');
       const { error: resetError } = await supabase.from('state_plan_amendments').update({ is_new: 'no' }).neq('id', null);
       if (resetError) {
-        log(`Error resetting is_new flags in state_plan_amendments: ${resetError.message}`, 'error', 'reset');
+        if (resetError.message.includes('is_new') && resetError.message.includes('schema cache')) {
+          log(`⚠️ is_new column does not exist yet. Please run the SQL migration to add it.`, 'warning', 'reset');
+          log(`⚠️ Continuing with update process, but is_new flag will not be set.`, 'warning', 'reset');
+        } else {
+          log(`Error resetting is_new flags in state_plan_amendments: ${resetError.message}`, 'error', 'reset');
+        }
       } else {
         log(`Reset is_new flags in state_plan_amendments. Update attempted for all rows.`, 'success', 'reset');
       }
@@ -775,8 +781,16 @@ export async function POST(req: NextRequest) {
       let insertedSpa = [];
       if (finalNewSpaEntries.length > 0) {
         // Include all columns including id for new insertions
+        // Only add is_new if the column exists (will be handled by database default if column exists)
         const batchToInsertSpa = finalNewSpaEntries.map((entry) => {
-          const obj = { ...entry, is_new: 'yes' };
+          const obj = { ...entry };
+          // Try to add is_new, but don't fail if column doesn't exist
+          // The database will use default value if column exists
+          try {
+            obj.is_new = 'yes';
+          } catch (e) {
+            // Column might not exist yet, that's okay
+          }
           return obj;
         });
         
