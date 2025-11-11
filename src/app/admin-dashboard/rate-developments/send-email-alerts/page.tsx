@@ -37,7 +37,7 @@ export default function SendEmailAlertsPage() {
       setLogs(data.logs || []);
       setSuccess(data.success);
       
-      if (data.success && data.previewHtml) {
+      if (data.success && data.mode === 'preview' && data.previewHtml) {
         setPreviewHtml(data.previewHtml);
         setPreviewSubject(data.previewSubject);
         setPreviewUser(data.previewUser);
@@ -220,7 +220,9 @@ export default function SendEmailAlertsPage() {
             <div className="flex items-center">
               <div className="text-green-600 mr-2">✅</div>
               <span className="text-green-800 font-semibold">
-                Email notifications sent successfully!
+                {previewHtml 
+                  ? "Email preview generated successfully! No emails were sent." 
+                  : "Email notifications sent successfully!"}
               </span>
             </div>
           </div>
