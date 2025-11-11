@@ -431,7 +431,7 @@ export default function Dashboard() {
   const [showUsageModal, setShowUsageModal] = useState(false);
   const [pendingExportRowCount, setPendingExportRowCount] = useState(0);
   const [showCsvWarningModal, setShowCsvWarningModal] = useState(false);
-  const [pendingCsvExport, setPendingCsvExport] = useState<{ rowCount: number; proceed: () => void; primaryUserEmail?: string } | null>(null);
+  const [pendingCsvExport, setPendingCsvExport] = useState<{ rowCount: number; proceed: () => void; primaryUserEmail?: string; userRole?: 'subscription_manager' | 'primary_user' | 'sub_user' } | null>(null);
   const [isPreparingExport, setIsPreparingExport] = useState(false);
   
   const itemsPerPage = 50; // Adjust this number based on your needs
@@ -1142,18 +1142,21 @@ export default function Dashboard() {
     return null;
   };
 
-  // Get primary user email for the current user
-  const getPrimaryUserEmail = async (): Promise<string | null> => {
+  // Get primary user email and user role
+  const getPrimaryUserInfo = async (): Promise<{ primaryUserEmail: string | null; userRole: 'subscription_manager' | 'primary_user' | 'sub_user' }> => {
     try {
       const response = await fetch('/api/excel-export/check-usage');
       if (response.ok) {
         const data = await response.json();
-        return data.primaryUserEmail || null;
+        return {
+          primaryUserEmail: data.primaryUserEmail || null,
+          userRole: data.userRole || 'primary_user'
+        };
       }
     } catch (error) {
-      console.error('Error getting primary user email:', error);
+      console.error('Error getting primary user info:', error);
     }
-    return null;
+    return { primaryUserEmail: null, userRole: 'primary_user' };
   };
 
   // Export function to fetch ALL data and convert to Excel with protection
@@ -1460,10 +1463,10 @@ export default function Dashboard() {
         return;
       }
 
-      // Check usage and get primary user email in parallel
-      const [usage, primaryUserEmail] = await Promise.all([
+      // Check usage and get primary user info in parallel
+      const [usage, primaryUserInfo] = await Promise.all([
         checkExportUsage(),
-        getPrimaryUserEmail()
+        getPrimaryUserInfo()
       ]);
 
       if (!usage) {
@@ -1484,7 +1487,8 @@ export default function Dashboard() {
       setPendingCsvExport({
         rowCount: totalRowCount,
         proceed: () => performCsvExport(filters, totalRowCount),
-        primaryUserEmail: primaryUserEmail || undefined
+        primaryUserEmail: primaryUserInfo.primaryUserEmail || undefined,
+        userRole: primaryUserInfo.userRole
       });
       setShowCsvWarningModal(true);
       setIsPreparingExport(false);
@@ -2757,7 +2761,13 @@ export default function Dashboard() {
                         <>
                           <br />
                           <span className="mt-1 block">
-                            <strong>Subscription Manager:</strong> {pendingCsvExport.primaryUserEmail}
+                            <strong>
+                              {pendingCsvExport.userRole === 'subscription_manager' 
+                                ? 'Subscription Manager' 
+                                : pendingCsvExport.userRole === 'primary_user'
+                                ? 'Primary User'
+                                : 'Primary User'}:
+                            </strong> {pendingCsvExport.primaryUserEmail}
                           </span>
                         </>
                       )}

@@ -287,8 +287,26 @@ export async function GET() {
     const usage = await getOrCreateUsageRecord(primaryUserEmail, subscriptionType);
 
     const rowsRemaining = Math.max(0, usage.rowsLimit - usage.rowsUsed);
+    
+    // Check user role to determine if they are subscription manager or primary user
+    let userRole: 'subscription_manager' | 'primary_user' | 'sub_user' = 'primary_user';
+    
+    // Check registrationform table for account_role
+    const { data: formData } = await supabase
+      .from("registrationform")
+      .select("account_role")
+      .eq("email", user.email.toLowerCase())
+      .single();
+    
+    if (formData?.account_role === 'subscription_manager') {
+      userRole = 'subscription_manager';
+    } else {
+      // Check if current user is the primary user or a sub-user
+      const isCurrentUserPrimary = user.email.toLowerCase() === primaryUserEmail.toLowerCase();
+      userRole = isCurrentUserPrimary ? 'primary_user' : 'sub_user';
+    }
 
-    const response: UsageInfo & { primaryUserEmail?: string } = {
+    const response: UsageInfo & { primaryUserEmail?: string; userRole?: 'subscription_manager' | 'primary_user' | 'sub_user' } = {
       rowsUsed: usage.rowsUsed,
       rowsLimit: usage.rowsLimit,
       rowsRemaining,
@@ -296,6 +314,7 @@ export async function GET() {
       currentPeriodEnd: usage.periodEnd.toISOString(),
       canExport: rowsRemaining > 0,
       primaryUserEmail,
+      userRole,
     };
 
     return NextResponse.json(response);
