@@ -430,6 +430,8 @@ export default function Dashboard() {
   } | null>(null);
   const [showUsageModal, setShowUsageModal] = useState(false);
   const [pendingExportRowCount, setPendingExportRowCount] = useState(0);
+  const [showCsvWarningModal, setShowCsvWarningModal] = useState(false);
+  const [pendingCsvExport, setPendingCsvExport] = useState<{ rowCount: number; proceed: () => void } | null>(null);
   
   const itemsPerPage = 50; // Adjust this number based on your needs
 
@@ -1401,7 +1403,7 @@ export default function Dashboard() {
       return;
     }
 
-    setIsExporting(true);
+    // First, get the total row count to show in warning
     try {
       // Build filters from current selections
       const filters: Record<string, string> = {};
@@ -1417,13 +1419,98 @@ export default function Dashboard() {
         filters.sort = sortParts;
       }
 
+      // Get total count first
+      const countParams = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value && typeof value === 'string') countParams.append(key, value);
+      });
+      countParams.append('page', '1');
+      countParams.append('itemsPerPage', '1');
+      
+      const countUrl = `/api/state-payment-comparison?${countParams.toString()}`;
+      const countResponse = await fetch(countUrl);
+      
+      if (!countResponse.ok) {
+        throw new Error('Failed to get total count');
+      }
+
+      const countResult = await countResponse.json();
+      const totalRowCount = countResult.totalCount || 0;
+
+      if (totalRowCount === 0) {
+        alert('No data available to export.');
+        return;
+      }
+
+      // Check usage
+      const usage = await checkExportUsage();
+      if (!usage) {
+        alert('Failed to check export limits. Please try again.');
+        return;
+      }
+
+      // Check if export exceeds limit
+      if (totalRowCount > usage.rowsRemaining) {
+        setPendingExportRowCount(totalRowCount);
+        setShowUsageModal(true);
+        return;
+      }
+
+      // Show warning modal with usage info
+      setPendingCsvExport({
+        rowCount: totalRowCount,
+        proceed: () => performCsvExport(filters, totalRowCount)
+      });
+      setShowCsvWarningModal(true);
+    } catch (err) {
+      console.error('❌ Error preparing export:', err);
+      alert(`Failed to prepare export: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  };
+
+  const performCsvExport = async (filters: Record<string, string>, expectedRowCount: number) => {
+    setIsExporting(true);
+    setShowCsvWarningModal(false);
+    
+    try {
+      // Reserve the rows first
+      const reserveResponse = await fetch('/api/excel-export/check-usage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rowCount: expectedRowCount }),
+      });
+
+      if (!reserveResponse.ok) {
+        const errorData = await reserveResponse.json();
+        alert(errorData.message || 'Failed to reserve rows for export. Please try again.');
+        setIsExporting(false);
+        return;
+      }
+
+      const reserveData = await reserveResponse.json();
+      if (!reserveData.canExport) {
+        alert(reserveData.message || 'Export limit exceeded. Please try again later.');
+        setIsExporting(false);
+        return;
+      }
+
+      // Update usage display
+      setExportUsage({
+        rowsUsed: reserveData.rowsUsed,
+        rowsLimit: reserveData.rowsLimit,
+        rowsRemaining: reserveData.rowsRemaining,
+        currentPeriodStart: reserveData.currentPeriodStart || '',
+        currentPeriodEnd: reserveData.currentPeriodEnd || '',
+        canExport: true,
+      });
+
       // Fetch all pages of data
       const allData: ServiceData[] = [];
       let currentPageNum = 1;
       let hasMore = true;
       const exportPageSize = 1000; // Larger page size for exports to reduce API calls
 
-      console.log('📥 Starting export - fetching all pages...');
+      console.log('📥 Starting CSV export - fetching all pages...');
       
       while (hasMore) {
         const params = new URLSearchParams();
@@ -1581,7 +1668,14 @@ export default function Dashboard() {
       link.click();
       document.body.removeChild(link);
       
-      console.log(`✅ Export downloaded: ${filename} (${allData.length} records)`);
+      console.log(`✅ CSV export downloaded: ${filename} (${allData.length} records)`);
+      
+      // Show success message with usage info
+      if (exportUsage) {
+        const updatedRemaining = reserveData.rowsRemaining;
+        alert(`✅ Export successful!\n\n${allData.length.toLocaleString()} rows exported.\n${updatedRemaining.toLocaleString()} rows remaining in your subscription.`);
+      }
+      
       setIsExporting(false);
     } catch (err) {
       console.error('❌ Export error:', err);
@@ -2578,34 +2672,6 @@ export default function Dashboard() {
                 </button>
               </div>
               <button
-                onClick={handleExportExcel}
-                disabled={isExporting || !hasSearched || data.length === 0}
-                className={clsx(
-                  "px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 border",
-                  isExporting || !hasSearched || data.length === 0
-                    ? "bg-gray-50 text-gray-400 cursor-not-allowed border-gray-200"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm"
-                )}
-                title={isExporting ? 'Exporting all data...' : 'Export all data to Excel with protection (includes all pages)'}
-              >
-                {isExporting ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Exporting...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Export Excel
-                  </span>
-                )}
-              </button>
-              <button
                 onClick={() => setIsTableExpanded(prev => !prev)}
                 className="px-3 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                 title={isTableExpanded ? 'Shrink table' : 'Expand table to full screen'}
@@ -2632,21 +2698,122 @@ export default function Dashboard() {
             </div>
           )}
           
+          {/* CSV Export Warning Modal */}
+          {showCsvWarningModal && pendingCsvExport && exportUsage && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-lg mx-4 shadow-xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900">Export Confirmation</h3>
+                </div>
+                
+                <div className="space-y-4 mb-6">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-blue-900 mb-3">Export Details</p>
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <div className="flex justify-between">
+                        <span className="font-medium">File contains:</span>
+                        <span className="font-semibold text-gray-900">{pendingCsvExport.rowCount.toLocaleString()} rows</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-gray-900 mb-3">Subscription Usage</p>
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <div className="flex justify-between">
+                        <span>Rows remaining in subscription:</span>
+                        <span className="font-semibold text-gray-900">{exportUsage.rowsRemaining.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Rows used this period:</span>
+                        <span>{exportUsage.rowsUsed.toLocaleString()} / {exportUsage.rowsLimit.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-green-900 mb-2">After Download</p>
+                    <div className="text-sm text-gray-700">
+                      <div className="flex justify-between items-center">
+                        <span>Rows remaining after download:</span>
+                        <span className="font-semibold text-green-700 text-base">
+                          {Math.max(0, exportUsage.rowsRemaining - pendingCsvExport.rowCount).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {exportUsage.currentPeriodEnd && (
+                    <p className="text-xs text-gray-500 text-center">
+                      Usage limit resets on {new Date(exportUsage.currentPeriodEnd).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => {
+                      setShowCsvWarningModal(false);
+                      setPendingCsvExport(null);
+                    }}
+                    className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (pendingCsvExport) {
+                        pendingCsvExport.proceed();
+                      }
+                    }}
+                    className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors shadow-sm"
+                  >
+                    Confirm Export
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Usage Limit Exceeded Modal */}
           {showUsageModal && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-                <h3 className="text-lg font-bold text-red-600 mb-4">Export Limit Exceeded</h3>
-                <div className="space-y-2 mb-4">
+              <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-red-600">Export Limit Exceeded</h3>
+                </div>
+                <div className="space-y-3 mb-6">
                   <p className="text-gray-700">
-                    You are trying to export <strong>{pendingExportRowCount.toLocaleString()} rows</strong>, but you only have <strong>{exportUsage?.rowsRemaining.toLocaleString() || 0} rows</strong> remaining in your subscription.
+                    You are trying to export <strong className="text-gray-900">{pendingExportRowCount.toLocaleString()} rows</strong>, but you only have <strong className="text-gray-900">{exportUsage?.rowsRemaining.toLocaleString() || 0} rows</strong> remaining in your subscription.
                   </p>
-                  <p className="text-gray-700">
-                    <strong>Current Usage:</strong> {exportUsage?.rowsUsed.toLocaleString() || 0} / {exportUsage?.rowsLimit.toLocaleString() || 0} rows
-                  </p>
-                  <p className="text-sm text-gray-500 mt-3">
-                    Your limit will reset on {exportUsage ? new Date(exportUsage.currentPeriodEnd).toLocaleDateString() : 'N/A'}.
-                  </p>
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <p className="text-sm text-gray-700">
+                      <strong>Current Usage:</strong> {exportUsage?.rowsUsed.toLocaleString() || 0} / {exportUsage?.rowsLimit.toLocaleString() || 0} rows
+                    </p>
+                  </div>
+                  {exportUsage?.currentPeriodEnd && (
+                    <p className="text-sm text-gray-500">
+                      Your limit will reset on {new Date(exportUsage.currentPeriodEnd).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}.
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-3 justify-end">
                   <button
@@ -2654,7 +2821,7 @@ export default function Dashboard() {
                       setShowUsageModal(false);
                       setPendingExportRowCount(0);
                     }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                    className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                   >
                     Close
                   </button>
