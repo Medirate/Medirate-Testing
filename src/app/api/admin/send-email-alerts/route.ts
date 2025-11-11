@@ -525,7 +525,7 @@ export async function POST(req: NextRequest) {
             categorySections.push(`
               <div style="margin:40px 48px 20px 48px;">
                 <h3 style="color:#0F3557; font-size:20px; font-weight:bold; margin-bottom:16px; border-bottom:2px solid #0F3557; padding-bottom:8px;">
-                  📜 Legislative Updates (${billsAlerts.length})
+                  Legislative Updates (${billsAlerts.length})
                 </h3>
                 ${billsCards}
               </div>
@@ -536,7 +536,7 @@ export async function POST(req: NextRequest) {
             categorySections.push(`
               <div style="margin:40px 48px 20px 48px;">
                 <h3 style="color:#0F3557; font-size:20px; font-weight:bold; margin-bottom:16px; border-bottom:2px solid #0F3557; padding-bottom:8px;">
-                  📢 Provider Alerts (${providerAlerts.length})
+                  Provider Alerts (${providerAlerts.length})
                 </h3>
                 ${providerCards}
               </div>
@@ -547,7 +547,7 @@ export async function POST(req: NextRequest) {
             categorySections.push(`
               <div style="margin:40px 48px 20px 48px;">
                 <h3 style="color:#0F3557; font-size:20px; font-weight:bold; margin-bottom:16px; border-bottom:2px solid #0F3557; padding-bottom:8px;">
-                  📋 State Plan Amendments (${spaAlerts.length})
+                  State Plan Amendments (${spaAlerts.length})
                 </h3>
                 ${spaCards}
               </div>
@@ -856,7 +856,7 @@ export async function POST(req: NextRequest) {
         categorySections.push(`
           <div style="margin:40px 48px 20px 48px;">
             <h3 style="color:#0F3557; font-size:20px; font-weight:bold; margin-bottom:16px; border-bottom:2px solid #0F3557; padding-bottom:8px;">
-              📜 Legislative Updates (${billsAlerts.length})
+              Legislative Updates (${billsAlerts.length})
             </h3>
             ${billsCards}
           </div>
@@ -867,7 +867,7 @@ export async function POST(req: NextRequest) {
         categorySections.push(`
           <div style="margin:40px 48px 20px 48px;">
             <h3 style="color:#0F3557; font-size:20px; font-weight:bold; margin-bottom:16px; border-bottom:2px solid #0F3557; padding-bottom:8px;">
-              📢 Provider Alerts (${providerAlerts.length})
+              Provider Alerts (${providerAlerts.length})
             </h3>
             ${providerCards}
           </div>
@@ -878,7 +878,7 @@ export async function POST(req: NextRequest) {
         categorySections.push(`
           <div style="margin:40px 48px 20px 48px;">
             <h3 style="color:#0F3557; font-size:20px; font-weight:bold; margin-bottom:16px; border-bottom:2px solid #0F3557; padding-bottom:8px;">
-              📋 State Plan Amendments (${spaAlerts.length})
+              State Plan Amendments (${spaAlerts.length})
             </h3>
             ${spaCards}
           </div>
