@@ -2134,7 +2134,7 @@ export default function StatePaymentComparison() {
         xAxis: {
           type: 'category',
           data: sortedStatesList,
-          axisLabel: { rotate: 45, fontSize: 10 }
+          axisLabel: { rotate: 45, fontSize: 14, fontWeight: 'bold' }
         },
         yAxis: {
           type: 'value',
@@ -2236,7 +2236,7 @@ export default function StatePaymentComparison() {
       xAxis: {
         type: 'category',
         data: sortedEntries.map(e => e.label),
-        axisLabel: { rotate: 45, fontSize: 10 },
+        axisLabel: { rotate: 45, fontSize: 14, fontWeight: 'bold' },
         axisTick: { show: false }
       },
       yAxis: {
