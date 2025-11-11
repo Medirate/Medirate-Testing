@@ -640,7 +640,7 @@ export const DataTable = ({
                             </div>
                           </td>
                           {visibleColumns.state_name && (
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td className="px-6 py-4 whitespace-nowrap text-base font-bold text-gray-900">
                               {STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || '-'}
                             </td>
                           )}
