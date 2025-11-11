@@ -32,11 +32,21 @@ export async function GET(request: NextRequest) {
 
     // Transform blob data to show actual storage structure
     const documents = blobs
-      // exclude metadata and json helper files from UI
+      // exclude metadata, json helper files, and archive folders from UI
       .filter(blob => {
         const p = (blob.pathname || '');
+        // Exclude metadata folder
         if (p.startsWith('_metadata/')) return false;
+        // Exclude JSON files
         if (p.toLowerCase().endsWith('.json')) return false;
+        // Exclude archive folders (e.g., ABA_ARCHIVE, BH_ARCHIVE, etc.)
+        // Archive folders are only visible in Vercel Blob, not on the website
+        const pathParts = p.split('/').filter(part => part && part !== '');
+        const hasArchiveFolder = pathParts.some(part => 
+          part.toUpperCase().includes('ARCHIVE') || 
+          part.toUpperCase().endsWith('_ARCHIVE')
+        );
+        if (hasArchiveFolder) return false;
         return true;
       })
       .map(blob => {

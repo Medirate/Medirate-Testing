@@ -30,11 +30,21 @@ export async function GET(request: NextRequest) {
     
     console.log(`📁 Total files found: ${blobs.length}`);
     
-    // Filter out metadata files
+    // Filter out metadata files and archive folders
     const documentBlobs = blobs.filter(blob => {
       const p = (blob.pathname || '');
+      // Exclude metadata folder
       if (p.startsWith('_metadata/')) return false;
+      // Exclude JSON files
       if (p.toLowerCase().endsWith('.json')) return false;
+      // Exclude archive folders (e.g., ABA_ARCHIVE, BH_ARCHIVE, etc.)
+      // Archive folders are only visible in Vercel Blob, not on the website
+      const pathParts = p.split('/').filter(part => part && part !== '');
+      const hasArchiveFolder = pathParts.some(part => 
+        part.toUpperCase().includes('ARCHIVE') || 
+        part.toUpperCase().endsWith('_ARCHIVE')
+      );
+      if (hasArchiveFolder) return false;
       return true;
     });
     
@@ -56,7 +66,13 @@ export async function GET(request: NextRequest) {
         url: blob.url
       });
       
-      // Separate metadata files
+      // Separate metadata files and archive folders
+      const pathParts = pathname.split('/').filter(part => part && part !== '');
+      const hasArchiveFolder = pathParts.some(part => 
+        part.toUpperCase().includes('ARCHIVE') || 
+        part.toUpperCase().endsWith('_ARCHIVE')
+      );
+      
       if (pathname.startsWith('_metadata/') || pathname.toLowerCase().endsWith('.json')) {
         metadataFiles.push({
           pathname: blob.pathname || '',
@@ -64,6 +80,11 @@ export async function GET(request: NextRequest) {
           uploadedAt: blob.uploadedAt,
           url: blob.url
         });
+        return;
+      }
+      
+      // Skip archive folders in structure building (they're only in Vercel Blob)
+      if (hasArchiveFolder) {
         return;
       }
       
