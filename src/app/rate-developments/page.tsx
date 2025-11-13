@@ -49,6 +49,7 @@ interface StatePlanAmendment {
   service_lines_impacted?: string | null;
   service_lines_impacted_1?: string | null;
   service_lines_impacted_2?: string | null;
+  service_lines_impacted_3?: string | null;
   "Effective Date"?: string | null;
   "Approval Date"?: string | null;
 }
