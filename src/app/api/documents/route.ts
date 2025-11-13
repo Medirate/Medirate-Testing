@@ -59,14 +59,20 @@ export async function GET(request: NextRequest) {
       const folderPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : 'Root';
       
       // Extract subfolder (like ABA, BH, BILLING_MANUALS, IDD)
-      const subfolder = pathParts.length > 2 ? pathParts[pathParts.length - 2] : null;
+      let subfolder = pathParts.length > 2 ? pathParts[pathParts.length - 2] : null;
+      
+      // Correct folder name: ADA -> ABA for Washington and New Hampshire
+      const state = extractStateFromPath(blob.pathname);
+      if (subfolder === 'ADA' && (state === 'WASHINGTON' || state === 'NEW HAMPSHIRE')) {
+        subfolder = 'ABA';
+      }
       
       return {
         id: blob.url.split('/').pop() || blob.url,
         title: fileName,
         type: fileExtension, // Show actual file extension
         folder: folderPath, // Show actual folder path
-        subfolder: subfolder, // Add subfolder information
+        subfolder: subfolder, // Add subfolder information (corrected)
         state: extractStateFromPath(blob.pathname),
         category: subfolder || folderPath, // Use subfolder as primary category
         description: `File in ${folderPath}${subfolder ? ` → ${subfolder}` : ''} - Uploaded on ${new Date(blob.uploadedAt).toLocaleDateString()}`,

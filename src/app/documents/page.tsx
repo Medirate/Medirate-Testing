@@ -102,7 +102,12 @@ export default function Documents() {
     
     // Extract subfolder from folder path (e.g., "ALABAMA/ABA" -> "ABA")
     const folderParts = doc.folder.split('/');
-    const subfolder = folderParts.length > 1 ? folderParts[folderParts.length - 1] : 'Root';
+    let subfolder = folderParts.length > 1 ? folderParts[folderParts.length - 1] : 'Root';
+    
+    // Correct folder name: ADA -> ABA for Washington and New Hampshire
+    if (subfolder === 'ADA' && (state === 'WASHINGTON' || state === 'NEW HAMPSHIRE')) {
+      subfolder = 'ABA';
+    }
     
     if (!acc[state][subfolder]) {
       acc[state][subfolder] = [];

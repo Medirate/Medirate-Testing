@@ -123,7 +123,12 @@ export async function GET(request: NextRequest) {
       } else if (parts.length >= 2) {
         // State/Subfolder/File structure
         const state = parts[0];
-        const subfolder = parts[1];
+        let subfolder = parts[1];
+        
+        // Correct folder name: ADA -> ABA for Washington and New Hampshire
+        if (subfolder === 'ADA' && (state === 'WASHINGTON' || state === 'NEW HAMPSHIRE')) {
+          subfolder = 'ABA';
+        }
         
         if (!structure[state]) {
           structure[state] = {};
