@@ -614,6 +614,7 @@ export async function POST(req: NextRequest) {
     if (type === 'state_plan_amendments') {
       // 1. Reset is_new flags ONLY in state_plan_amendments
       // Check if is_new column exists first
+      // State plan amendments now support 4 service line columns (service_lines_impacted, service_lines_impacted_1, service_lines_impacted_2, service_lines_impacted_3)
       log('Resetting is_new flags in state_plan_amendments...', 'info', 'reset');
       const { error: resetError } = await supabase.from('state_plan_amendments').update({ is_new: 'no' }).neq('id', null);
       if (resetError) {
