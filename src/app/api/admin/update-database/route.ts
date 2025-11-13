@@ -670,6 +670,7 @@ export async function POST(req: NextRequest) {
         'service_lines_impacted': 'service_lines_impacted',
         'service_lines_impacted_1': 'service_lines_impacted_1',
         'service_lines_impacted_2': 'service_lines_impacted_2',
+        'service_lines_impacted_3': 'service_lines_impacted_3',
         // Handle both "Transmittal Number" (with space) and "transmittal_number" (snake_case)
         'transmittal_number': 'Transmittal Number',
         'transmittal number': 'Transmittal Number',
@@ -689,7 +690,7 @@ export async function POST(req: NextRequest) {
           const foundKey = Object.keys(obj).find(k => k.trim().toLowerCase() === excelKey);
           if (foundKey !== undefined) {
             mapped[dbKey] = obj[foundKey];
-          } else if (dbKey === 'service_lines_impacted_2') {
+          } else if (dbKey === 'service_lines_impacted_2' || dbKey === 'service_lines_impacted_3') {
             mapped[dbKey] = null;
           } else {
             mapped[dbKey] = "";

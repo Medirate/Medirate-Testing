@@ -668,7 +668,7 @@ export default function RateDevelopments() {
                                ));
       
       if (isInSelectedState) {
-        [spa.service_lines_impacted, spa.service_lines_impacted_1, spa.service_lines_impacted_2]
+        [spa.service_lines_impacted, spa.service_lines_impacted_1, spa.service_lines_impacted_2, spa.service_lines_impacted_3]
           .filter((line): line is string => line !== null && line !== undefined && line.toUpperCase() !== 'NULL')
           .forEach(line => serviceLinesInSelectedStates.add(line));
       }
@@ -906,6 +906,7 @@ export default function RateDevelopments() {
           spa.service_lines_impacted,
           spa.service_lines_impacted_1,
           spa.service_lines_impacted_2,
+          spa.service_lines_impacted_3,
         ].some(line => line && selectedSpaServiceLines.some(selectedLine => line.includes(selectedLine)));
 
       return matchesState && matchesServiceLine;
@@ -927,7 +928,8 @@ export default function RateDevelopments() {
     return [
       spa.service_lines_impacted,
       spa.service_lines_impacted_1,
-      spa.service_lines_impacted_2
+      spa.service_lines_impacted_2,
+      spa.service_lines_impacted_3
     ]
       .filter(line => line && line.toUpperCase() !== 'NULL')
       .join(", ");

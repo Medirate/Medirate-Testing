@@ -52,6 +52,7 @@ interface StatePlanAmendment {
   service_lines_impacted?: string | null;
   service_lines_impacted_1?: string | null;
   service_lines_impacted_2?: string | null;
+  service_lines_impacted_3?: string | null;
   "Effective Date"?: string | null;
   effective_date?: string | null;
   "Approval Date"?: string | null;
@@ -630,12 +631,12 @@ const isNew = (val: any) => {
 
 // Helper function to check if service lines are blank
 const hasBlankServiceLines = (item: Alert | Bill | StatePlanAmendment) => {
-  // State plan amendments have 3 service line columns, bills and alerts have 4
+  // All items now have 4 service line columns
   const serviceLines = [
     item.service_lines_impacted,
     item.service_lines_impacted_1,
     item.service_lines_impacted_2,
-    (item as Alert | Bill).service_lines_impacted_3 // Only bills and alerts have this
+    (item as Alert | Bill | StatePlanAmendment).service_lines_impacted_3
   ].filter(line => line !== undefined && line && line.trim() !== '' && line.toUpperCase() !== 'NULL');
   
   return serviceLines.length === 0;
@@ -1154,6 +1155,7 @@ export default function RateDevelopments() {
         spa.service_lines_impacted,
         spa.service_lines_impacted_1,
         spa.service_lines_impacted_2,
+        spa.service_lines_impacted_3,
       ].some(line => line && selectedSpaServiceLines.includes(line));
 
     const matchesNewFilter = !showOnlyNew || isNew(spa.is_new);
@@ -1195,6 +1197,7 @@ export default function RateDevelopments() {
       spa.service_lines_impacted,
       spa.service_lines_impacted_1,
       spa.service_lines_impacted_2,
+      spa.service_lines_impacted_3,
     ]
       .filter((line): line is string => !!line && line.toUpperCase() !== 'NULL');
     
@@ -1558,6 +1561,7 @@ export default function RateDevelopments() {
         prevSpa.service_lines_impacted,
         prevSpa.service_lines_impacted_1,
         prevSpa.service_lines_impacted_2,
+        prevSpa.service_lines_impacted_3,
       ].filter(line => line && line.toUpperCase() !== 'NULL');
       
       const newServiceLines = editingSpaServiceLines.filter(line => line && line.trim() !== '');
@@ -1572,6 +1576,7 @@ export default function RateDevelopments() {
           service_lines_impacted: editingSpaServiceLines[0] || null,
           service_lines_impacted_1: editingSpaServiceLines[1] || null,
           service_lines_impacted_2: editingSpaServiceLines[2] || null,
+          service_lines_impacted_3: editingSpaServiceLines[3] || null,
         };
         console.log('Service lines changed, updating:', serviceLinesData);
       } else {
@@ -2048,7 +2053,7 @@ export default function RateDevelopments() {
                             values={editingProviderServiceLines}
                             onChange={setEditingProviderServiceLines}
                             options={normalizedServiceLineOptions}
-                            placeholder="Select service lines (max 3)"
+                            placeholder="Select service lines (max 4)"
                             />
                           </td>
                         <td className="p-3 align-middle text-center">
@@ -2197,7 +2202,7 @@ export default function RateDevelopments() {
                             values={editingBillServiceLines}
                             onChange={setEditingBillServiceLines}
                             options={normalizedServiceLineOptions}
-                            placeholder="Select service lines (max 3)"
+                            placeholder="Select service lines (max 4)"
                           />
                         </td>
                         <td className="p-3 align-middle text-center">
@@ -2299,7 +2304,7 @@ export default function RateDevelopments() {
                             values={editingSpaServiceLines}
                             onChange={setEditingSpaServiceLines}
                             options={normalizedServiceLineOptions}
-                            placeholder="Select service lines (max 3)"
+                            placeholder="Select service lines (max 4)"
                           />
                         </td>
                         <td className="p-3 align-middle text-center">
@@ -2347,6 +2352,7 @@ export default function RateDevelopments() {
                                 spa.service_lines_impacted,
                                 spa.service_lines_impacted_1,
                                 spa.service_lines_impacted_2,
+                                spa.service_lines_impacted_3,
                               ].filter(line => line && line.toUpperCase().trim() !== 'NULL');
                               const seen = new Set();
                               const uniqueLines = [];
@@ -2427,7 +2433,7 @@ export default function RateDevelopments() {
                             values={editingProviderServiceLines}
                             onChange={setEditingProviderServiceLines}
                             options={normalizedServiceLineOptions}
-                            placeholder="Select service lines (max 3)"
+                            placeholder="Select service lines (max 4)"
                           />
                         </td>
                         <td className="p-3 align-middle text-center">
@@ -2543,7 +2549,7 @@ export default function RateDevelopments() {
                             values={editingBillServiceLines}
                             onChange={setEditingBillServiceLines}
                             options={normalizedServiceLineOptions}
-                            placeholder="Select service lines (max 3)"
+                            placeholder="Select service lines (max 4)"
                           />
                         </td>
                         <td className="p-3 align-middle text-center">
@@ -2661,7 +2667,7 @@ export default function RateDevelopments() {
                             values={editingSpaServiceLines}
                             onChange={setEditingSpaServiceLines}
                             options={normalizedServiceLineOptions}
-                            placeholder="Select service lines (max 3)"
+                            placeholder="Select service lines (max 4)"
                           />
                         </td>
                         <td className="p-3 align-middle text-center">
@@ -2709,6 +2715,7 @@ export default function RateDevelopments() {
                                 spa.service_lines_impacted,
                                 spa.service_lines_impacted_1,
                                 spa.service_lines_impacted_2,
+                                spa.service_lines_impacted_3,
                               ].filter(line => line && line.toUpperCase().trim() !== 'NULL');
                               const seen = new Set();
                               const uniqueLines = [];

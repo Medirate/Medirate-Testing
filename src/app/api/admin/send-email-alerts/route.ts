@@ -321,8 +321,8 @@ export async function POST(req: NextRequest) {
       const stateNorm = normalizeState(state);
       const serviceLines = new Set<string>();
       
-      // Check service line columns
-      for (const col of ['service_lines_impacted', 'service_lines_impacted_1', 'service_lines_impacted_2']) {
+      // Check service line columns (now 4 columns like provider alerts)
+      for (const col of ['service_lines_impacted', 'service_lines_impacted_1', 'service_lines_impacted_2', 'service_lines_impacted_3']) {
         const val = spa[col];
         if (val && String(val).trim() && String(val).trim().toUpperCase() !== 'NULL') {
           serviceLines.add(String(val).trim().toUpperCase());
