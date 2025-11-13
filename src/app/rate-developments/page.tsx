@@ -1145,16 +1145,16 @@ export default function RateDevelopments() {
             {/* Divider for md+ screens */}
             <div className="hidden md:block w-px bg-blue-100 mx-4 my-2 rounded-full" />
 
-            {/* Right Column: State Plan Amendments Filters */}
-            <div className="flex-1 flex flex-col gap-5">
-              <span className="text-xs uppercase tracking-wider text-[#012C61] font-lemonMilkRegular mb-1 ml-1">State Plan Amendments Filters</span>
+            {/* Right Column: SPA/Waiver Amendments Filters */}
+              <div className="flex-1 flex flex-col gap-5">
+                <span className="text-xs uppercase tracking-wider text-[#012C61] font-lemonMilkRegular mb-1 ml-1">SPA/Waiver Amendments Filters</span>
               <div className="relative">
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
                 <input
                   type="text"
                   value={spaSearch}
                   onChange={e => setSpaSearch(e.target.value)}
-                  placeholder="Search State Plan Amendments by subject or transmittal number"
+                  placeholder="Search SPA/Waiver Amendments by subject or transmittal number"
                   className="w-full pl-10 pr-4 py-3 bg-white border border-blue-300 rounded-xl text-gray-800 focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all placeholder-gray-500 text-base shadow-sm"
                 />
               </div>
@@ -1314,16 +1314,16 @@ export default function RateDevelopments() {
               </div>
               </>
             ) : (
-              // State Plan Amendments Filters
+              // SPA/Waiver Amendments Filters
               <>
-                <span className="text-xs uppercase tracking-wider text-[#012C61] font-lemonMilkRegular mb-1 ml-1">State Plan Amendments Filters</span>
+                <span className="text-xs uppercase tracking-wider text-[#012C61] font-lemonMilkRegular mb-1 ml-1">SPA/Waiver Amendments Filters</span>
                 <div className="relative">
                   <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
                   <input
                     type="text"
                     value={spaSearch}
                     onChange={e => setSpaSearch(e.target.value)}
-                    placeholder="Search State Plan Amendments by subject or transmittal number"
+                    placeholder="Search SPA/Waiver Amendments by subject or transmittal number"
                     className="w-full pl-10 pr-4 py-3 bg-white border border-blue-300 rounded-xl text-gray-800 focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all placeholder-gray-500 text-base shadow-sm"
                   />
                 </div>
@@ -1420,7 +1420,7 @@ export default function RateDevelopments() {
                     : "text-gray-600 hover:text-gray-800"
               }`}
               >
-                State Plan Amendments
+                SPA/Waiver Amendments
           </button>
         </div>
           </div>
@@ -1597,10 +1597,10 @@ export default function RateDevelopments() {
             </div>
           </div>
 
-          {/* State Plan Amendments Table */}
+          {/* SPA/Waiver Amendments Table */}
           <div>
             <h2 className="text-xl font-semibold text-[#012C61] mb-2">
-              State Plan Amendments
+              SPA/Waiver Amendments
             </h2>
             <div className="border rounded-md max-h-[600px] overflow-y-auto bg-gray-50 shadow-lg">
               <table className="min-w-full bg-white border-collapse">
@@ -1676,7 +1676,7 @@ export default function RateDevelopments() {
         <div className="relative overflow-hidden">
           {/* Table Heading */}
           <h2 className="text-xl font-semibold text-[#012C61] mb-2">
-            {activeTable === "provider" ? "Provider Alerts" : activeTable === "legislative" ? "Legislative Updates" : "State Plan Amendments"}
+            {activeTable === "provider" ? "Provider Alerts" : activeTable === "legislative" ? "Legislative Updates" : "SPA/Waiver Amendments"}
           </h2>
 
           {/* Tables Container with Animation */}
@@ -1831,7 +1831,7 @@ export default function RateDevelopments() {
               </table>
             </div>
 
-            {/* State Plan Amendments Table */}
+            {/* SPA/Waiver Amendments Table */}
             <div className="min-w-full border rounded-md max-h-[600px] overflow-y-auto bg-gray-50 shadow-lg relative">
               <table className="min-w-full bg-white border-collapse">
                 <thead className="sticky top-0 bg-white shadow">

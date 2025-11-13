@@ -1601,13 +1601,13 @@ export default function RateDevelopments() {
         if (!response.ok) {
           const errorData = await response.json();
           console.error('Failed to update state plan amendment:', errorData);
-          alert(`❌ Failed to update state plan amendment: ${errorData.error || 'Unknown error'}`);
+          alert(`❌ Failed to update SPA/Waiver Amendment: ${errorData.error || 'Unknown error'}`);
         } else {
           console.log('✅ State plan amendment updated successfully');
         }
       } catch (error) {
         console.error('Error updating state plan amendment:', error);
-        alert('❌ Error updating state plan amendment');
+        alert('❌ Error updating SPA/Waiver Amendment');
       }
     }
     
@@ -1642,14 +1642,14 @@ export default function RateDevelopments() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Failed to delete state plan amendment:', errorData);
-        alert(`❌ Failed to delete state plan amendment: ${errorData.error || 'Unknown error'}`);
+        alert(`❌ Failed to delete SPA/Waiver Amendment: ${errorData.error || 'Unknown error'}`);
       } else {
         console.log('✅ State plan amendment deleted successfully');
         setStatePlanAmendments(statePlanAmendments => statePlanAmendments.filter(spa => spa.id !== deleteSpaId));
       }
     } catch (error) {
       console.error('Error deleting state plan amendment:', error);
-      alert('❌ Error deleting state plan amendment');
+      alert('❌ Error deleting SPA/Waiver Amendment');
     } finally {
       setDeleteSpaId(null);
       setShowDeleteConfirmation(false);
@@ -1821,16 +1821,16 @@ export default function RateDevelopments() {
               {/* Divider for md+ screens */}
               <div className="hidden md:block w-px bg-blue-100 mx-4 my-2 rounded-full" />
 
-              {/* Right Column: State Plan Amendments Filters */}
+              {/* Right Column: SPA/Waiver Amendments Filters */}
               <div className="flex-1 flex flex-col gap-5">
-                <span className="text-xs uppercase tracking-wider text-[#012C61] font-lemonMilkRegular mb-1 ml-1">State Plan Amendments Filters</span>
+                <span className="text-xs uppercase tracking-wider text-[#012C61] font-lemonMilkRegular mb-1 ml-1">SPA/Waiver Amendments Filters</span>
                 <div className="relative">
                   <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
                   <input
                     type="text"
                     value={spaSearch}
                     onChange={e => setSpaSearch(e.target.value)}
-                    placeholder="Search State Plan Amendments by subject or transmittal number"
+                    placeholder="Search SPA/Waiver Amendments by subject or transmittal number"
                     className="w-full pl-10 pr-4 py-3 bg-white border border-blue-300 rounded-xl text-gray-800 focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all placeholder-gray-500 text-base shadow-sm"
                   />
                 </div>
@@ -1989,7 +1989,7 @@ export default function RateDevelopments() {
                       : "text-gray-600 hover:text-gray-800"
                   }`}
                 >
-                  State Plan Amendments ({filteredStatePlanAmendments.length})
+                  SPA/Waiver Amendments ({filteredStatePlanAmendments.length})
                 </button>
               </div>
             </div>
@@ -2263,12 +2263,12 @@ export default function RateDevelopments() {
             </div>
           </div>
 
-          {/* State Plan Amendments Table */}
+          {/* SPA/Waiver Amendments Table */}
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-purple-100">
               <h2 className="text-xl font-semibold text-[#012C61] flex items-center">
                 <FaChartLine className="mr-2" />
-                State Plan Amendments ({filteredStatePlanAmendments.length})
+                SPA/Waiver Amendments ({filteredStatePlanAmendments.length})
               </h2>
             </div>
             <div className="max-h-[600px] overflow-y-auto">
@@ -2392,7 +2392,7 @@ export default function RateDevelopments() {
               ) : (
                 <>
                   <FaChartLine className="mr-2" />
-                  State Plan Amendments ({filteredStatePlanAmendments.length})
+                  SPA/Waiver Amendments ({filteredStatePlanAmendments.length})
                 </>
               )}
             </h2>
@@ -2632,7 +2632,7 @@ export default function RateDevelopments() {
               </table>
             </div>
 
-            {/* State Plan Amendments Table */}
+            {/* SPA/Waiver Amendments Table */}
             <div className="min-w-full max-h-[600px] overflow-y-auto relative">
               <table className="min-w-full bg-white border-collapse">
                 <thead className="sticky top-0 bg-white shadow">
@@ -2767,7 +2767,7 @@ export default function RateDevelopments() {
               <h3 className="text-lg font-bold text-gray-900">Confirm Delete</h3>
             </div>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete this {deleteProviderId ? 'provider alert' : deleteBillUrl ? 'legislative bill' : 'state plan amendment'}? This action cannot be undone.
+              Are you sure you want to delete this {deleteProviderId ? 'provider alert' : deleteBillUrl ? 'legislative bill' : 'SPA/Waiver Amendment'}? This action cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
               <button
