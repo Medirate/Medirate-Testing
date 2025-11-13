@@ -278,10 +278,10 @@ export default function SendEmailAlertsPage() {
             <button
               onClick={handleGeneratePreview}
               disabled={loading}
-              className={`px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 ${
+              className={`px-8 py-3 rounded-md font-semibold text-sm text-white transition-all duration-200 shadow-md ${
                 loading 
                   ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 transform hover:scale-105'
+                  : 'bg-[#012C61] hover:bg-[#014085] hover:shadow-lg active:scale-95'
               }`}
             >
               {loading && sendingTo === "preview" ? (
@@ -290,17 +290,17 @@ export default function SendEmailAlertsPage() {
                   Generating Preview...
                 </div>
               ) : (
-                '👁️ Generate Email Preview'
+                'Generate Email Preview'
               )}
             </button>
             
             <button
               onClick={() => handleSendEmails("test")}
               disabled={loading}
-              className={`px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 ${
+              className={`px-8 py-3 rounded-md font-semibold text-sm text-white transition-all duration-200 shadow-md ${
                 loading 
                   ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 transform hover:scale-105'
+                  : 'bg-green-600 hover:bg-green-700 hover:shadow-lg active:scale-95'
               }`}
             >
               {loading && sendingTo === "test" ? (
@@ -309,17 +309,17 @@ export default function SendEmailAlertsPage() {
                   Sending to Test Users...
                 </div>
               ) : (
-                '📧 Send to Test Users'
+                'Send to Test Users'
               )}
             </button>
             
             <button
               onClick={() => handleSendEmails("production")}
               disabled={loading}
-              className={`px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 ${
+              className={`px-8 py-3 rounded-md font-semibold text-sm text-white transition-all duration-200 shadow-md ${
                 loading 
                   ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transform hover:scale-105'
+                  : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg active:scale-95'
               }`}
             >
               {loading && sendingTo === "production" ? (
@@ -328,7 +328,7 @@ export default function SendEmailAlertsPage() {
                   Sending to All Users...
                 </div>
               ) : (
-                '📢 Send to All Users'
+                'Send to All Users'
               )}
             </button>
           </div>
