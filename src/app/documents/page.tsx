@@ -320,8 +320,8 @@ export default function Documents() {
                       >
                         <div className="flex items-center justify-between flex-wrap gap-4">
                           <div className="flex items-center gap-4">
-                            <div className="p-3 bg-gradient-to-br from-[#012C61] to-blue-600 rounded-xl shadow-lg">
-                              <stateInfo.icon className="h-6 w-6 text-white" />
+                            <div className="p-2.5 bg-[#012C61]/10 rounded-lg border border-[#012C61]/20">
+                              <stateInfo.icon className="h-5 w-5 text-[#012C61]" />
                             </div>
                             <div>
                               <h2 className="text-xl md:text-2xl font-bold text-[#012C61] mb-1 font-lemonMilkRegular">
@@ -386,8 +386,8 @@ export default function Documents() {
                                   >
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-[#012C61]/10 rounded-lg">
-                                          <FileText className="h-5 w-5 text-[#012C61]" />
+                                        <div className="p-1.5 bg-gray-100 rounded-md border border-gray-200">
+                                          <FileText className="h-4 w-4 text-gray-600" />
                                         </div>
                                         <div>
                                           <h3 className="text-base font-semibold text-gray-900">{subfolderInfo.label}</h3>
@@ -412,7 +412,7 @@ export default function Documents() {
                                             <div className="flex items-start justify-between gap-4">
                                               <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-3 flex-wrap">
-                                                  <div className="p-1.5 bg-[#012C61]/10 rounded-lg">
+                                                  <div className="p-1 bg-gray-100 rounded border border-gray-200">
                                                     {getTypeIcon(doc.type)}
                                                   </div>
                                                   <h4 className="text-sm font-semibold text-gray-900 truncate">{doc.title}</h4>
