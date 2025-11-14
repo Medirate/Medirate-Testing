@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
+import TemplatesIcon from "@/app/components/TemplatesIcon";
 
 // --- NEW: Types for client-side filtering ---
 interface FilterOptionsData {
@@ -2218,6 +2219,45 @@ export default function Dashboard() {
     setCurrentPage(1);
   };
 
+  // Handler for loading templates
+  const handleLoadTemplate = (templateData: {
+    selections: Record<string, string | null>;
+    startDate?: string | null;
+    endDate?: string | null;
+    sortConfig?: Array<{ key: string; direction: 'asc' | 'desc' }>;
+    displayedItems?: number;
+  }) => {
+    // Load selections
+    if (templateData.selections) {
+      setSelections(templateData.selections);
+    }
+
+    // Load dates
+    if (templateData.startDate) {
+      setStartDate(new Date(templateData.startDate));
+    } else {
+      setStartDate(null);
+    }
+    if (templateData.endDate) {
+      setEndDate(new Date(templateData.endDate));
+    } else {
+      setEndDate(null);
+    }
+
+    // Load sort config
+    if (templateData.sortConfig) {
+      setSortConfig(templateData.sortConfig);
+    }
+
+    // Load displayed items
+    if (templateData.displayedItems) {
+      setDisplayedItems(templateData.displayedItems);
+    }
+
+    // Reset to first page
+    setCurrentPage(1);
+  };
+
   // 1. Remove Load More logic and button
   // ... existing code ...
   // Remove handleLoadMore, hasMoreItems, and LoadMoreButton
@@ -2250,8 +2290,17 @@ export default function Dashboard() {
   }
 
   return (
-    <AppLayout activeTab="dashboard">
-      <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
+    <>
+      <TemplatesIcon
+        onLoadTemplate={handleLoadTemplate}
+        currentSelections={selections}
+        currentStartDate={startDate}
+        currentEndDate={endDate}
+        currentSortConfig={sortConfig}
+        currentDisplayedItems={displayedItems}
+      />
+      <AppLayout activeTab="dashboard">
+        <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         {/* Error Messages */}
         <ErrorMessage error={localError} />
         {authError && (
@@ -3248,6 +3297,7 @@ export default function Dashboard() {
           z-index: 999999999 !important;
         }
       `}</style>
-    </AppLayout>
+      </AppLayout>
+    </>
   );
 }
