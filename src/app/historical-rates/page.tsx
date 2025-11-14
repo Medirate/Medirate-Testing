@@ -2038,32 +2038,71 @@ export default function HistoricalRates() {
                     <ReactECharts
                       option={{
                         tooltip: {
-                          trigger: 'item',
+                          trigger: 'axis',
                           formatter: (params: any) => {
-                            if (!params || !params.data) return '';
+                            if (!Array.isArray(params) || params.length === 0) return '';
                             
-                            const data = params.data;
-                            if (data.value === null || data.value === undefined) return '';
+                            const axisValue = params[0].axisValue;
+                            let tooltip = `<b>Date:</b> ${formatDate(axisValue) || '-'}<br><br>`;
                             
-                            const rate = data.value ? `$${data.value.toFixed(2)}` : '-';
-                            const modifiers = [
-                              data.modifier1 ? `${data.modifier1}${data.modifier1Details ? ` - ${data.modifier1Details}` : ''}` : null,
-                              data.modifier2 ? `${data.modifier2}${data.modifier2Details ? ` - ${data.modifier2Details}` : ''}` : null,
-                              data.modifier3 ? `${data.modifier3}${data.modifier3Details ? ` - ${data.modifier3Details}` : ''}` : null,
-                              data.modifier4 ? `${data.modifier4}${data.modifier4Details ? ` - ${data.modifier4Details}` : ''}` : null
-                            ].filter(Boolean).join('<br>');
+                            // Filter to only show data points that have actual values at this date
+                            const validParams = params.filter((param: any) => {
+                              const data = param.data;
+                              return data && data.value !== null && data.value !== undefined && data.date === axisValue;
+                            });
+                            
+                            if (validParams.length === 0) return '';
+                            
+                            // If only one point, show detailed info
+                            if (validParams.length === 1) {
+                              const param = validParams[0];
+                              const data = param.data;
+                              const rate = data.value ? `$${data.value.toFixed(2)}` : '-';
+                              const modifiers = [
+                                data.modifier1 ? `${data.modifier1}${data.modifier1Details ? ` - ${data.modifier1Details}` : ''}` : null,
+                                data.modifier2 ? `${data.modifier2}${data.modifier2Details ? ` - ${data.modifier2Details}` : ''}` : null,
+                                data.modifier3 ? `${data.modifier3}${data.modifier3Details ? ` - ${data.modifier3Details}` : ''}` : null,
+                                data.modifier4 ? `${data.modifier4}${data.modifier4Details ? ` - ${data.modifier4Details}` : ''}` : null
+                              ].filter(Boolean).join('<br>');
 
-                            return `
-                              <b style="color: ${params.color};">${params.seriesName}</b><br>
-                              <b>Date:</b> ${formatDate(data.date) || '-'}<br>
-                              <b>Rate:</b> ${rate}<br>
-                              <b>State:</b> ${data.state || '-'}<br>
-                              <b>Service Code:</b> ${data.serviceCode || '-'}<br>
-                              <b>Program:</b> ${data.program || '-'}<br>
-                              <b>Location/Region:</b> ${data.locationRegion || '-'}<br>
-                              <b>Duration Unit:</b> ${data.durationUnit || '-'}<br>
-                              ${modifiers ? `<b>Modifiers:</b><br>${modifiers}` : ''}
-                            `;
+                              return `
+                                <b style="color: ${param.color};">${param.seriesName}</b><br>
+                                <b>Rate:</b> ${rate}<br>
+                                <b>State:</b> ${data.state || '-'}<br>
+                                <b>Service Code:</b> ${data.serviceCode || '-'}<br>
+                                <b>Program:</b> ${data.program || '-'}<br>
+                                <b>Location/Region:</b> ${data.locationRegion || '-'}<br>
+                                <b>Duration Unit:</b> ${data.durationUnit || '-'}<br>
+                                ${modifiers ? `<b>Modifiers:</b><br>${modifiers}` : ''}
+                              `;
+                            }
+                            
+                            // Multiple overlapping points - show all of them
+                            validParams.forEach((param: any, index: number) => {
+                              const data = param.data;
+                              const rate = data.value ? `$${data.value.toFixed(2)}` : '-';
+                              const modifiers = [
+                                data.modifier1 ? `${data.modifier1}${data.modifier1Details ? ` - ${data.modifier1Details}` : ''}` : null,
+                                data.modifier2 ? `${data.modifier2}${data.modifier2Details ? ` - ${data.modifier2Details}` : ''}` : null,
+                                data.modifier3 ? `${data.modifier3}${data.modifier3Details ? ` - ${data.modifier3Details}` : ''}` : null,
+                                data.modifier4 ? `${data.modifier4}${data.modifier4Details ? ` - ${data.modifier4Details}` : ''}` : null
+                              ].filter(Boolean).join('<br>');
+
+                              tooltip += `
+                                <div style="margin-bottom: ${index < validParams.length - 1 ? '8px' : '0'}; padding-bottom: ${index < validParams.length - 1 ? '8px' : '0'}; ${index < validParams.length - 1 ? 'border-bottom: 1px solid #e5e7eb;' : ''}">
+                                  <b style="color: ${param.color};">${param.seriesName}</b><br>
+                                  <b>Rate:</b> ${rate}<br>
+                                  <b>State:</b> ${data.state || '-'}<br>
+                                  <b>Service Code:</b> ${data.serviceCode || '-'}<br>
+                                  <b>Program:</b> ${data.program || '-'}<br>
+                                  <b>Location/Region:</b> ${data.locationRegion || '-'}<br>
+                                  <b>Duration Unit:</b> ${data.durationUnit || '-'}<br>
+                                  ${modifiers ? `<b>Modifiers:</b><br>${modifiers}` : ''}
+                                </div>
+                              `;
+                            });
+                            
+                            return tooltip;
                           }
                         },
                         xAxis: {
