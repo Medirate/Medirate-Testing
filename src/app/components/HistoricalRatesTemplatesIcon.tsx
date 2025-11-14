@@ -31,7 +31,7 @@ interface HistoricalRatesTemplate {
   template_name: string;
   template_data: {
     selections: Record<string, string | null>;
-    selectedEntry?: ServiceData | null;
+    selectedEntries?: ServiceData[];
   };
   created_at: string;
   updated_at: string;
@@ -40,13 +40,13 @@ interface HistoricalRatesTemplate {
 interface HistoricalRatesTemplatesIconProps {
   onLoadTemplate: (template: HistoricalRatesTemplate['template_data']) => void;
   currentSelections: Record<string, string | null>;
-  currentSelectedEntry?: ServiceData | null;
+  currentSelectedEntries?: ServiceData[];
 }
 
 const HistoricalRatesTemplatesIcon = ({
   onLoadTemplate,
   currentSelections,
-  currentSelectedEntry,
+  currentSelectedEntries = [],
 }: HistoricalRatesTemplatesIconProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [templates, setTemplates] = useState<HistoricalRatesTemplate[]>([]);
@@ -105,7 +105,7 @@ const HistoricalRatesTemplatesIcon = ({
     try {
       const templateData = {
         selections: currentSelections,
-        selectedEntry: currentSelectedEntry || null,
+        selectedEntries: currentSelectedEntries || [],
       };
 
       const response = await fetch('/api/dashboard-templates', {
