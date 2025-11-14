@@ -2720,14 +2720,16 @@ export default function Dashboard() {
             <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-blue-800">
-                  <strong>Excel Export Usage:</strong> {exportUsage.rowsUsed.toLocaleString()} / {exportUsage.rowsLimit.toLocaleString()} rows used
+                  <strong>Excel Export Usage:</strong> {exportUsage!.rowsUsed.toLocaleString()} / {exportUsage!.rowsLimit.toLocaleString()} rows used
                 </span>
                 <span className="text-blue-600">
-                  {exportUsage.rowsRemaining.toLocaleString()} rows remaining
+                  {exportUsage!.rowsRemaining.toLocaleString()} rows remaining
                 </span>
               </div>
               <div className="mt-1 text-xs text-blue-600">
-                Resets on {new Date(exportUsage.currentPeriodEnd).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
+                {exportUsage!.currentPeriodEnd && (
+                  <>Resets on {new Date(exportUsage!.currentPeriodEnd).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</>
+                )}
               </div>
             </div>
           )}
@@ -2751,7 +2753,7 @@ export default function Dashboard() {
                     <div className="space-y-2 text-sm text-gray-700">
                       <div className="flex justify-between">
                         <span className="font-medium">File contains:</span>
-                        <span className="font-semibold text-gray-900">{pendingCsvExport.rowCount.toLocaleString()} rows</span>
+                        <span className="font-semibold text-gray-900">{pendingCsvExport!.rowCount.toLocaleString()} rows</span>
                       </div>
                     </div>
                   </div>
@@ -2760,17 +2762,17 @@ export default function Dashboard() {
                     <p className="text-xs font-medium text-amber-900 mb-2">📋 Important Note</p>
                     <p className="text-xs text-amber-800">
                       This limit is shared across <strong>all users</strong> in your subscription (primary user and sub-users combined).
-                      {pendingCsvExport.primaryUserEmail && (
+                      {pendingCsvExport!.primaryUserEmail && (
                         <>
                           <br />
                           <span className="mt-1 block">
                             <strong>
-                              {pendingCsvExport.userRole === 'subscription_manager' 
+                              {pendingCsvExport!.userRole === 'subscription_manager' 
                                 ? 'Subscription Manager' 
-                                : pendingCsvExport.userRole === 'primary_user'
+                                : pendingCsvExport!.userRole === 'primary_user'
                                 ? 'Primary User'
                                 : 'Primary User'}:
-                            </strong> {pendingCsvExport.primaryUserEmail}
+                            </strong> {pendingCsvExport!.primaryUserEmail}
                           </span>
                         </>
                       )}
@@ -2782,11 +2784,11 @@ export default function Dashboard() {
                     <div className="space-y-2 text-sm text-gray-700">
                       <div className="flex justify-between">
                         <span>Rows remaining in subscription:</span>
-                        <span className="font-semibold text-gray-900">{exportUsage.rowsRemaining.toLocaleString()}</span>
+                        <span className="font-semibold text-gray-900">{exportUsage!.rowsRemaining.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Rows used this period:</span>
-                        <span>{exportUsage.rowsUsed.toLocaleString()} / {exportUsage.rowsLimit.toLocaleString()}</span>
+                        <span>{exportUsage!.rowsUsed.toLocaleString()} / {exportUsage!.rowsLimit.toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
@@ -2797,15 +2799,15 @@ export default function Dashboard() {
                       <div className="flex justify-between items-center">
                         <span>Rows remaining after download:</span>
                         <span className="font-semibold text-green-700 text-base">
-                          {Math.max(0, exportUsage.rowsRemaining - pendingCsvExport.rowCount).toLocaleString()}
+                          {exportUsage && pendingCsvExport ? Math.max(0, exportUsage!.rowsRemaining - pendingCsvExport!.rowCount).toLocaleString() : '0'}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {exportUsage.currentPeriodEnd && (
+                  {exportUsage!.currentPeriodEnd && (
                     <p className="text-xs text-gray-500 text-center">
-                      Usage limit resets on {new Date(exportUsage.currentPeriodEnd).toLocaleDateString('en-US', { 
+                      Usage limit resets on {new Date(exportUsage!.currentPeriodEnd).toLocaleDateString('en-US', { 
                         month: '2-digit', 
                         day: '2-digit', 
                         year: 'numeric' 
@@ -2827,7 +2829,7 @@ export default function Dashboard() {
                   <button
                     onClick={() => {
                       if (pendingCsvExport) {
-                        pendingCsvExport.proceed();
+                        pendingCsvExport!.proceed();
                       }
                     }}
                     className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors shadow-sm"
