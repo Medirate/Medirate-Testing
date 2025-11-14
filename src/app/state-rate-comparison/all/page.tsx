@@ -3467,12 +3467,6 @@ export default function StatePaymentComparison() {
   // Store handleSearch in a ref so we can call it from useEffect
   const handleSearchRef = useRef<(() => Promise<void>) | null>(null);
   
-  // Set handleSearch ref immediately when component renders (before handleSearch is defined)
-  // We'll update it in a useEffect after handleSearch is defined
-  useEffect(() => {
-    // This will be set after handleSearch is defined
-  }, []);
-  
   // Listen for auto-search trigger
   useEffect(() => {
     const handleTriggerSearch = () => {
