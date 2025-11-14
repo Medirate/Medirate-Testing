@@ -913,9 +913,45 @@ export default function HistoricalRates() {
     selections.duration_unit
   ]);
 
+  // Match pending selected entry to filteredData after search completes
   useEffect(() => {
-    // Filtered data processing
-  }, [filteredData]);
+    if (!pendingSelectedEntryForMatching || !hasSearched || filteredData.length === 0) return;
+
+    console.log('🔍 Matching pending selected entry to filteredData...', {
+      pendingEntry: pendingSelectedEntryForMatching,
+      filteredDataLength: filteredData.length
+    });
+
+    // Find matching entry in filteredData (this is what's displayed in the table)
+    const matchingEntry = filteredData.find((item: ServiceData) => 
+      item.state_name === pendingSelectedEntryForMatching.state_name &&
+      item.service_category === pendingSelectedEntryForMatching.service_category &&
+      item.service_code === pendingSelectedEntryForMatching.service_code &&
+      item.service_description === pendingSelectedEntryForMatching.service_description &&
+      item.program === pendingSelectedEntryForMatching.program &&
+      item.location_region === pendingSelectedEntryForMatching.location_region &&
+      item.modifier_1 === pendingSelectedEntryForMatching.modifier_1 &&
+      item.modifier_1_details === pendingSelectedEntryForMatching.modifier_1_details &&
+      item.modifier_2 === pendingSelectedEntryForMatching.modifier_2 &&
+      item.modifier_2_details === pendingSelectedEntryForMatching.modifier_2_details &&
+      item.modifier_3 === pendingSelectedEntryForMatching.modifier_3 &&
+      item.modifier_3_details === pendingSelectedEntryForMatching.modifier_3_details &&
+      item.modifier_4 === pendingSelectedEntryForMatching.modifier_4 &&
+      item.modifier_4_details === pendingSelectedEntryForMatching.modifier_4_details &&
+      item.duration_unit === pendingSelectedEntryForMatching.duration_unit &&
+      item.provider_type === pendingSelectedEntryForMatching.provider_type &&
+      item.rate_effective_date === pendingSelectedEntryForMatching.rate_effective_date
+    );
+    
+    if (matchingEntry) {
+      console.log('✅ Found matching entry, setting selectedEntry');
+      setSelectedEntry(matchingEntry);
+      setPendingSelectedEntryForMatching(null); // Clear pending
+    } else {
+      console.log('⚠️ Could not find matching entry in filteredData');
+      setPendingSelectedEntryForMatching(null); // Clear pending even if not found
+    }
+  }, [filteredData, hasSearched, pendingSelectedEntryForMatching]);
 
   const getVisibleColumns = useMemo(() => {
     const columns = {
