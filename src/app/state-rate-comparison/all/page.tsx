@@ -743,6 +743,8 @@ export default function StatePaymentComparison() {
   const [providerTypes, setProviderTypes] = useState<string[]>([]);
   const [filterSetData, setFilterSetData] = useState<{ [index: number]: ServiceData[] }>({});
   const [selectedEntries, setSelectedEntries] = useState<{ [state: string]: ServiceData[] }>({});
+  // Store pending selections from template load (before data is fetched)
+  const [pendingSelectedEntries, setPendingSelectedEntries] = useState<{ [state: string]: any[] } | null>(null);
   const [chartRefreshKey, setChartRefreshKey] = useState(0);
   // State to hold all states averages for All States mode
   const [allStatesAverages, setAllStatesAverages] = useState<{ state_name: string; avg_rate: number }[] | null>(null);
@@ -821,9 +823,10 @@ export default function StatePaymentComparison() {
       setIsAllStatesSelected(templateData.isAllStatesSelected);
     }
 
-    // Load selected entries
+    // Load selected entries - store as pending until data is loaded
     if (templateData.selectedEntries) {
-      setSelectedEntries(templateData.selectedEntries);
+      setPendingSelectedEntries(templateData.selectedEntries);
+      // Don't set selectedEntries yet - wait for data to load
     }
   };
 
@@ -2858,6 +2861,7 @@ export default function StatePaymentComparison() {
     setSortOrder('default');
     setSelectedStateDetails(null);
     setSelectedEntries({});         // <-- Clear selected entries
+    setPendingSelectedEntries(null); // <-- Clear pending selections
     setClickedStates([]);          // <-- Clear clicked states
     setChartRefreshKey(k => k + 1); // <-- Force chart to re-render/reset
     
@@ -3123,6 +3127,65 @@ export default function StatePaymentComparison() {
     setChartRefreshKey(k => k + 1);
   };
 
+  // Match pending selected entries to loaded data after data is fetched
+  useEffect(() => {
+    if (!pendingSelectedEntries) return; // No pending selections
+    
+    // Get all loaded data (either from data or filterSetData)
+    const allLoadedData: ServiceData[] = [];
+    
+    if (!isAllStatesSelected && Object.keys(filterSetData).length > 0) {
+      // For individual states mode, use filterSetData
+      Object.values(filterSetData).forEach(stateData => {
+        if (Array.isArray(stateData)) {
+          allLoadedData.push(...stateData);
+        }
+      });
+    } else if (isAllStatesSelected && data.length > 0) {
+      // For all states mode, use data
+      allLoadedData.push(...data);
+    }
+    
+    // If no data loaded yet, wait
+    if (allLoadedData.length === 0) return;
+    
+    // Match pending entries to loaded data using row keys
+    const matchedEntries: { [state: string]: ServiceData[] } = {};
+    
+    Object.entries(pendingSelectedEntries).forEach(([state, savedEntries]) => {
+      if (!Array.isArray(savedEntries) || savedEntries.length === 0) return;
+      
+      const matched: ServiceData[] = [];
+      
+      savedEntries.forEach(savedEntry => {
+        // Create row key from saved entry
+        const savedKey = getRowKey(savedEntry as ServiceData);
+        
+        // Find matching entry in loaded data
+        const matchedEntry = allLoadedData.find(loadedItem => {
+          const loadedKey = getRowKey(loadedItem);
+          return loadedKey === savedKey;
+        });
+        
+        if (matchedEntry) {
+          matched.push(matchedEntry);
+        }
+      });
+      
+      if (matched.length > 0) {
+        matchedEntries[state] = matched;
+      }
+    });
+    
+    // Update selectedEntries with matched entries
+    if (Object.keys(matchedEntries).length > 0) {
+      setSelectedEntries(matchedEntries);
+      setChartRefreshKey(k => k + 1); // Refresh chart
+    }
+    
+    // Clear pending selections
+    setPendingSelectedEntries(null);
+  }, [data, filterSetData, pendingSelectedEntries, isAllStatesSelected]);
 
   // Add filter options loading logic
   useEffect(() => {
