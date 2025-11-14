@@ -781,6 +781,30 @@ export default function HistoricalRates() {
       }
     });
   };
+  
+  // Helper function to get the color for a selected entry
+  const getEntryColor = (entry: ServiceData): string | null => {
+    const index = selectedEntries.findIndex(selected => 
+      selected.state_name === entry.state_name &&
+      selected.service_category === entry.service_category &&
+      selected.service_code === entry.service_code &&
+      selected.service_description === entry.service_description &&
+      selected.program === entry.program &&
+      selected.location_region === entry.location_region &&
+      selected.modifier_1 === entry.modifier_1 &&
+      selected.modifier_1_details === entry.modifier_1_details &&
+      selected.modifier_2 === entry.modifier_2 &&
+      selected.modifier_2_details === entry.modifier_2_details &&
+      selected.modifier_3 === entry.modifier_3 &&
+      selected.modifier_3_details === entry.modifier_3_details &&
+      selected.modifier_4 === entry.modifier_4 &&
+      selected.modifier_4_details === entry.modifier_4_details &&
+      selected.duration_unit === entry.duration_unit &&
+      selected.provider_type === entry.provider_type &&
+      selected.rate_effective_date === entry.rate_effective_date
+    );
+    return index >= 0 ? chartColors[index % chartColors.length] : null;
+  };
   const [showRatePerHour, setShowRatePerHour] = useState(false);
   const [comment, setComment] = useState<string | null>(null);
   const [filterStep, setFilterStep] = useState(1);
@@ -1517,19 +1541,28 @@ export default function HistoricalRates() {
     // Map each series data to match the unified xAxis dates
     const mappedSeries = allSeries.map(series => {
       const dataMap = new Map(series.data.map((d: any) => [d.date, d]));
-      const mappedData = sortedDates.map(date => {
+      let lastValue: any = null;
+      const mappedData: any[] = [];
+      
+      sortedDates.forEach(date => {
         const existingData = dataMap.get(date);
-        if (existingData) {
-          return existingData;
+        if (existingData && existingData.value !== null && existingData.value !== undefined) {
+          lastValue = existingData;
+          mappedData.push(existingData);
+        } else if (lastValue) {
+          // Forward fill: use the last known value for missing dates
+          mappedData.push({ 
+            ...lastValue, 
+            value: lastValue.value, 
+            date,
+            // Mark as forward-filled for potential styling
+            isForwardFilled: true
+          });
         }
-        // For missing dates, find the previous value (forward fill)
-        const previousData = series.data.find((d: any) => {
-          const dDate = parseDateString(d.date);
-          const currentDate = parseDateString(date);
-          return dDate <= currentDate;
-        });
-        return previousData ? { ...previousData, value: null, date } : null;
-      }).filter(Boolean);
+        // If no previous data exists, skip this date for this series
+        // (don't add anything, creating a gap in the line)
+      });
+      
       return { ...series, data: mappedData };
     });
 
@@ -2005,49 +2038,32 @@ export default function HistoricalRates() {
                     <ReactECharts
                       option={{
                         tooltip: {
-                          trigger: 'axis',
+                          trigger: 'item',
                           formatter: (params: any) => {
-                            if (!Array.isArray(params)) return '';
+                            if (!params || !params.data) return '';
                             
-                            let tooltip = `<b>Date:</b> ${formatDate(params[0].axisValue) || '-'}<br><br>`;
+                            const data = params.data;
+                            if (data.value === null || data.value === undefined) return '';
                             
-                            params.forEach((param: any) => {
-                              const data = param.data;
-                              if (!data || data.value === null) return;
-                              
-                              const rate = data.value ? `$${data.value.toFixed(2)}` : '-';
-                              const modifiers = [
-                                data.modifier1 ? `${data.modifier1}${data.modifier1Details ? ` - ${data.modifier1Details}` : ''}` : null,
-                                data.modifier2 ? `${data.modifier2}${data.modifier2Details ? ` - ${data.modifier2Details}` : ''}` : null,
-                                data.modifier3 ? `${data.modifier3}${data.modifier3Details ? ` - ${data.modifier3Details}` : ''}` : null,
-                                data.modifier4 ? `${data.modifier4}${data.modifier4Details ? ` - ${data.modifier4Details}` : ''}` : null
-                              ].filter(Boolean).join('<br>');
+                            const rate = data.value ? `$${data.value.toFixed(2)}` : '-';
+                            const modifiers = [
+                              data.modifier1 ? `${data.modifier1}${data.modifier1Details ? ` - ${data.modifier1Details}` : ''}` : null,
+                              data.modifier2 ? `${data.modifier2}${data.modifier2Details ? ` - ${data.modifier2Details}` : ''}` : null,
+                              data.modifier3 ? `${data.modifier3}${data.modifier3Details ? ` - ${data.modifier3Details}` : ''}` : null,
+                              data.modifier4 ? `${data.modifier4}${data.modifier4Details ? ` - ${data.modifier4Details}` : ''}` : null
+                            ].filter(Boolean).join('<br>');
 
-                              tooltip += `
-                                <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
-                                  <b style="color: ${param.color};">${param.seriesName}</b><br>
-                                  <b>Rate:</b> ${rate}<br>
-                                  <b>State:</b> ${data.state || '-'}<br>
-                                  <b>Service Code:</b> ${data.serviceCode || '-'}<br>
-                                  <b>Program:</b> ${data.program || '-'}<br>
-                                  <b>Location/Region:</b> ${data.locationRegion || '-'}<br>
-                                  <b>Duration Unit:</b> ${data.durationUnit || '-'}<br>
-                                  ${modifiers ? `<b>Modifiers:</b><br>${modifiers}` : ''}
-                                </div>
-                              `;
-                            });
-                            
-                            return tooltip;
-                          }
-                        },
-                        legend: {
-                          data: getGraphData.series.map((s: any) => s.name),
-                          type: 'scroll',
-                          orient: 'horizontal',
-                          left: 'center',
-                          top: 'top',
-                          textStyle: {
-                            fontSize: 11
+                            return `
+                              <b style="color: ${params.color};">${params.seriesName}</b><br>
+                              <b>Date:</b> ${formatDate(data.date) || '-'}<br>
+                              <b>Rate:</b> ${rate}<br>
+                              <b>State:</b> ${data.state || '-'}<br>
+                              <b>Service Code:</b> ${data.serviceCode || '-'}<br>
+                              <b>Program:</b> ${data.program || '-'}<br>
+                              <b>Location/Region:</b> ${data.locationRegion || '-'}<br>
+                              <b>Duration Unit:</b> ${data.durationUnit || '-'}<br>
+                              ${modifiers ? `<b>Modifiers:</b><br>${modifiers}` : ''}
+                            `;
                           }
                         },
                         xAxis: {
@@ -2081,8 +2097,8 @@ export default function HistoricalRates() {
                           containLabel: true,
                           left: '10%',
                           right: '3%',
-                          bottom: '15%',
-                          top: '15%'
+                          bottom: '10%',
+                          top: '10%'
                         }
                       }}
                       style={{ height: '100%', width: '100%' }}
@@ -2169,6 +2185,7 @@ export default function HistoricalRates() {
                       {tableData.map((item, index) => {
                         const entry = item as ServiceData;
                         const isSelected = isEntrySelected(entry);
+                        const entryColor = getEntryColor(entry);
 
                         const rateValue = parseRate(entry.rate);
                         const durationUnit = entry.duration_unit?.toUpperCase();
@@ -2179,18 +2196,28 @@ export default function HistoricalRates() {
                           key={index} 
                           className={`group relative transition-all duration-200 ease-in-out cursor-pointer ${
                             isSelected 
-                              ? 'bg-blue-50 shadow-[0_0_0_1px_rgba(59,130,246,0.2)]' 
+                              ? `shadow-[0_0_0_2px_${entryColor}]` 
                               : 'hover:bg-gray-50 hover:shadow-[0_2px_4px_rgba(0,0,0,0.05)] hover:scale-[1.01] hover:z-10'
                           }`}
+                          style={isSelected && entryColor ? { 
+                            backgroundColor: `${entryColor}15`, // 15 = ~8% opacity
+                            borderLeft: `4px solid ${entryColor}`
+                          } : {}}
                           onClick={() => toggleEntrySelection(entry)}
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
-                                isSelected 
-                                  ? 'border-blue-500 bg-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.2)]' 
-                                  : 'border-gray-300 group-hover:border-blue-300 group-hover:shadow-[0_0_0_2px_rgba(59,130,246,0.1)]'
-                              }`}>
+                              <div 
+                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+                                  isSelected 
+                                    ? 'shadow-[0_0_0_3px_rgba(0,0,0,0.1)]' 
+                                    : 'border-gray-300 group-hover:border-blue-300 group-hover:shadow-[0_0_0_2px_rgba(59,130,246,0.1)]'
+                                }`}
+                                style={isSelected && entryColor ? {
+                                  backgroundColor: entryColor,
+                                  borderColor: entryColor
+                                } : {}}
+                              >
                                 {isSelected && (
                                   <svg 
                                     className="w-3 h-3 text-white transition-transform duration-200" 
