@@ -1545,11 +1545,11 @@ export default function HistoricalRates() {
       const mappedData: any[] = [];
       
       sortedDates.forEach(date => {
-        const existingData = dataMap.get(date);
+        const existingData = dataMap.get(date) as any;
         if (existingData && existingData.value !== null && existingData.value !== undefined) {
           lastValue = existingData;
           mappedData.push(existingData);
-        } else if (lastValue) {
+        } else if (lastValue && lastValue.value !== null && lastValue.value !== undefined) {
           // Forward fill: use the last known value for missing dates
           mappedData.push({ 
             ...lastValue, 
