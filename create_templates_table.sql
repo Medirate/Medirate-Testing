@@ -18,12 +18,12 @@ CREATE INDEX IF NOT EXISTS idx_templates_user_id ON templates(user_id);
 CREATE INDEX IF NOT EXISTS idx_templates_page_name ON templates(page_name);
 
 -- Add comment
-COMMENT ON TABLE templates IS 'Stores user-saved filter templates for all pages. Templates are isolated per user via user_id and separated by page_name.';
-COMMENT ON COLUMN templates.template_data IS 'JSONB object containing page-specific filter configurations. Structure varies by page_name (dashboard vs state-rate-comparison-all).';
-COMMENT ON COLUMN templates.page_name IS 'Page identifier: "dashboard" or "state-rate-comparison-all". Used to separate templates for different pages with different filter structures.';
+COMMENT ON TABLE dashboard_templates IS 'Stores user-saved filter templates for dashboard and other pages. Templates are isolated per user via user_id and separated by page_name.';
+COMMENT ON COLUMN dashboard_templates.template_data IS 'JSONB object containing page-specific filter configurations. Structure varies by page_name (dashboard vs state-rate-comparison-all).';
+COMMENT ON COLUMN dashboard_templates.page_name IS 'Page identifier: "dashboard" or "state-rate-comparison-all". Used to separate templates for different pages with different filter structures.';
 
 -- Enable Row Level Security
-ALTER TABLE templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dashboard_templates ENABLE ROW LEVEL SECURITY;
 
 -- Note: Since this application uses KindeAuth (not Supabase Auth), 
 -- the API routes use service role which bypasses RLS.

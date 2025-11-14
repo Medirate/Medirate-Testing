@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch templates for this user and page
     const { data: templates, error } = await supabase
-      .from("dashboard_templates")
+      .from("templates")
       .select("*")
       .eq("user_id", userData.UserID)
       .eq("page_name", pageName)
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     // Check if template name already exists for this user and page
     const { data: existing } = await supabase
-      .from("dashboard_templates")
+      .from("templates")
       .select("id")
       .eq("user_id", userData.UserID)
       .eq("template_name", template_name)
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     // Create new template
     const { data: template, error: insertError } = await supabase
-      .from("dashboard_templates")
+      .from("templates")
       .insert({
         user_id: userData.UserID,
         template_name,
@@ -153,7 +153,7 @@ export async function PUT(request: NextRequest) {
 
     // Verify template belongs to user
     const { data: existing, error: fetchError } = await supabase
-      .from("dashboard_templates")
+      .from("templates")
       .select("*")
       .eq("id", id)
       .eq("user_id", userData.UserID)
@@ -163,16 +163,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Template not found" }, { status: 404 });
     }
 
-    // If renaming, check for duplicate names
-    if (template_name && template_name !== existing.template_name) {
-      const { data: duplicate } = await supabase
-        .from("dashboard_templates")
-        .select("id")
-        .eq("user_id", userData.UserID)
-        .eq("template_name", template_name)
-        .eq("page_name", existing.page_name)
-        .neq("id", id)
-        .single();
+      // If renaming, check for duplicate names
+      if (template_name && template_name !== existing.template_name) {
+        const { data: duplicate } = await supabase
+          .from("templates")
+          .select("id")
+          .eq("user_id", userData.UserID)
+          .eq("template_name", template_name)
+          .eq("page_name", existing.page_name)
+          .neq("id", id)
+          .single();
 
       if (duplicate) {
         return NextResponse.json(
@@ -190,9 +190,10 @@ export async function PUT(request: NextRequest) {
     if (template_data) updateData.template_data = template_data;
 
     const { data: template, error: updateError } = await supabase
-      .from("dashboard_templates")
+      .from("templates")
       .update(updateData)
       .eq("id", id)
+      .eq("user_id", userData.UserID) // Extra security: ensure user_id matches
       .select()
       .single();
 
@@ -240,7 +241,7 @@ export async function DELETE(request: NextRequest) {
 
     // Verify template belongs to user and delete
     const { error: deleteError } = await supabase
-      .from("dashboard_templates")
+      .from("templates")
       .delete()
       .eq("id", id)
       .eq("user_id", userData.UserID);
