@@ -184,7 +184,7 @@ const TemplatesIcon = ({
     <>
       <button
         onClick={() => setIsOpen(true)}
-        style={{ top: '8.5rem' }}
+        style={{ top: '10rem' }}
         className="fixed right-4 z-[1000] px-4 py-2 bg-[#012C61] text-white rounded-lg shadow-lg hover:bg-[#001a3d] transition-colors flex items-center space-x-2"
         aria-label="View Templates"
       >
