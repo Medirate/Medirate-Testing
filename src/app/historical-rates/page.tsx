@@ -723,8 +723,6 @@ export default function HistoricalRates() {
 
   // Keep only the states that are still needed
   const [selectedEntry, setSelectedEntry] = useState<ServiceData | null>(null);
-  // Store pending selected entry from template load
-  const [pendingSelectedEntry, setPendingSelectedEntry] = useState<ServiceData | null>(null);
   const [showRatePerHour, setShowRatePerHour] = useState(false);
   const [comment, setComment] = useState<string | null>(null);
   const [filterStep, setFilterStep] = useState(1);
@@ -1209,7 +1207,7 @@ export default function HistoricalRates() {
       modifier_1: null,
     });
     setSelectedEntry(null);
-    setPendingSelectedEntry(null); // Clear pending selected entry
+    setPendingSelectedEntryForMatching(null);
     setCurrentPage(1);
     setTotalCount(0);
     setData([]);
@@ -1484,65 +1482,52 @@ export default function HistoricalRates() {
   const availableDurationUnits = getAvailableOptionsForFilter('duration_unit', selections, filterOptionsData) as string[];
   const availableModifiers = getAvailableOptionsForFilter('modifier_1', selections, filterOptionsData) as string[];
 
-  // Handler for loading templates - NO auto-search, user must click Search button
-  const handleLoadTemplate = (templateData: {
+  // Handler for loading templates
+  const handleLoadTemplate = async (templateData: {
     selections: Record<string, string | null>;
     selectedEntry?: ServiceData | null;
   }) => {
-    console.log('📥 Loading template (no auto-search)...');
+    console.log('📥 Loading template and triggering search...');
     
     // Load selections
     if (templateData.selections) {
       setSelections(templateData.selections);
     }
 
-    // Store selectedEntry to be applied after user searches and data loads
-    // We'll use a useEffect to match it after filteredData is available
-    if (templateData.selectedEntry) {
-      // Store in a ref or state that will be used after search
-      setPendingSelectedEntry(templateData.selectedEntry);
+    // Wait for React to process state updates, then trigger search
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Trigger search by calling refreshData with the loaded selections
+    const loadedSelections = templateData.selections;
+    if (loadedSelections.service_category && loadedSelections.state_name && (loadedSelections.service_code || loadedSelections.service_description)) {
+      const filters: Record<string, string> = {};
+      if (loadedSelections.service_category) filters.service_category = loadedSelections.service_category;
+      if (loadedSelections.state_name) filters.state_name = loadedSelections.state_name;
+      if (loadedSelections.service_code) filters.service_code = loadedSelections.service_code;
+      if (loadedSelections.service_description) filters.service_description = loadedSelections.service_description;
+      if (loadedSelections.program) filters.program = loadedSelections.program;
+      if (loadedSelections.location_region) filters.location_region = loadedSelections.location_region;
+      if (loadedSelections.provider_type) filters.provider_type = loadedSelections.provider_type;
+      if (loadedSelections.duration_unit) filters.duration_unit = loadedSelections.duration_unit;
+      if (loadedSelections.modifier_1) filters.modifier_1 = loadedSelections.modifier_1;
+      filters.page = String(currentPage);
+      filters.itemsPerPage = String(itemsPerPage);
+      
+      console.log('🚀 Calling refreshData with template filters...');
+      const result = await refreshData(filters);
+      
+      // After data loads, set the selected entry if it exists
+      // We need to wait for filteredData to be computed, then match against it
+      if (templateData.selectedEntry) {
+        // Wait for filteredData to update (it depends on data and selections)
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Use a useEffect-like approach - we'll set a pending state and match in useEffect
+        // For now, let's use a ref or state to trigger matching after filteredData updates
+        setPendingSelectedEntryForMatching(templateData.selectedEntry);
+      }
     }
   };
-
-  // Match pending selected entry to filteredData after search completes
-  useEffect(() => {
-    if (!pendingSelectedEntry || !hasSearched || filteredData.length === 0) return;
-
-    console.log('🔍 Matching pending selected entry to filteredData...', {
-      pendingEntry: pendingSelectedEntry,
-      filteredDataLength: filteredData.length
-    });
-
-    // Find matching entry in filteredData (this is what's displayed in the table)
-    const matchingEntry = filteredData.find((item: ServiceData) => 
-      item.state_name === pendingSelectedEntry.state_name &&
-      item.service_category === pendingSelectedEntry.service_category &&
-      item.service_code === pendingSelectedEntry.service_code &&
-      item.service_description === pendingSelectedEntry.service_description &&
-      item.program === pendingSelectedEntry.program &&
-      item.location_region === pendingSelectedEntry.location_region &&
-      item.modifier_1 === pendingSelectedEntry.modifier_1 &&
-      item.modifier_1_details === pendingSelectedEntry.modifier_1_details &&
-      item.modifier_2 === pendingSelectedEntry.modifier_2 &&
-      item.modifier_2_details === pendingSelectedEntry.modifier_2_details &&
-      item.modifier_3 === pendingSelectedEntry.modifier_3 &&
-      item.modifier_3_details === pendingSelectedEntry.modifier_3_details &&
-      item.modifier_4 === pendingSelectedEntry.modifier_4 &&
-      item.modifier_4_details === pendingSelectedEntry.modifier_4_details &&
-      item.duration_unit === pendingSelectedEntry.duration_unit &&
-      item.provider_type === pendingSelectedEntry.provider_type &&
-      item.rate_effective_date === pendingSelectedEntry.rate_effective_date
-    );
-    
-    if (matchingEntry) {
-      console.log('✅ Found matching entry, setting selectedEntry');
-      setSelectedEntry(matchingEntry);
-      setPendingSelectedEntry(null); // Clear pending
-    } else {
-      console.log('⚠️ Could not find matching entry in filteredData');
-      setPendingSelectedEntry(null); // Clear pending even if not found
-    }
-  }, [filteredData, hasSearched, pendingSelectedEntry]);
 
   return (
     <AppLayout activeTab="historicalRates">
