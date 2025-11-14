@@ -3202,13 +3202,23 @@ export default function StatePaymentComparison() {
   }, [data, filterSetData, pendingSelectedEntries, isAllStatesSelected]);
 
   // Validate and clean up stateSelectedForAverage after data loads (for All States mode)
+  // Only run this after user has searched (hasSearchedOnce) to ensure data is fully loaded
   useEffect(() => {
-    if (!isAllStatesSelected || data.length === 0) return;
+    if (!isAllStatesSelected || data.length === 0 || !hasSearchedOnce) return;
     
-    // Get all row keys from loaded data
-    const loadedRowKeys = new Set(data.map(item => getRowKey(item)));
+    // Get all row keys from loaded data, grouped by state for more accurate matching
+    const loadedRowKeysByState: { [state: string]: Set<string> } = {};
+    data.forEach(item => {
+      const state = item.state_name?.trim().toUpperCase();
+      if (state) {
+        if (!loadedRowKeysByState[state]) {
+          loadedRowKeysByState[state] = new Set();
+        }
+        loadedRowKeysByState[state].add(getRowKey(item));
+      }
+    });
     
-    // Clean up stateSelectedForAverage to only include row keys that exist in loaded data
+    // Clean up stateSelectedForAverage to only include row keys that exist in loaded data for that state
     setStateSelectedForAverage(prev => {
       if (Object.keys(prev).length === 0) return prev;
       
@@ -3216,25 +3226,37 @@ export default function StatePaymentComparison() {
       let hasChanges = false;
       
       Object.entries(prev).forEach(([state, rowKeySet]) => {
+        const stateUpper = state.toUpperCase();
+        const stateRowKeys = loadedRowKeysByState[stateUpper];
+        
+        // If we don't have data for this state yet, keep the selections (they'll be validated when data loads)
+        if (!stateRowKeys) {
+          cleaned[state] = rowKeySet;
+          return;
+        }
+        
         const cleanedSet = new Set<string>();
         rowKeySet.forEach(rowKey => {
-          if (loadedRowKeys.has(rowKey)) {
+          if (stateRowKeys.has(rowKey)) {
             cleanedSet.add(rowKey);
           } else {
-            hasChanges = true; // Row key doesn't exist in loaded data
+            hasChanges = true; // Row key doesn't exist in loaded data for this state
+            console.log(`⚠️ Row key not found in loaded data for ${state}:`, rowKey.substring(0, 50) + '...');
           }
         });
         
         if (cleanedSet.size > 0) {
           cleaned[state] = cleanedSet;
-        } else {
-          hasChanges = true; // All row keys for this state were invalid
+        } else if (rowKeySet.size > 0) {
+          // If we had selections but none matched, still keep the state key but empty
+          cleaned[state] = new Set();
+          hasChanges = true;
         }
       });
       
       return hasChanges ? cleaned : prev;
     });
-  }, [data, isAllStatesSelected]);
+  }, [data, isAllStatesSelected, hasSearchedOnce]);
 
   // Add filter options loading logic
   useEffect(() => {
