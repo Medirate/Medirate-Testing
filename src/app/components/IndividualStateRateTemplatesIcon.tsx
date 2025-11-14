@@ -101,6 +101,18 @@ const IndividualStateRateTemplatesIcon = ({
     setError(null);
 
     try {
+      // Log what we're saving for debugging
+      console.log('💾 Saving individual page template:', {
+        filterSetsCount: currentFilterSets.length,
+        filterSets: currentFilterSets.map(fs => ({
+          states: fs.states,
+          serviceCategory: fs.serviceCategory,
+          serviceCode: fs.serviceCode
+        })),
+        selectedTableRowsCount: Object.keys(currentSelectedTableRows).length,
+        selectedEntriesCount: Object.keys(currentSelectedEntries || {}).length
+      });
+
       const templateData = {
         selections: currentSelections,
         filterSets: currentFilterSets,
