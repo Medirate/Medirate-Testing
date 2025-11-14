@@ -936,15 +936,29 @@ export default function StatePaymentComparison() {
   // Auto-trigger search after template loads
   useEffect(() => {
     if (!shouldAutoSearch) return;
-    if (!filterSets[0]?.serviceCategory || !filterSets[0]?.serviceCode) return;
     
-    console.log('🔄 Auto-triggering search after template load...');
+    // Check if filters are ready
+    const filterSet = filterSets[0];
+    if (!filterSet?.serviceCategory || !filterSet?.serviceCode) {
+      console.log('⏳ Waiting for filters to be set...', { 
+        hasServiceCategory: !!filterSet?.serviceCategory,
+        hasServiceCode: !!filterSet?.serviceCode 
+      });
+      return;
+    }
+    
+    console.log('🔄 Auto-triggering search after template load...', {
+      serviceCategory: filterSet.serviceCategory,
+      serviceCode: filterSet.serviceCode
+    });
     setShouldAutoSearch(false);
-    // Use setTimeout to ensure filters are fully set before searching
+    
+    // Use setTimeout to ensure filters are fully set and component is ready
     const timer = setTimeout(() => {
       // Trigger search via custom event
+      console.log('🚀 Dispatching triggerSearch event...');
       window.dispatchEvent(new CustomEvent('triggerSearch'));
-    }, 200);
+    }, 300);
     
     return () => clearTimeout(timer);
   }, [shouldAutoSearch, filterSets]);
@@ -3421,12 +3435,25 @@ export default function StatePaymentComparison() {
   // Listen for auto-search trigger
   useEffect(() => {
     const handleTriggerSearch = () => {
-      if (handleSearchRef.current) {
-        console.log('🚀 Triggering auto-search from template load...');
-        handleSearchRef.current();
-      } else {
-        console.warn('⚠️ handleSearchRef.current is null, cannot trigger auto-search');
-      }
+      console.log('📢 triggerSearch event received');
+      // Use a small delay to ensure handleSearch is defined
+      setTimeout(() => {
+        if (handleSearchRef.current) {
+          console.log('🚀 Triggering auto-search from template load...');
+          handleSearchRef.current();
+        } else {
+          console.warn('⚠️ handleSearchRef.current is null, retrying...');
+          // Retry after a bit more time
+          setTimeout(() => {
+            if (handleSearchRef.current) {
+              console.log('🚀 Retry: Triggering auto-search...');
+              handleSearchRef.current();
+            } else {
+              console.error('❌ Failed to trigger auto-search: handleSearchRef.current is still null');
+            }
+          }, 200);
+        }
+      }, 100);
     };
     window.addEventListener('triggerSearch', handleTriggerSearch);
     return () => window.removeEventListener('triggerSearch', handleTriggerSearch);
