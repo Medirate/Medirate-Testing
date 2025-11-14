@@ -723,6 +723,8 @@ export default function HistoricalRates() {
 
   // Keep only the states that are still needed
   const [selectedEntry, setSelectedEntry] = useState<ServiceData | null>(null);
+  // Store pending selected entry from template load to match after filteredData updates
+  const [pendingSelectedEntryForMatching, setPendingSelectedEntryForMatching] = useState<ServiceData | null>(null);
   const [showRatePerHour, setShowRatePerHour] = useState(false);
   const [comment, setComment] = useState<string | null>(null);
   const [filterStep, setFilterStep] = useState(1);
@@ -1169,9 +1171,11 @@ export default function HistoricalRates() {
     handleSelectionChange('service_description', desc);
   };
 
-  // Add useEffect for pagination
+  // Remove auto-search on filter changes - user must click Search button
+  // Only auto-fetch when page changes (pagination)
   useEffect(() => {
-    if (areFiltersApplied) {
+    // Only fetch if we've already searched (hasSearched is true) and page changes
+    if (hasSearched && areFiltersApplied) {
       const filters: Record<string, string> = {};
       if (selections.service_category) filters.service_category = selections.service_category;
       if (selections.state_name) filters.state_name = selections.state_name;
@@ -1191,7 +1195,7 @@ export default function HistoricalRates() {
         }
       });
     }
-  }, [currentPage, areFiltersApplied, selections, itemsPerPage]);
+  }, [currentPage, hasSearched]); // Only depend on currentPage and hasSearched, not selections
 
   // Update resetFilters to use selections state
   const resetFilters = async () => {
