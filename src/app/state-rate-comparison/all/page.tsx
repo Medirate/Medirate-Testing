@@ -3434,6 +3434,9 @@ export default function StatePaymentComparison() {
 
   // Only fetch data when Search is clicked
   const handleSearch = async () => {
+    // Update ref so it can be called from auto-search
+    handleSearchRef.current = handleSearch;
+    
     // Reset debug flag for new search
     window.debugLogShown = false;
     // Set new search timestamp for chart key stability
