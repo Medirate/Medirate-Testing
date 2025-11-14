@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Modal from './modal';
-import { FaBookmark, FaTrash, FaEdit, FaCheck, FaTimes, FaDownload, FaSave } from 'react-icons/fa';
+import { FaBookmark, FaTrash, FaEdit, FaCheck, FaTimes, FaDownload, FaSave, FaSearch } from 'react-icons/fa';
 
 interface DashboardTemplate {
   id: string;
@@ -43,6 +43,7 @@ const TemplatesIcon = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Fetch templates on mount and when modal opens
   useEffect(() => {
@@ -50,6 +51,17 @@ const TemplatesIcon = ({
       fetchTemplates();
     }
   }, [isOpen]);
+
+  // Filter templates based on search term
+  const filteredTemplates = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return templates;
+    }
+    const searchLower = searchTerm.toLowerCase().trim();
+    return templates.filter(template =>
+      template.template_name.toLowerCase().includes(searchLower)
+    );
+  }, [templates, searchTerm]);
 
   const fetchTemplates = async () => {
     setLoading(true);
@@ -199,6 +211,7 @@ const TemplatesIcon = ({
           setNewTemplateName('');
           setError(null);
           setEditingId(null);
+          setSearchTerm('');
         }}
         width="max-w-2xl"
         className="z-[1001]"
@@ -218,6 +231,30 @@ const TemplatesIcon = ({
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
               {error}
+            </div>
+          )}
+
+          {/* Search Bar */}
+          {templates.length > 0 && (
+            <div className="mb-4">
+              <div className="relative">
+                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search templates..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61] focus:border-transparent"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <FaTimes className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -256,9 +293,13 @@ const TemplatesIcon = ({
               <div className="text-center py-8 text-gray-500">
                 No templates saved yet. Save your first template above!
               </div>
+            ) : filteredTemplates.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No templates found matching "{searchTerm}"
+              </div>
             ) : (
               <div className="space-y-2">
-                {templates.map((template) => (
+                {filteredTemplates.map((template) => (
                   <div
                     key={template.id}
                     className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
