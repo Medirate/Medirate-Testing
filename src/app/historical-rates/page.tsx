@@ -733,6 +733,7 @@ export default function HistoricalRates() {
   const [isLoadingFilters, setIsLoadingFilters] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [dataQualityWarning, setDataQualityWarning] = useState<string | null>(null);
+  const [showDurationUnitWarning, setShowDurationUnitWarning] = useState(false);
 
   // Replace individual filter states with selections state
   const [selections, setSelections] = useState<Selections>({
@@ -772,6 +773,11 @@ export default function HistoricalRates() {
     setSelectedEntry(null);
     setHasSearched(false);
     setData([]);
+    
+    // Clear duration unit warning when duration_unit is selected
+    if (field === 'duration_unit' && value) {
+      setShowDurationUnitWarning(false);
+    }
   };
 
   const filteredData = useMemo(() => {
@@ -1256,6 +1262,7 @@ export default function HistoricalRates() {
     setAuthError(null);
     setHasSearched(false);
     setComment(null);
+    setShowDurationUnitWarning(false);
     if (typeof refreshFilters === 'function') {
       await refreshFilters();
     }
@@ -1779,7 +1786,7 @@ export default function HistoricalRates() {
                         className="react-select-container"
                         classNamePrefix="react-select"
                       />
-                      {!selections.duration_unit && (
+                      {showDurationUnitWarning && !selections.duration_unit && (
                         <div className="text-xs text-red-500 mt-1">Duration unit is required</div>
                       )}
                     </div>
@@ -1827,6 +1834,15 @@ export default function HistoricalRates() {
                   <div className="mt-6 flex items-center justify-end space-x-4">
                     <button 
                       onClick={async () => {
+                        // Check if duration_unit is missing
+                        if (!selections.duration_unit) {
+                          setShowDurationUnitWarning(true);
+                          return;
+                        }
+                        
+                        // Clear warning if duration_unit is present
+                        setShowDurationUnitWarning(false);
+                        
                         if (areFiltersApplied) {
                           setHasSearched(true);
                           const filters: Record<string, string> = {};
@@ -1844,7 +1860,7 @@ export default function HistoricalRates() {
                           await refreshData(filters);
                         }
                       }}
-                      disabled={!areFiltersApplied || loading} 
+                      disabled={loading} 
                       className="px-6 py-2 text-sm bg-[#012C61] text-white rounded-lg hover:bg-blue-800 disabled:bg-gray-400 transition-colors"
                     >
                       {loading ? 'Searching...' : 'Search'}
