@@ -745,8 +745,8 @@ export default function HistoricalRates() {
     modifier_1: null,
   });
 
-  // Update areFiltersApplied to use selections state
-  const areFiltersApplied = selections.service_category && selections.state_name && (selections.service_code || selections.service_description);
+  // Update areFiltersApplied to use selections state - duration_unit is now mandatory
+  const areFiltersApplied = selections.service_category && selections.state_name && (selections.service_code || selections.service_description) && selections.duration_unit;
 
   // Generic handler to update selections state
   const handleSelectionChange = (field: keyof Selections, value: string | null) => {
@@ -1480,70 +1480,65 @@ export default function HistoricalRates() {
   const availableDurationUnits = getAvailableOptionsForFilter('duration_unit', selections, filterOptionsData) as string[];
   const availableModifiers = getAvailableOptionsForFilter('modifier_1', selections, filterOptionsData) as string[];
 
-  // Handler for loading templates
-  const handleLoadTemplate = async (templateData: {
+  // Handler for loading templates - NO auto-search, user must click Search button
+  const handleLoadTemplate = (templateData: {
     selections: Record<string, string | null>;
     selectedEntry?: ServiceData | null;
   }) => {
-    console.log('📥 Loading template and triggering search...');
+    console.log('📥 Loading template (no auto-search)...');
     
     // Load selections
     if (templateData.selections) {
       setSelections(templateData.selections);
     }
 
-    // Wait for React to process state updates, then trigger search
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Trigger search by calling refreshData with the loaded selections
-    const loadedSelections = templateData.selections;
-    if (loadedSelections.service_category && loadedSelections.state_name && (loadedSelections.service_code || loadedSelections.service_description)) {
-      const filters: Record<string, string> = {};
-      if (loadedSelections.service_category) filters.service_category = loadedSelections.service_category;
-      if (loadedSelections.state_name) filters.state_name = loadedSelections.state_name;
-      if (loadedSelections.service_code) filters.service_code = loadedSelections.service_code;
-      if (loadedSelections.service_description) filters.service_description = loadedSelections.service_description;
-      if (loadedSelections.program) filters.program = loadedSelections.program;
-      if (loadedSelections.location_region) filters.location_region = loadedSelections.location_region;
-      if (loadedSelections.provider_type) filters.provider_type = loadedSelections.provider_type;
-      if (loadedSelections.duration_unit) filters.duration_unit = loadedSelections.duration_unit;
-      if (loadedSelections.modifier_1) filters.modifier_1 = loadedSelections.modifier_1;
-      filters.page = String(currentPage);
-      filters.itemsPerPage = String(itemsPerPage);
-      
-      console.log('🚀 Calling refreshData with template filters...');
-      const result = await refreshData(filters);
-      
-      // After data loads, set the selected entry if it exists
-      if (templateData.selectedEntry && result && result.data) {
-        // Wait a bit more for filteredData to update
-        await new Promise(resolve => setTimeout(resolve, 200));
-        // Find matching entry in loaded data
-        const matchingEntry = result.data.find((item: ServiceData) => 
-          item.state_name === templateData.selectedEntry?.state_name &&
-          item.service_category === templateData.selectedEntry?.service_category &&
-          item.service_code === templateData.selectedEntry?.service_code &&
-          item.service_description === templateData.selectedEntry?.service_description &&
-          item.program === templateData.selectedEntry?.program &&
-          item.location_region === templateData.selectedEntry?.location_region &&
-          item.modifier_1 === templateData.selectedEntry?.modifier_1 &&
-          item.modifier_1_details === templateData.selectedEntry?.modifier_1_details &&
-          item.modifier_2 === templateData.selectedEntry?.modifier_2 &&
-          item.modifier_2_details === templateData.selectedEntry?.modifier_2_details &&
-          item.modifier_3 === templateData.selectedEntry?.modifier_3 &&
-          item.modifier_3_details === templateData.selectedEntry?.modifier_3_details &&
-          item.modifier_4 === templateData.selectedEntry?.modifier_4 &&
-          item.modifier_4_details === templateData.selectedEntry?.modifier_4_details &&
-          item.duration_unit === templateData.selectedEntry?.duration_unit &&
-          item.provider_type === templateData.selectedEntry?.provider_type
-        );
-        
-        if (matchingEntry) {
-          setSelectedEntry(matchingEntry);
-        }
-      }
+    // Store selectedEntry to be applied after user searches and data loads
+    // We'll use a useEffect to match it after filteredData is available
+    if (templateData.selectedEntry) {
+      // Store in a ref or state that will be used after search
+      setPendingSelectedEntry(templateData.selectedEntry);
     }
   };
+
+  // Match pending selected entry to filteredData after search completes
+  useEffect(() => {
+    if (!pendingSelectedEntry || !hasSearched || filteredData.length === 0) return;
+
+    console.log('🔍 Matching pending selected entry to filteredData...', {
+      pendingEntry: pendingSelectedEntry,
+      filteredDataLength: filteredData.length
+    });
+
+    // Find matching entry in filteredData (this is what's displayed in the table)
+    const matchingEntry = filteredData.find((item: ServiceData) => 
+      item.state_name === pendingSelectedEntry.state_name &&
+      item.service_category === pendingSelectedEntry.service_category &&
+      item.service_code === pendingSelectedEntry.service_code &&
+      item.service_description === pendingSelectedEntry.service_description &&
+      item.program === pendingSelectedEntry.program &&
+      item.location_region === pendingSelectedEntry.location_region &&
+      item.modifier_1 === pendingSelectedEntry.modifier_1 &&
+      item.modifier_1_details === pendingSelectedEntry.modifier_1_details &&
+      item.modifier_2 === pendingSelectedEntry.modifier_2 &&
+      item.modifier_2_details === pendingSelectedEntry.modifier_2_details &&
+      item.modifier_3 === pendingSelectedEntry.modifier_3 &&
+      item.modifier_3_details === pendingSelectedEntry.modifier_3_details &&
+      item.modifier_4 === pendingSelectedEntry.modifier_4 &&
+      item.modifier_4_details === pendingSelectedEntry.modifier_4_details &&
+      item.duration_unit === pendingSelectedEntry.duration_unit &&
+      item.provider_type === pendingSelectedEntry.provider_type &&
+      item.rate_effective_date === pendingSelectedEntry.rate_effective_date
+    );
+    
+    if (matchingEntry) {
+      console.log('✅ Found matching entry, setting selectedEntry');
+      setSelectedEntry(matchingEntry);
+      setPendingSelectedEntry(null); // Clear pending
+    } else {
+      console.log('⚠️ Could not find matching entry in filteredData');
+      setPendingSelectedEntry(null); // Clear pending even if not found
+    }
+  }, [filteredData, hasSearched, pendingSelectedEntry]);
 
   return (
     <AppLayout activeTab="historicalRates">
@@ -1741,9 +1736,9 @@ export default function HistoricalRates() {
                         <button onClick={() => handleSelectionChange('provider_type', null)} className="text-xs text-blue-500 hover:underline mt-1">Clear</button>
                       )}
                     </div>
-                    {/* Duration Unit */}
+                    {/* Duration Unit - Mandatory */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Duration Unit</label>
+                      <label className="text-sm font-medium text-gray-700">Duration Unit <span className="text-red-500">*</span></label>
                       <Select
                         instanceId="duration_unit_select"
                         options={getDropdownOptions(availableDurationUnits, false)}
@@ -1751,13 +1746,12 @@ export default function HistoricalRates() {
                         onChange={(options) => handleSelectionChange('duration_unit', options ? options.map(opt => opt.value).join(',') : null)}
                         placeholder="Select Duration Unit"
                         isMulti
-                        isClearable
                         isDisabled={!selections.service_category || !selections.state_name || availableDurationUnits.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
                       />
-                      {selections.duration_unit && (
-                        <button onClick={() => handleSelectionChange('duration_unit', null)} className="text-xs text-blue-500 hover:underline mt-1">Clear</button>
+                      {!selections.duration_unit && (
+                        <div className="text-xs text-red-500 mt-1">Duration unit is required</div>
                       )}
                     </div>
                     {/* Modifier */}
