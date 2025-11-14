@@ -3447,24 +3447,24 @@ export default function StatePaymentComparison() {
   useEffect(() => {
     const handleTriggerSearch = () => {
       console.log('📢 triggerSearch event received');
-      // Use a small delay to ensure handleSearch is defined
-      setTimeout(() => {
+      // Try multiple times with increasing delays
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      const trySearch = () => {
+        attempts++;
         if (handleSearchRef.current) {
-          console.log('🚀 Triggering auto-search from template load...');
+          console.log(`🚀 Triggering auto-search from template load... (attempt ${attempts})`);
           handleSearchRef.current();
+        } else if (attempts < maxAttempts) {
+          console.log(`⏳ handleSearchRef not ready, retrying... (attempt ${attempts}/${maxAttempts})`);
+          setTimeout(trySearch, 200);
         } else {
-          console.warn('⚠️ handleSearchRef.current is null, retrying...');
-          // Retry after a bit more time
-          setTimeout(() => {
-            if (handleSearchRef.current) {
-              console.log('🚀 Retry: Triggering auto-search...');
-              handleSearchRef.current();
-            } else {
-              console.error('❌ Failed to trigger auto-search: handleSearchRef.current is still null');
-            }
-          }, 200);
+          console.error('❌ Failed to trigger auto-search after all attempts');
         }
-      }, 100);
+      };
+      
+      setTimeout(trySearch, 100);
     };
     window.addEventListener('triggerSearch', handleTriggerSearch);
     return () => window.removeEventListener('triggerSearch', handleTriggerSearch);
