@@ -3467,6 +3467,12 @@ export default function StatePaymentComparison() {
   // Store handleSearch in a ref so we can call it from useEffect
   const handleSearchRef = useRef<(() => Promise<void>) | null>(null);
   
+  // Set handleSearch ref immediately when component renders (before handleSearch is defined)
+  // We'll update it in a useEffect after handleSearch is defined
+  useEffect(() => {
+    // This will be set after handleSearch is defined
+  }, []);
+  
   // Listen for auto-search trigger
   useEffect(() => {
     const handleTriggerSearch = () => {
@@ -3496,9 +3502,6 @@ export default function StatePaymentComparison() {
 
   // Only fetch data when Search is clicked
   const handleSearch = async () => {
-    // Update ref so it can be called from auto-search
-    handleSearchRef.current = handleSearch;
-    
     // Reset debug flag for new search
     window.debugLogShown = false;
     // Set new search timestamp for chart key stability
@@ -3801,6 +3804,11 @@ export default function StatePaymentComparison() {
       setLoading(false);
     }
   };
+  
+  // Update handleSearch ref whenever handleSearch function changes
+  useEffect(() => {
+    handleSearchRef.current = handleSearch;
+  }, [filterSets, isAllStatesSelected]); // Dependencies that affect handleSearch behavior
 
   // Reset search state when key filters change to prevent showing stale chart data
   useEffect(() => {
