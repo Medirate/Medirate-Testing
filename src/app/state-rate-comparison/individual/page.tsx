@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useId, useCallback } from "react";
+import { useEffect, useState, useMemo, useId, useCallback, useRef } from "react";
 import { Bar } from "react-chartjs-2";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
@@ -17,6 +17,7 @@ import { useRequireSubscription } from "@/hooks/useRequireAuth";
 import clsx from 'clsx';
 import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
+import IndividualStateRateTemplatesIcon from "@/app/components/IndividualStateRateTemplatesIcon";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -674,6 +675,10 @@ export default function StatePaymentComparison() {
   const [providerTypes, setProviderTypes] = useState<string[]>([]);
   const [filterSetData, setFilterSetData] = useState<{ [index: number]: ServiceData[] }>({});
   const [selectedEntries, setSelectedEntries] = useState<{ [state: string]: ServiceData[] }>({});
+  // Store pending selections from template load (before data is fetched)
+  const [pendingSelectedEntries, setPendingSelectedEntries] = useState<{ [state: string]: any[] } | null>(null);
+  // Store handleSearch in a ref so we can call it from template load
+  const handleSearchRef = useRef<(() => Promise<void>) | null>(null);
   const [chartRefreshKey, setChartRefreshKey] = useState(0);
   const [searchTimestamp, setSearchTimestamp] = useState<number>(Date.now()); // For chart key stability
   // State to hold all states averages for All States mode
@@ -2326,6 +2331,8 @@ export default function StatePaymentComparison() {
   };
 
   const resetFilters = () => {
+    // Clear pending selections when resetting
+    setPendingSelectedEntries(null);
     // Reset filter sets to one empty filter set
     setFilterSets([{ serviceCategory: "", states: [], serviceCode: "", stateOptions: [], serviceCodeOptions: [], serviceDescription: "", durationUnits: [] }]);
 
@@ -2590,8 +2597,19 @@ export default function StatePaymentComparison() {
     }
   }, [selections.service_category, selections.state_name, filterSets, refreshFilters]);
 
-  // Update the row selection handler to update selectedEntries and refresh chart
+  // Update the row selection handler to update selectedEntries, selectedTableRows, and refresh chart
   const handleRowSelection = (state: string, item: ServiceData) => {
+    // Create modifier key for selectedTableRows (same format as handleTableRowSelection)
+    const modifierKey = [
+      item.modifier_1?.trim().toUpperCase() || '',
+      item.modifier_2?.trim().toUpperCase() || '',
+      item.modifier_3?.trim().toUpperCase() || '',
+      item.modifier_4?.trim().toUpperCase() || '',
+      item.program?.trim().toUpperCase() || '',
+      item.location_region?.trim().toUpperCase() || ''
+    ].join('|');
+
+    // Update selectedEntries
     setSelectedEntries(prev => {
       const prevArr = prev[state] || [];
       // Check if already selected (by unique key)
@@ -2612,9 +2630,139 @@ export default function StatePaymentComparison() {
       }
       return { ...prev, [state]: newArr };
     });
+
+    // Update selectedTableRows to keep it in sync
+    setSelectedTableRows(prev => {
+      const stateSelections = prev[state] || [];
+      const isSelected = stateSelections.includes(modifierKey);
+      const newSelections = isSelected
+        ? stateSelections.filter(key => key !== modifierKey)
+        : [...stateSelections, modifierKey];
+
+      // If newSelections is empty, remove the state key entirely
+      if (newSelections.length === 0) {
+        const { [state]: _, ...rest } = prev;
+        return rest;
+      }
+      return {
+        ...prev,
+        [state]: newSelections
+      };
+    });
+
     setChartRefreshKey(k => k + 1);
   };
 
+  // Handler for loading templates
+  const handleLoadTemplate = async (templateData: {
+    selections: Record<string, string | null>;
+    filterSets: FilterSet[];
+    selectedTableRows: { [state: string]: string[] };
+    selectedEntries?: { [state: string]: any[] };
+  }) => {
+    console.log('📥 Loading template and triggering search...');
+    
+    // Load selections
+    if (templateData.selections) {
+      setSelections(templateData.selections);
+    }
+
+    // Load filter sets
+    if (templateData.filterSets) {
+      setFilterSets(templateData.filterSets);
+    }
+
+    // Load table row selections
+    if (templateData.selectedTableRows) {
+      setSelectedTableRows(templateData.selectedTableRows);
+    }
+
+    // Load selected entries - store as pending until data is loaded
+    if (templateData.selectedEntries) {
+      setPendingSelectedEntries(templateData.selectedEntries);
+      // Don't set selectedEntries yet - wait for data to load
+    }
+
+    // Wait for React to process state updates, then trigger search directly
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Now call handleSearch directly - it will use the updated filterSets from state
+    console.log('🚀 Calling handleSearch directly after template load...');
+    
+    // Try multiple times to ensure handleSearch is ready
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (attempts < maxAttempts) {
+      if (handleSearchRef.current) {
+        console.log(`✅ handleSearchRef ready, calling search (attempt ${attempts + 1})`);
+        await handleSearchRef.current();
+        return; // Success, exit
+      }
+      attempts++;
+      if (attempts < maxAttempts) {
+        console.log(`⏳ handleSearchRef not ready, waiting... (attempt ${attempts}/${maxAttempts})`);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    // Final fallback - dispatch event
+    console.log('⚠️ handleSearchRef still not ready after all attempts, using event fallback');
+    window.dispatchEvent(new CustomEvent('triggerSearch'));
+  };
+
+  // Match pending selected entries to loaded data after data is fetched
+  useEffect(() => {
+    if (!pendingSelectedEntries) return; // No pending selections
+    
+    // Get all loaded data from filterSetData
+    const allLoadedData: ServiceData[] = [];
+    Object.values(filterSetData).forEach(stateData => {
+      if (Array.isArray(stateData)) {
+        allLoadedData.push(...stateData);
+      }
+    });
+    
+    // If no data loaded yet, wait
+    if (allLoadedData.length === 0) return;
+    
+    // Match pending entries to loaded data using row keys
+    const matchedEntries: { [state: string]: ServiceData[] } = {};
+    
+    Object.entries(pendingSelectedEntries).forEach(([state, savedEntries]) => {
+      if (!Array.isArray(savedEntries) || savedEntries.length === 0) return;
+      
+      const matched: ServiceData[] = [];
+      
+      savedEntries.forEach(savedEntry => {
+        // Create row key from saved entry
+        const savedKey = getRowKey(savedEntry as ServiceData);
+        
+        // Find matching entry in loaded data
+        const matchedEntry = allLoadedData.find(loadedItem => {
+          const loadedKey = getRowKey(loadedItem);
+          return loadedKey === savedKey;
+        });
+        
+        if (matchedEntry) {
+          matched.push(matchedEntry);
+        }
+      });
+      
+      if (matched.length > 0) {
+        matchedEntries[state] = matched;
+      }
+    });
+    
+    // Update selectedEntries with matched entries
+    if (Object.keys(matchedEntries).length > 0) {
+      setSelectedEntries(matchedEntries);
+      setChartRefreshKey(k => k + 1); // Refresh chart
+    }
+    
+    // Clear pending selections
+    setPendingSelectedEntries(null);
+  }, [filterSetData, pendingSelectedEntries]);
 
   // Add filter options loading logic
   useEffect(() => {
@@ -2716,6 +2864,38 @@ export default function StatePaymentComparison() {
   }, [filterSets]);
 
   // Only fetch data when Search is clicked
+  // Update handleSearch ref whenever handleSearch function changes
+  useEffect(() => {
+    handleSearchRef.current = handleSearch;
+  }, [filterSets]); // Dependencies that affect handleSearch behavior
+
+  // Listen for auto-search trigger
+  useEffect(() => {
+    const handleTriggerSearch = () => {
+      console.log('📢 triggerSearch event received');
+      // Try multiple times with increasing delays
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      const trySearch = () => {
+        attempts++;
+        if (handleSearchRef.current) {
+          console.log(`🚀 Triggering auto-search from template load... (attempt ${attempts})`);
+          handleSearchRef.current();
+        } else if (attempts < maxAttempts) {
+          console.log(`⏳ handleSearchRef not ready, retrying... (attempt ${attempts}/${maxAttempts})`);
+          setTimeout(trySearch, 200);
+        } else {
+          console.error('❌ Failed to trigger auto-search after all attempts');
+        }
+      };
+      
+      setTimeout(trySearch, 100);
+    };
+    window.addEventListener('triggerSearch', handleTriggerSearch);
+    return () => window.removeEventListener('triggerSearch', handleTriggerSearch);
+  }, []);
+
   const handleSearch = async () => {
     console.log('🔍 Search button clicked - fetching data...');
     setSearchTimestamp(Date.now()); // Update timestamp for chart key stability
@@ -2838,6 +3018,13 @@ export default function StatePaymentComparison() {
 
   return (
     <AppLayout activeTab="stateRateComparison">
+      <IndividualStateRateTemplatesIcon
+        onLoadTemplate={handleLoadTemplate}
+        currentSelections={selections}
+        currentFilterSets={filterSets}
+        currentSelectedTableRows={selectedTableRows}
+        currentSelectedEntries={selectedEntries}
+      />
       <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         {/* Error Messages */}
         <div className="mb-4 sm:mb-8">
