@@ -836,9 +836,11 @@ export default function StatePaymentComparison() {
       Object.entries(templateData.stateSelectedForAverage).forEach(([state, rowKeys]) => {
         if (Array.isArray(rowKeys) && rowKeys.length > 0) {
           stateSelectedForAverageSets[state] = new Set(rowKeys);
+          console.log(`✅ Loaded ${rowKeys.length} selected rows for ${state} from template`);
         }
       });
       if (Object.keys(stateSelectedForAverageSets).length > 0) {
+        console.log(`✅ Loaded stateSelectedForAverage for ${Object.keys(stateSelectedForAverageSets).length} states:`, Object.keys(stateSelectedForAverageSets));
         setStateSelectedForAverage(stateSelectedForAverageSets);
       }
     }
