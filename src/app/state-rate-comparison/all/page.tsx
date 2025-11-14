@@ -3069,8 +3069,19 @@ export default function StatePaymentComparison() {
     }
   }, [selections.service_category, selections.state_name, filterSets, refreshFilters]);
 
-  // Update the row selection handler to update selectedEntries and refresh chart
+  // Update the row selection handler to update selectedEntries, selectedTableRows, and refresh chart
   const handleRowSelection = (state: string, item: ServiceData) => {
+    // Create modifier key for selectedTableRows (same format as handleTableRowSelection)
+    const modifierKey = [
+      item.modifier_1?.trim().toUpperCase() || '',
+      item.modifier_2?.trim().toUpperCase() || '',
+      item.modifier_3?.trim().toUpperCase() || '',
+      item.modifier_4?.trim().toUpperCase() || '',
+      item.program?.trim().toUpperCase() || '',
+      item.location_region?.trim().toUpperCase() || ''
+    ].join('|');
+
+    // Update selectedEntries
     setSelectedEntries(prev => {
       const prevArr = prev[state] || [];
       // Check if already selected (by unique key)
@@ -3079,7 +3090,7 @@ export default function StatePaymentComparison() {
       let newArr;
       if (exists) {
         newArr = prevArr.filter(i => getRowKey(i) !== key);
-    } else {
+      } else {
         newArr = [...prevArr, item];
       }
       // If newArr is empty, remove the state key entirely
@@ -3089,6 +3100,26 @@ export default function StatePaymentComparison() {
       }
       return { ...prev, [state]: newArr };
     });
+
+    // Update selectedTableRows to keep it in sync
+    setSelectedTableRows(prev => {
+      const stateSelections = prev[state] || [];
+      const isSelected = stateSelections.includes(modifierKey);
+      const newSelections = isSelected
+        ? stateSelections.filter(key => key !== modifierKey)
+        : [...stateSelections, modifierKey];
+
+      // If newSelections is empty, remove the state key entirely
+      if (newSelections.length === 0) {
+        const { [state]: _, ...rest } = prev;
+        return rest;
+      }
+      return {
+        ...prev,
+        [state]: newSelections
+      };
+    });
+
     setChartRefreshKey(k => k + 1);
   };
 
