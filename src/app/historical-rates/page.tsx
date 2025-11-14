@@ -723,6 +723,8 @@ export default function HistoricalRates() {
 
   // Keep only the states that are still needed
   const [selectedEntry, setSelectedEntry] = useState<ServiceData | null>(null);
+  // Store pending selected entry from template load
+  const [pendingSelectedEntry, setPendingSelectedEntry] = useState<ServiceData | null>(null);
   const [showRatePerHour, setShowRatePerHour] = useState(false);
   const [comment, setComment] = useState<string | null>(null);
   const [filterStep, setFilterStep] = useState(1);
@@ -774,7 +776,8 @@ export default function HistoricalRates() {
 
   const filteredData = useMemo(() => {
     // Only show data after a search has been performed
-    if (!hasSearched || !selections.service_category || !selections.state_name || (!selections.service_code && !selections.service_description)) return [];
+    // Duration unit is now mandatory
+    if (!hasSearched || !selections.service_category || !selections.state_name || (!selections.service_code && !selections.service_description) || !selections.duration_unit) return [];
 
     console.log('🏁 TABLE DATA SOURCE (filteredData) - Starting with raw data:', data.length, 'entries');
 
