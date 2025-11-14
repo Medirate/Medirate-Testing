@@ -2659,28 +2659,86 @@ export default function StatePaymentComparison() {
     filterSets: FilterSet[];
     selectedTableRows: { [state: string]: string[] };
     selectedEntries?: { [state: string]: any[] };
+    // Support loading "all states" format templates (for backward compatibility)
+    isAllStatesSelected?: boolean;
+    stateSelectedForAverage?: { [state: string]: string[] };
   }) => {
-    console.log('📥 Loading template and triggering search...');
+    console.log('📥 Loading template and triggering search...', {
+      hasFilterSets: !!templateData.filterSets,
+      filterSetsCount: templateData.filterSets?.length || 0,
+      isAllStatesFormat: templateData.isAllStatesSelected === true,
+      hasStateSelectedForAverage: !!templateData.stateSelectedForAverage
+    });
     
     // Load selections
     if (templateData.selections) {
       setSelections(templateData.selections);
     }
 
-    // Load filter sets
-    if (templateData.filterSets) {
-      setFilterSets(templateData.filterSets);
-    }
+    // Handle "all states" format template - convert to individual page format
+    if (templateData.isAllStatesSelected && templateData.stateSelectedForAverage) {
+      console.log('🔄 Converting "all states" format template to individual page format...');
+      
+      // Extract states from stateSelectedForAverage
+      const states = Object.keys(templateData.stateSelectedForAverage);
+      console.log('📊 Found states in template:', states);
+      
+      // Get the first filter set to use as base (should have serviceCategory, serviceCode, etc.)
+      const baseFilterSet = templateData.filterSets?.[0];
+      if (baseFilterSet && states.length > 0) {
+        // Create one filter set per state
+        const newFilterSets: FilterSet[] = states.map(state => ({
+          ...baseFilterSet,
+          states: [state], // Each filter set gets one state
+          stateOptions: baseFilterSet.stateOptions || [],
+          serviceCodeOptions: baseFilterSet.serviceCodeOptions || []
+        }));
+        
+        console.log('✅ Created filter sets:', newFilterSets.map(fs => ({ state: fs.states[0], serviceCode: fs.serviceCode })));
+        setFilterSets(newFilterSets);
+        
+        // Convert stateSelectedForAverage to selectedTableRows format
+        // The keys in stateSelectedForAverage are row keys (pipe-separated strings)
+        const convertedSelectedTableRows: { [state: string]: string[] } = {};
+        Object.entries(templateData.stateSelectedForAverage).forEach(([state, rowKeys]) => {
+          if (Array.isArray(rowKeys) && rowKeys.length > 0) {
+            convertedSelectedTableRows[state] = rowKeys;
+          }
+        });
+        
+        console.log('✅ Converted selectedTableRows:', Object.keys(convertedSelectedTableRows));
+        setSelectedTableRows(convertedSelectedTableRows);
+        
+        // Note: selectedEntries will be populated after data loads via the pendingSelectedEntries logic
+        // For now, we'll need to reconstruct them from the row keys after data loads
+        setPendingSelectedEntries({}); // Will be populated after data loads
+      } else {
+        console.warn('⚠️ Could not convert template - missing base filter set or states');
+        // Fall back to regular loading
+        if (templateData.filterSets) {
+          setFilterSets(templateData.filterSets);
+        }
+        if (templateData.selectedTableRows) {
+          setSelectedTableRows(templateData.selectedTableRows);
+        }
+      }
+    } else {
+      // Regular individual page format - load as-is
+      // Load filter sets
+      if (templateData.filterSets) {
+        setFilterSets(templateData.filterSets);
+      }
 
-    // Load table row selections
-    if (templateData.selectedTableRows) {
-      setSelectedTableRows(templateData.selectedTableRows);
-    }
+      // Load table row selections
+      if (templateData.selectedTableRows) {
+        setSelectedTableRows(templateData.selectedTableRows);
+      }
 
-    // Load selected entries - store as pending until data is loaded
-    if (templateData.selectedEntries) {
-      setPendingSelectedEntries(templateData.selectedEntries);
-      // Don't set selectedEntries yet - wait for data to load
+      // Load selected entries - store as pending until data is loaded
+      if (templateData.selectedEntries) {
+        setPendingSelectedEntries(templateData.selectedEntries);
+        // Don't set selectedEntries yet - wait for data to load
+      }
     }
 
     // Wait for React to process state updates, then trigger search directly
