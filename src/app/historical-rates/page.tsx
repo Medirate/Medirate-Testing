@@ -1209,6 +1209,7 @@ export default function HistoricalRates() {
       modifier_1: null,
     });
     setSelectedEntry(null);
+    setPendingSelectedEntry(null); // Clear pending selected entry
     setCurrentPage(1);
     setTotalCount(0);
     setData([]);
