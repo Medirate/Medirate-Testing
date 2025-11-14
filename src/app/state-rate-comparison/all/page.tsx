@@ -843,17 +843,32 @@ export default function StatePaymentComparison() {
     }
 
     // Wait for React to process state updates, then trigger search directly
-    await new Promise(resolve => setTimeout(resolve, 200));
+    // Use a longer delay to ensure state is fully updated and handleSearch is ready
+    await new Promise(resolve => setTimeout(resolve, 300));
     
     // Now call handleSearch directly - it will use the updated filterSets from state
     console.log('🚀 Calling handleSearch directly after template load...');
-    if (handleSearchRef.current) {
-      await handleSearchRef.current();
-    } else {
-      // If ref isn't ready, try the event system as fallback
-      console.log('⏳ handleSearchRef not ready, using event fallback...');
-      window.dispatchEvent(new CustomEvent('triggerSearch'));
+    
+    // Try multiple times to ensure handleSearch is ready
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (attempts < maxAttempts) {
+      if (handleSearchRef.current) {
+        console.log(`✅ handleSearchRef ready, calling search (attempt ${attempts + 1})`);
+        await handleSearchRef.current();
+        return; // Success, exit
+      }
+      attempts++;
+      if (attempts < maxAttempts) {
+        console.log(`⏳ handleSearchRef not ready, waiting... (attempt ${attempts}/${maxAttempts})`);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
+    
+    // Final fallback - dispatch event
+    console.log('⚠️ handleSearchRef still not ready after all attempts, using event fallback');
+    window.dispatchEvent(new CustomEvent('triggerSearch'));
   };
 
   // Move handleTableRowSelection to top level
