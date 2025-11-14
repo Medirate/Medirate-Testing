@@ -2770,9 +2770,8 @@ export default function StatePaymentComparison() {
   };
 
   // Match pending selected entries to loaded data after data is fetched
+  // Also handle selectedTableRows from "all states" format templates
   useEffect(() => {
-    if (!pendingSelectedEntries) return; // No pending selections
-    
     // Get all loaded data from filterSetData
     const allLoadedData: ServiceData[] = [];
     Object.values(filterSetData).forEach(stateData => {
@@ -2784,43 +2783,81 @@ export default function StatePaymentComparison() {
     // If no data loaded yet, wait
     if (allLoadedData.length === 0) return;
     
-    // Match pending entries to loaded data using row keys
-    const matchedEntries: { [state: string]: ServiceData[] } = {};
+    // Handle selectedTableRows - convert row keys to actual entries
+    // This is needed for "all states" format templates where we only have row keys
+    const matchedEntriesFromTableRows: { [state: string]: ServiceData[] } = {};
     
-    Object.entries(pendingSelectedEntries).forEach(([state, savedEntries]) => {
-      if (!Array.isArray(savedEntries) || savedEntries.length === 0) return;
+    Object.entries(selectedTableRows).forEach(([state, rowKeys]) => {
+      if (!Array.isArray(rowKeys) || rowKeys.length === 0) return;
       
       const matched: ServiceData[] = [];
       
-      savedEntries.forEach(savedEntry => {
-        // Create row key from saved entry
-        const savedKey = getRowKey(savedEntry as ServiceData);
-        
-        // Find matching entry in loaded data
-        const matchedEntry = allLoadedData.find(loadedItem => {
-          const loadedKey = getRowKey(loadedItem);
-          return loadedKey === savedKey;
+      // Find entries that match the row keys for this state
+      rowKeys.forEach(rowKey => {
+        // Row key is a pipe-separated string matching getRowKey format
+        const matchingEntry = allLoadedData.find(item => {
+          const itemKey = getRowKey(item);
+          return itemKey === rowKey && item.state_name?.trim().toUpperCase() === state.toUpperCase();
         });
         
-        if (matchedEntry) {
-          matched.push(matchedEntry);
+        if (matchingEntry) {
+          matched.push(matchingEntry);
         }
       });
       
       if (matched.length > 0) {
-        matchedEntries[state] = matched;
+        matchedEntriesFromTableRows[state] = matched;
       }
     });
     
+    // Also handle pendingSelectedEntries (for regular individual page format)
+    const matchedEntriesFromPending: { [state: string]: ServiceData[] } = {};
+    
+    if (pendingSelectedEntries) {
+      Object.entries(pendingSelectedEntries).forEach(([state, savedEntries]) => {
+        if (!Array.isArray(savedEntries) || savedEntries.length === 0) return;
+        
+        const matched: ServiceData[] = [];
+        
+        savedEntries.forEach(savedEntry => {
+          // Create row key from saved entry
+          const savedKey = getRowKey(savedEntry as ServiceData);
+          
+          // Find matching entry in loaded data
+          const matchedEntry = allLoadedData.find(loadedItem => {
+            const loadedKey = getRowKey(loadedItem);
+            return loadedKey === savedKey;
+          });
+          
+          if (matchedEntry) {
+            matched.push(matchedEntry);
+          }
+        });
+        
+        if (matched.length > 0) {
+          matchedEntriesFromPending[state] = matched;
+        }
+      });
+    }
+    
+    // Merge both sources of matched entries (pending takes precedence if both exist for same state)
+    const allMatchedEntries: { [state: string]: ServiceData[] } = {
+      ...matchedEntriesFromTableRows,
+      ...matchedEntriesFromPending
+    };
+    
     // Update selectedEntries with matched entries
-    if (Object.keys(matchedEntries).length > 0) {
-      setSelectedEntries(matchedEntries);
+    if (Object.keys(allMatchedEntries).length > 0) {
+      console.log('✅ Matched entries for states:', Object.keys(allMatchedEntries));
+      setSelectedEntries(allMatchedEntries);
       setChartRefreshKey(k => k + 1); // Refresh chart
     }
     
     // Clear pending selections
-    setPendingSelectedEntries(null);
-  }, [filterSetData, pendingSelectedEntries]);
+    if (pendingSelectedEntries) {
+      setPendingSelectedEntries(null);
+    }
+  }, [filterSetData, pendingSelectedEntries, selectedTableRows]);
 
   // Add filter options loading logic
   useEffect(() => {
