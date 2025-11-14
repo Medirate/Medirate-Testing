@@ -745,6 +745,10 @@ export default function StatePaymentComparison() {
   const [selectedEntries, setSelectedEntries] = useState<{ [state: string]: ServiceData[] }>({});
   // Store pending selections from template load (before data is fetched)
   const [pendingSelectedEntries, setPendingSelectedEntries] = useState<{ [state: string]: any[] } | null>(null);
+  // Store pending stateSelectedForAverage from template load (before data is fetched)
+  const [pendingStateSelectedForAverage, setPendingStateSelectedForAverage] = useState<{ [state: string]: string[] } | null>(null);
+  // Flag to auto-trigger search after template load
+  const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
   const [chartRefreshKey, setChartRefreshKey] = useState(0);
   // State to hold all states averages for All States mode
   const [allStatesAverages, setAllStatesAverages] = useState<{ state_name: string; avg_rate: number }[] | null>(null);
@@ -830,20 +834,14 @@ export default function StatePaymentComparison() {
       // Don't set selectedEntries yet - wait for data to load
     }
 
-    // Load stateSelectedForAverage (for All States mode) - convert arrays back to Sets
+    // Load stateSelectedForAverage (for All States mode) - store as pending until data loads
     if (templateData.stateSelectedForAverage) {
-      const stateSelectedForAverageSets: { [state: string]: Set<string> } = {};
-      Object.entries(templateData.stateSelectedForAverage).forEach(([state, rowKeys]) => {
-        if (Array.isArray(rowKeys) && rowKeys.length > 0) {
-          stateSelectedForAverageSets[state] = new Set(rowKeys);
-          console.log(`✅ Loaded ${rowKeys.length} selected rows for ${state} from template`);
-        }
-      });
-      if (Object.keys(stateSelectedForAverageSets).length > 0) {
-        console.log(`✅ Loaded stateSelectedForAverage for ${Object.keys(stateSelectedForAverageSets).length} states:`, Object.keys(stateSelectedForAverageSets));
-        setStateSelectedForAverage(stateSelectedForAverageSets);
-      }
+      setPendingStateSelectedForAverage(templateData.stateSelectedForAverage);
+      console.log(`✅ Loaded stateSelectedForAverage for ${Object.keys(templateData.stateSelectedForAverage).length} states (pending until data loads)`);
     }
+
+    // Trigger auto-search after template loads
+    setShouldAutoSearch(true);
   };
 
   // Move handleTableRowSelection to top level
@@ -934,6 +932,22 @@ export default function StatePaymentComparison() {
     // Just initialize filters from the context
     extractFilters([]);
   }, [pendingSearch]);
+
+  // Auto-trigger search after template loads
+  useEffect(() => {
+    if (!shouldAutoSearch) return;
+    if (!filterSets[0]?.serviceCategory || !filterSets[0]?.serviceCode) return;
+    
+    console.log('🔄 Auto-triggering search after template load...');
+    setShouldAutoSearch(false);
+    // Use setTimeout to ensure filters are fully set before searching
+    const timer = setTimeout(() => {
+      // Trigger search via custom event
+      window.dispatchEvent(new CustomEvent('triggerSearch'));
+    }, 200);
+    
+    return () => clearTimeout(timer);
+  }, [shouldAutoSearch, filterSets]);
 
   // Update extractFilters to use filterOptions from context
   const extractFilters = (data: ServiceData[]) => {
@@ -3203,12 +3217,15 @@ export default function StatePaymentComparison() {
     setPendingSelectedEntries(null);
   }, [data, filterSetData, pendingSelectedEntries, isAllStatesSelected]);
 
-  // Validate and clean up stateSelectedForAverage after data loads (for All States mode)
-  // Only run this after user has searched (hasSearchedOnce) to ensure data is fully loaded
+  // Apply pending stateSelectedForAverage after data loads (for All States mode)
+  // This runs after search completes and data is loaded
   useEffect(() => {
     if (!isAllStatesSelected || data.length === 0 || !hasSearchedOnce) return;
+    if (!pendingStateSelectedForAverage) return;
     
-    // Get all row keys from loaded data, grouped by state for more accurate matching
+    console.log('🔄 Applying pending stateSelectedForAverage after data load...');
+    
+    // Get all row keys from loaded data, grouped by state for accurate matching
     const loadedRowKeysByState: { [state: string]: Set<string> } = {};
     data.forEach(item => {
       const state = item.state_name?.trim().toUpperCase();
@@ -3220,45 +3237,45 @@ export default function StatePaymentComparison() {
       }
     });
     
-    // Clean up stateSelectedForAverage to only include row keys that exist in loaded data for that state
-    setStateSelectedForAverage(prev => {
-      if (Object.keys(prev).length === 0) return prev;
+    // Match pending selections to loaded data
+    const matchedSelections: { [state: string]: Set<string> } = {};
+    
+    Object.entries(pendingStateSelectedForAverage).forEach(([state, savedRowKeys]) => {
+      const stateUpper = state.toUpperCase();
+      const stateRowKeys = loadedRowKeysByState[stateUpper];
       
-      const cleaned: { [state: string]: Set<string> } = {};
-      let hasChanges = false;
+      if (!stateRowKeys) {
+        console.log(`⚠️ No data loaded for ${state}, skipping selections`);
+        return;
+      }
       
-      Object.entries(prev).forEach(([state, rowKeySet]) => {
-        const stateUpper = state.toUpperCase();
-        const stateRowKeys = loadedRowKeysByState[stateUpper];
-        
-        // If we don't have data for this state yet, keep the selections (they'll be validated when data loads)
-        if (!stateRowKeys) {
-          cleaned[state] = rowKeySet;
-          return;
-        }
-        
-        const cleanedSet = new Set<string>();
-        rowKeySet.forEach(rowKey => {
-          if (stateRowKeys.has(rowKey)) {
-            cleanedSet.add(rowKey);
-          } else {
-            hasChanges = true; // Row key doesn't exist in loaded data for this state
-            console.log(`⚠️ Row key not found in loaded data for ${state}:`, rowKey.substring(0, 50) + '...');
-          }
-        });
-        
-        if (cleanedSet.size > 0) {
-          cleaned[state] = cleanedSet;
-        } else if (rowKeySet.size > 0) {
-          // If we had selections but none matched, still keep the state key but empty
-          cleaned[state] = new Set();
-          hasChanges = true;
+      const matchedSet = new Set<string>();
+      savedRowKeys.forEach(rowKey => {
+        if (stateRowKeys.has(rowKey)) {
+          matchedSet.add(rowKey);
+        } else {
+          console.log(`⚠️ Row key not found in loaded data for ${state}:`, rowKey.substring(0, 50) + '...');
         }
       });
       
-      return hasChanges ? cleaned : prev;
+      if (matchedSet.size > 0) {
+        matchedSelections[state] = matchedSet;
+        console.log(`✅ Matched ${matchedSet.size} out of ${savedRowKeys.length} selections for ${state}`);
+      } else {
+        console.log(`⚠️ No selections matched for ${state}`);
+      }
     });
-  }, [data, isAllStatesSelected, hasSearchedOnce]);
+    
+    // Apply matched selections
+    if (Object.keys(matchedSelections).length > 0) {
+      setStateSelectedForAverage(matchedSelections);
+      setChartRefreshKey(k => k + 1); // Refresh chart
+      console.log(`✅ Applied stateSelectedForAverage for ${Object.keys(matchedSelections).length} states`);
+    }
+    
+    // Clear pending selections
+    setPendingStateSelectedForAverage(null);
+  }, [data, isAllStatesSelected, hasSearchedOnce, pendingStateSelectedForAverage]);
 
   // Add filter options loading logic
   useEffect(() => {
@@ -3397,6 +3414,23 @@ export default function StatePaymentComparison() {
   const wrappedHandleServiceDescriptionChange = handleFilterChange(handleServiceDescriptionChange);
   const wrappedHandleProviderTypeChange = handleFilterChange(handleProviderTypeChange);
   const wrappedHandleDurationUnitChange = handleFilterChange(handleDurationUnitChange);
+
+  // Store handleSearch in a ref so we can call it from useEffect
+  const handleSearchRef = useRef<(() => Promise<void>) | null>(null);
+  
+  // Listen for auto-search trigger
+  useEffect(() => {
+    const handleTriggerSearch = () => {
+      if (handleSearchRef.current) {
+        console.log('🚀 Triggering auto-search from template load...');
+        handleSearchRef.current();
+      } else {
+        console.warn('⚠️ handleSearchRef.current is null, cannot trigger auto-search');
+      }
+    };
+    window.addEventListener('triggerSearch', handleTriggerSearch);
+    return () => window.removeEventListener('triggerSearch', handleTriggerSearch);
+  }, []);
 
   // Only fetch data when Search is clicked
   const handleSearch = async () => {
@@ -3688,7 +3722,11 @@ export default function StatePaymentComparison() {
         }
       }
       setChartRefreshKey(k => k + 1);
-      if (success) setHasSearchedOnce(true);
+      if (success) {
+        setHasSearchedOnce(true);
+        // Update ref after successful search
+        handleSearchRef.current = handleSearch;
+      }
     } catch (error) {
       console.error("Error fetching data on search:", error);
       setFetchError("Failed to fetch data. Please try again.");
