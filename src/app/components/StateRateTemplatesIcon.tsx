@@ -27,6 +27,7 @@ interface StateRateTemplate {
     selectedTableRows: { [state: string]: string[] };
     isAllStatesSelected: boolean;
     selectedEntries?: { [state: string]: any[] };
+    stateSelectedForAverage?: { [state: string]: string[] }; // Array of row keys (Sets converted to arrays for JSON)
   };
   created_at: string;
   updated_at: string;
@@ -39,6 +40,7 @@ interface StateRateTemplatesIconProps {
   currentSelectedTableRows: { [state: string]: string[] };
   currentIsAllStatesSelected: boolean;
   currentSelectedEntries?: { [state: string]: any[] };
+  currentStateSelectedForAverage?: { [state: string]: Set<string> };
 }
 
 const StateRateTemplatesIcon = ({
@@ -48,6 +50,7 @@ const StateRateTemplatesIcon = ({
   currentSelectedTableRows,
   currentIsAllStatesSelected,
   currentSelectedEntries,
+  currentStateSelectedForAverage,
 }: StateRateTemplatesIconProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [templates, setTemplates] = useState<StateRateTemplate[]>([]);
@@ -106,12 +109,23 @@ const StateRateTemplatesIcon = ({
     setError(null);
 
     try {
+      // Convert Sets to arrays for JSON serialization
+      const stateSelectedForAverageArray: { [state: string]: string[] } = {};
+      if (currentStateSelectedForAverage) {
+        Object.entries(currentStateSelectedForAverage).forEach(([state, rowKeySet]) => {
+          if (rowKeySet && rowKeySet.size > 0) {
+            stateSelectedForAverageArray[state] = Array.from(rowKeySet);
+          }
+        });
+      }
+
       const templateData = {
         selections: currentSelections,
         filterSets: currentFilterSets,
         selectedTableRows: currentSelectedTableRows,
         isAllStatesSelected: currentIsAllStatesSelected,
         selectedEntries: currentSelectedEntries || {},
+        stateSelectedForAverage: Object.keys(stateSelectedForAverageArray).length > 0 ? stateSelectedForAverageArray : undefined,
       };
 
       const response = await fetch('/api/dashboard-templates', {

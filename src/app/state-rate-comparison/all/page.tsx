@@ -802,6 +802,7 @@ export default function StatePaymentComparison() {
     selectedTableRows: { [state: string]: string[] };
     isAllStatesSelected: boolean;
     selectedEntries?: { [state: string]: any[] };
+    stateSelectedForAverage?: { [state: string]: string[] }; // Array of row keys (will be converted to Sets)
   }) => {
     // Load selections
     if (templateData.selections) {
@@ -827,6 +828,19 @@ export default function StatePaymentComparison() {
     if (templateData.selectedEntries) {
       setPendingSelectedEntries(templateData.selectedEntries);
       // Don't set selectedEntries yet - wait for data to load
+    }
+
+    // Load stateSelectedForAverage (for All States mode) - convert arrays back to Sets
+    if (templateData.stateSelectedForAverage) {
+      const stateSelectedForAverageSets: { [state: string]: Set<string> } = {};
+      Object.entries(templateData.stateSelectedForAverage).forEach(([state, rowKeys]) => {
+        if (Array.isArray(rowKeys) && rowKeys.length > 0) {
+          stateSelectedForAverageSets[state] = new Set(rowKeys);
+        }
+      });
+      if (Object.keys(stateSelectedForAverageSets).length > 0) {
+        setStateSelectedForAverage(stateSelectedForAverageSets);
+      }
     }
   };
 
@@ -3187,6 +3201,41 @@ export default function StatePaymentComparison() {
     setPendingSelectedEntries(null);
   }, [data, filterSetData, pendingSelectedEntries, isAllStatesSelected]);
 
+  // Validate and clean up stateSelectedForAverage after data loads (for All States mode)
+  useEffect(() => {
+    if (!isAllStatesSelected || data.length === 0) return;
+    
+    // Get all row keys from loaded data
+    const loadedRowKeys = new Set(data.map(item => getRowKey(item)));
+    
+    // Clean up stateSelectedForAverage to only include row keys that exist in loaded data
+    setStateSelectedForAverage(prev => {
+      if (Object.keys(prev).length === 0) return prev;
+      
+      const cleaned: { [state: string]: Set<string> } = {};
+      let hasChanges = false;
+      
+      Object.entries(prev).forEach(([state, rowKeySet]) => {
+        const cleanedSet = new Set<string>();
+        rowKeySet.forEach(rowKey => {
+          if (loadedRowKeys.has(rowKey)) {
+            cleanedSet.add(rowKey);
+          } else {
+            hasChanges = true; // Row key doesn't exist in loaded data
+          }
+        });
+        
+        if (cleanedSet.size > 0) {
+          cleaned[state] = cleanedSet;
+        } else {
+          hasChanges = true; // All row keys for this state were invalid
+        }
+      });
+      
+      return hasChanges ? cleaned : prev;
+    });
+  }, [data, isAllStatesSelected]);
+
   // Add filter options loading logic
   useEffect(() => {
     async function loadUltraFilterOptions() {
@@ -3709,6 +3758,7 @@ export default function StatePaymentComparison() {
         currentSelectedTableRows={selectedTableRows}
         currentIsAllStatesSelected={isAllStatesSelected}
         currentSelectedEntries={selectedEntries}
+        currentStateSelectedForAverage={stateSelectedForAverage}
       />
       <AppLayout activeTab="stateRateComparison">
       <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
