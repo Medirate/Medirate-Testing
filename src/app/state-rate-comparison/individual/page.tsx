@@ -2659,86 +2659,28 @@ export default function StatePaymentComparison() {
     filterSets: FilterSet[];
     selectedTableRows: { [state: string]: string[] };
     selectedEntries?: { [state: string]: any[] };
-    // Support loading "all states" format templates (for backward compatibility)
-    isAllStatesSelected?: boolean;
-    stateSelectedForAverage?: { [state: string]: string[] };
   }) => {
-    console.log('📥 Loading template and triggering search...', {
-      hasFilterSets: !!templateData.filterSets,
-      filterSetsCount: templateData.filterSets?.length || 0,
-      isAllStatesFormat: templateData.isAllStatesSelected === true,
-      hasStateSelectedForAverage: !!templateData.stateSelectedForAverage
-    });
+    console.log('📥 Loading template and triggering search...');
     
     // Load selections
     if (templateData.selections) {
       setSelections(templateData.selections);
     }
 
-    // Handle "all states" format template - convert to individual page format
-    if (templateData.isAllStatesSelected && templateData.stateSelectedForAverage) {
-      console.log('🔄 Converting "all states" format template to individual page format...');
-      
-      // Extract states from stateSelectedForAverage
-      const states = Object.keys(templateData.stateSelectedForAverage);
-      console.log('📊 Found states in template:', states);
-      
-      // Get the first filter set to use as base (should have serviceCategory, serviceCode, etc.)
-      const baseFilterSet = templateData.filterSets?.[0];
-      if (baseFilterSet && states.length > 0) {
-        // Create one filter set per state
-        const newFilterSets: FilterSet[] = states.map(state => ({
-          ...baseFilterSet,
-          states: [state], // Each filter set gets one state
-          stateOptions: baseFilterSet.stateOptions || [],
-          serviceCodeOptions: baseFilterSet.serviceCodeOptions || []
-        }));
-        
-        console.log('✅ Created filter sets:', newFilterSets.map(fs => ({ state: fs.states[0], serviceCode: fs.serviceCode })));
-        setFilterSets(newFilterSets);
-        
-        // Convert stateSelectedForAverage to selectedTableRows format
-        // The keys in stateSelectedForAverage are row keys (pipe-separated strings)
-        const convertedSelectedTableRows: { [state: string]: string[] } = {};
-        Object.entries(templateData.stateSelectedForAverage).forEach(([state, rowKeys]) => {
-          if (Array.isArray(rowKeys) && rowKeys.length > 0) {
-            convertedSelectedTableRows[state] = rowKeys;
-          }
-        });
-        
-        console.log('✅ Converted selectedTableRows:', Object.keys(convertedSelectedTableRows));
-        setSelectedTableRows(convertedSelectedTableRows);
-        
-        // Note: selectedEntries will be populated after data loads via the pendingSelectedEntries logic
-        // For now, we'll need to reconstruct them from the row keys after data loads
-        setPendingSelectedEntries({}); // Will be populated after data loads
-      } else {
-        console.warn('⚠️ Could not convert template - missing base filter set or states');
-        // Fall back to regular loading
-        if (templateData.filterSets) {
-          setFilterSets(templateData.filterSets);
-        }
-        if (templateData.selectedTableRows) {
-          setSelectedTableRows(templateData.selectedTableRows);
-        }
-      }
-    } else {
-      // Regular individual page format - load as-is
-      // Load filter sets
-      if (templateData.filterSets) {
-        setFilterSets(templateData.filterSets);
-      }
+    // Load filter sets
+    if (templateData.filterSets) {
+      setFilterSets(templateData.filterSets);
+    }
 
-      // Load table row selections
-      if (templateData.selectedTableRows) {
-        setSelectedTableRows(templateData.selectedTableRows);
-      }
+    // Load table row selections
+    if (templateData.selectedTableRows) {
+      setSelectedTableRows(templateData.selectedTableRows);
+    }
 
-      // Load selected entries - store as pending until data is loaded
-      if (templateData.selectedEntries) {
-        setPendingSelectedEntries(templateData.selectedEntries);
-        // Don't set selectedEntries yet - wait for data to load
-      }
+    // Load selected entries - store as pending until data is loaded
+    if (templateData.selectedEntries) {
+      setPendingSelectedEntries(templateData.selectedEntries);
+      // Don't set selectedEntries yet - wait for data to load
     }
 
     // Wait for React to process state updates, then trigger search directly
@@ -2770,8 +2712,9 @@ export default function StatePaymentComparison() {
   };
 
   // Match pending selected entries to loaded data after data is fetched
-  // Also handle selectedTableRows from "all states" format templates
   useEffect(() => {
+    if (!pendingSelectedEntries) return; // No pending selections
+    
     // Get all loaded data from filterSetData
     const allLoadedData: ServiceData[] = [];
     Object.values(filterSetData).forEach(stateData => {
@@ -2783,81 +2726,82 @@ export default function StatePaymentComparison() {
     // If no data loaded yet, wait
     if (allLoadedData.length === 0) return;
     
-    // Handle selectedTableRows - convert row keys to actual entries
-    // This is needed for "all states" format templates where we only have row keys
-    const matchedEntriesFromTableRows: { [state: string]: ServiceData[] } = {};
+    // Check if we have data for all expected states
+    const expectedStates = Object.keys(pendingSelectedEntries);
+    const loadedStates = new Set(
+      allLoadedData.map(item => item.state_name?.trim().toUpperCase()).filter(Boolean)
+    );
     
-    Object.entries(selectedTableRows).forEach(([state, rowKeys]) => {
-      if (!Array.isArray(rowKeys) || rowKeys.length === 0) return;
+    // Check if all expected states have data loaded
+    const allStatesLoaded = expectedStates.every(state => 
+      loadedStates.has(state.trim().toUpperCase())
+    );
+    
+    // If not all states have data yet, wait
+    if (!allStatesLoaded) {
+      console.log('⏳ Waiting for all states to load data...', {
+        expectedStates,
+        loadedStates: Array.from(loadedStates),
+        filterSetDataKeys: Object.keys(filterSetData)
+      });
+      return;
+    }
+    
+    console.log('✅ All states have data, matching entries...', {
+      expectedStates,
+      totalLoadedData: allLoadedData.length
+    });
+    
+    // Match pending entries to loaded data using row keys
+    const matchedEntries: { [state: string]: ServiceData[] } = {};
+    
+    Object.entries(pendingSelectedEntries).forEach(([state, savedEntries]) => {
+      if (!Array.isArray(savedEntries) || savedEntries.length === 0) return;
       
       const matched: ServiceData[] = [];
+      const stateUpper = state.trim().toUpperCase();
       
-      // Find entries that match the row keys for this state
-      rowKeys.forEach(rowKey => {
-        // Row key is a pipe-separated string matching getRowKey format
-        const matchingEntry = allLoadedData.find(item => {
-          const itemKey = getRowKey(item);
-          return itemKey === rowKey && item.state_name?.trim().toUpperCase() === state.toUpperCase();
+      savedEntries.forEach(savedEntry => {
+        // Create row key from saved entry
+        const savedKey = getRowKey(savedEntry as ServiceData);
+        
+        // Find matching entry in loaded data - must match both row key AND state name
+        const matchedEntry = allLoadedData.find(loadedItem => {
+          const loadedKey = getRowKey(loadedItem);
+          const loadedStateUpper = loadedItem.state_name?.trim().toUpperCase();
+          return loadedKey === savedKey && loadedStateUpper === stateUpper;
         });
         
-        if (matchingEntry) {
-          matched.push(matchingEntry);
+        if (matchedEntry) {
+          matched.push(matchedEntry);
+        } else {
+          console.log('⚠️ Could not match entry for state:', state, {
+            savedKey,
+            savedState: (savedEntry as ServiceData).state_name
+          });
         }
       });
       
       if (matched.length > 0) {
-        matchedEntriesFromTableRows[state] = matched;
+        matchedEntries[state] = matched;
+        console.log(`✅ Matched ${matched.length} entries for ${state}`);
+      } else {
+        console.warn(`⚠️ No entries matched for ${state}`);
       }
     });
     
-    // Also handle pendingSelectedEntries (for regular individual page format)
-    const matchedEntriesFromPending: { [state: string]: ServiceData[] } = {};
-    
-    if (pendingSelectedEntries) {
-      Object.entries(pendingSelectedEntries).forEach(([state, savedEntries]) => {
-        if (!Array.isArray(savedEntries) || savedEntries.length === 0) return;
-        
-        const matched: ServiceData[] = [];
-        
-        savedEntries.forEach(savedEntry => {
-          // Create row key from saved entry
-          const savedKey = getRowKey(savedEntry as ServiceData);
-          
-          // Find matching entry in loaded data
-          const matchedEntry = allLoadedData.find(loadedItem => {
-            const loadedKey = getRowKey(loadedItem);
-            return loadedKey === savedKey;
-          });
-          
-          if (matchedEntry) {
-            matched.push(matchedEntry);
-          }
-        });
-        
-        if (matched.length > 0) {
-          matchedEntriesFromPending[state] = matched;
-        }
-      });
-    }
-    
-    // Merge both sources of matched entries (pending takes precedence if both exist for same state)
-    const allMatchedEntries: { [state: string]: ServiceData[] } = {
-      ...matchedEntriesFromTableRows,
-      ...matchedEntriesFromPending
-    };
-    
     // Update selectedEntries with matched entries
-    if (Object.keys(allMatchedEntries).length > 0) {
-      console.log('✅ Matched entries for states:', Object.keys(allMatchedEntries));
-      setSelectedEntries(allMatchedEntries);
+    if (Object.keys(matchedEntries).length > 0) {
+      console.log('✅ Updating selectedEntries with matched entries:', Object.keys(matchedEntries));
+      setSelectedEntries(matchedEntries);
       setChartRefreshKey(k => k + 1); // Refresh chart
+    } else {
+      console.warn('⚠️ No entries were matched for any state');
     }
     
     // Clear pending selections
-    if (pendingSelectedEntries) {
-      setPendingSelectedEntries(null);
-    }
-  }, [filterSetData, pendingSelectedEntries, selectedTableRows]);
+    setPendingSelectedEntries(null);
+  }, [filterSetData, pendingSelectedEntries]);
 
   // Add filter options loading logic
   useEffect(() => {
