@@ -290,70 +290,30 @@ const StateRateTemplatesIcon = ({
                     key={template.id}
                     className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    {editingId === template.id ? (
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-900">{template.template_name}</h4>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Saved {new Date(template.updated_at).toLocaleDateString()}
+                        </p>
+                      </div>
                       <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={editingName}
-                          onChange={(e) => setEditingName(e.target.value)}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#012C61]"
-                          onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                              handleSaveRename(template.id);
-                            } else if (e.key === 'Escape') {
-                              handleCancelRename();
-                            }
-                          }}
-                          autoFocus
-                        />
                         <button
-                          onClick={() => handleSaveRename(template.id)}
-                          className="p-2 text-green-600 hover:bg-green-50 rounded transition-colors"
-                          title="Save"
+                          onClick={() => handleLoadTemplate(template)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                          title="Load Template"
                         >
-                          <FaCheck className="h-4 w-4" />
+                          <FaDownload className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={handleCancelRename}
+                          onClick={() => handleDeleteTemplate(template.id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                          title="Cancel"
+                          title="Delete"
                         >
-                          <FaTimes className="h-4 w-4" />
+                          <FaTrash className="h-4 w-4" />
                         </button>
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900">{template.template_name}</h4>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Saved {new Date(template.updated_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleLoadTemplate(template)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                            title="Load Template"
-                          >
-                            <FaDownload className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleStartRename(template)}
-                            className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                            title="Rename"
-                          >
-                            <FaEdit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTemplate(template.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete"
-                          >
-                            <FaTrash className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 ))}
               </div>
