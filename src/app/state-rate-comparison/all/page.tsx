@@ -24,6 +24,7 @@ import { useRequireSubscription } from "@/hooks/useRequireAuth";
 import clsx from 'clsx';
 import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
+import StateRateTemplatesIcon from "@/app/components/StateRateTemplatesIcon";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -790,6 +791,40 @@ export default function StatePaymentComparison() {
   const formatText = (text: string | null | undefined) => {
     if (!text) return "-";
     return text.trim();
+  };
+
+  // Handler for loading templates
+  const handleLoadTemplate = (templateData: {
+    selections: Record<string, string | null>;
+    filterSets: FilterSet[];
+    selectedTableRows: { [state: string]: string[] };
+    isAllStatesSelected: boolean;
+    selectedEntries?: { [state: string]: any[] };
+  }) => {
+    // Load selections
+    if (templateData.selections) {
+      setSelections(templateData.selections);
+    }
+
+    // Load filter sets
+    if (templateData.filterSets) {
+      setFilterSets(templateData.filterSets);
+    }
+
+    // Load table row selections
+    if (templateData.selectedTableRows) {
+      setSelectedTableRows(templateData.selectedTableRows);
+    }
+
+    // Load all states selection mode
+    if (templateData.isAllStatesSelected !== undefined) {
+      setIsAllStatesSelected(templateData.isAllStatesSelected);
+    }
+
+    // Load selected entries
+    if (templateData.selectedEntries) {
+      setSelectedEntries(templateData.selectedEntries);
+    }
   };
 
   // Move handleTableRowSelection to top level
@@ -3572,7 +3607,16 @@ export default function StatePaymentComparison() {
   const shouldRenderChart = !isInitialLoading && filterOptionsData && (hasSearchedOnce || !isAllStatesSelected);
 
   return (
-    <AppLayout activeTab="stateRateComparison">
+    <>
+      <StateRateTemplatesIcon
+        onLoadTemplate={handleLoadTemplate}
+        currentSelections={selections}
+        currentFilterSets={filterSets}
+        currentSelectedTableRows={selectedTableRows}
+        currentIsAllStatesSelected={isAllStatesSelected}
+        currentSelectedEntries={selectedEntries}
+      />
+      <AppLayout activeTab="stateRateComparison">
       <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         {/* Error Messages */}
         <div className="mb-4 sm:mb-8">
@@ -4415,6 +4459,7 @@ export default function StatePaymentComparison() {
           </>
         )}
       </div>
-    </AppLayout>
+      </AppLayout>
+    </>
   );
 }
