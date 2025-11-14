@@ -2038,25 +2038,37 @@ export default function HistoricalRates() {
                     <ReactECharts
                       option={{
                         tooltip: {
-                          trigger: 'axis',
+                          trigger: 'item',
                           formatter: (params: any) => {
-                            if (!Array.isArray(params) || params.length === 0) return '';
+                            if (!params || !params.data) return '';
                             
-                            const axisValue = params[0].axisValue;
-                            let tooltip = `<b>Date:</b> ${formatDate(axisValue) || '-'}<br><br>`;
+                            const data = params.data;
+                            if (data.value === null || data.value === undefined) return '';
                             
-                            // Filter to only show data points that have actual values at this date
-                            const validParams = params.filter((param: any) => {
-                              const data = param.data;
-                              return data && data.value !== null && data.value !== undefined && data.date === axisValue;
+                            // Check if there are other points overlapping at this exact position (same date and same rate)
+                            const currentDate = data.date;
+                            const currentRate = data.value;
+                            
+                            // Find all series that have a point at this exact date and rate
+                            const overlappingPoints: any[] = [];
+                            getGraphData.series.forEach((series: any) => {
+                              const point = series.data.find((d: any) => 
+                                d.date === currentDate && 
+                                d.value !== null && 
+                                d.value !== undefined &&
+                                Math.abs(d.value - currentRate) < 0.01 // Allow small floating point differences
+                              );
+                              if (point) {
+                                overlappingPoints.push({
+                                  series: series,
+                                  data: point,
+                                  color: series.color || series.itemStyle?.color
+                                });
+                              }
                             });
                             
-                            if (validParams.length === 0) return '';
-                            
-                            // If only one point, show detailed info
-                            if (validParams.length === 1) {
-                              const param = validParams[0];
-                              const data = param.data;
+                            // If only one point (no overlap), show just that one
+                            if (overlappingPoints.length <= 1) {
                               const rate = data.value ? `$${data.value.toFixed(2)}` : '-';
                               const modifiers = [
                                 data.modifier1 ? `${data.modifier1}${data.modifier1Details ? ` - ${data.modifier1Details}` : ''}` : null,
@@ -2066,7 +2078,8 @@ export default function HistoricalRates() {
                               ].filter(Boolean).join('<br>');
 
                               return `
-                                <b style="color: ${param.color};">${param.seriesName}</b><br>
+                                <b style="color: ${params.color};">${params.seriesName}</b><br>
+                                <b>Date:</b> ${formatDate(data.date) || '-'}<br>
                                 <b>Rate:</b> ${rate}<br>
                                 <b>State:</b> ${data.state || '-'}<br>
                                 <b>Service Code:</b> ${data.serviceCode || '-'}<br>
@@ -2078,25 +2091,25 @@ export default function HistoricalRates() {
                             }
                             
                             // Multiple overlapping points - show all of them
-                            validParams.forEach((param: any, index: number) => {
-                              const data = param.data;
-                              const rate = data.value ? `$${data.value.toFixed(2)}` : '-';
+                            let tooltip = `<b>Date:</b> ${formatDate(currentDate) || '-'}<br><b>Rate:</b> $${currentRate.toFixed(2)}<br><br>`;
+                            
+                            overlappingPoints.forEach((overlap, index) => {
+                              const pointData = overlap.data;
                               const modifiers = [
-                                data.modifier1 ? `${data.modifier1}${data.modifier1Details ? ` - ${data.modifier1Details}` : ''}` : null,
-                                data.modifier2 ? `${data.modifier2}${data.modifier2Details ? ` - ${data.modifier2Details}` : ''}` : null,
-                                data.modifier3 ? `${data.modifier3}${data.modifier3Details ? ` - ${data.modifier3Details}` : ''}` : null,
-                                data.modifier4 ? `${data.modifier4}${data.modifier4Details ? ` - ${data.modifier4Details}` : ''}` : null
+                                pointData.modifier1 ? `${pointData.modifier1}${pointData.modifier1Details ? ` - ${pointData.modifier1Details}` : ''}` : null,
+                                pointData.modifier2 ? `${pointData.modifier2}${pointData.modifier2Details ? ` - ${pointData.modifier2Details}` : ''}` : null,
+                                pointData.modifier3 ? `${pointData.modifier3}${pointData.modifier3Details ? ` - ${pointData.modifier3Details}` : ''}` : null,
+                                pointData.modifier4 ? `${pointData.modifier4}${pointData.modifier4Details ? ` - ${pointData.modifier4Details}` : ''}` : null
                               ].filter(Boolean).join('<br>');
 
                               tooltip += `
-                                <div style="margin-bottom: ${index < validParams.length - 1 ? '8px' : '0'}; padding-bottom: ${index < validParams.length - 1 ? '8px' : '0'}; ${index < validParams.length - 1 ? 'border-bottom: 1px solid #e5e7eb;' : ''}">
-                                  <b style="color: ${param.color};">${param.seriesName}</b><br>
-                                  <b>Rate:</b> ${rate}<br>
-                                  <b>State:</b> ${data.state || '-'}<br>
-                                  <b>Service Code:</b> ${data.serviceCode || '-'}<br>
-                                  <b>Program:</b> ${data.program || '-'}<br>
-                                  <b>Location/Region:</b> ${data.locationRegion || '-'}<br>
-                                  <b>Duration Unit:</b> ${data.durationUnit || '-'}<br>
+                                <div style="margin-bottom: ${index < overlappingPoints.length - 1 ? '8px' : '0'}; padding-bottom: ${index < overlappingPoints.length - 1 ? '8px' : '0'}; ${index < overlappingPoints.length - 1 ? 'border-bottom: 1px solid #e5e7eb;' : ''}">
+                                  <b style="color: ${overlap.color};">${overlap.series.name}</b><br>
+                                  <b>State:</b> ${pointData.state || '-'}<br>
+                                  <b>Service Code:</b> ${pointData.serviceCode || '-'}<br>
+                                  <b>Program:</b> ${pointData.program || '-'}<br>
+                                  <b>Location/Region:</b> ${pointData.locationRegion || '-'}<br>
+                                  <b>Duration Unit:</b> ${pointData.durationUnit || '-'}<br>
                                   ${modifiers ? `<b>Modifiers:</b><br>${modifiers}` : ''}
                                 </div>
                               `;
