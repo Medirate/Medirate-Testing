@@ -198,7 +198,7 @@ export default function Documents() {
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
                   <h1 className="text-4xl md:text-5xl font-lemonMilkRegular text-[#012C61] mb-4 tracking-tight">
-                    Documents & State Notes
+                    Document Library
                   </h1>
                   <p className="text-lg text-gray-600 max-w-2xl">
                     Access comprehensive policy documents, state notes, guidelines, and essential resources

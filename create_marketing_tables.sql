@@ -1,1 +1,0 @@
--- Create the marketing email tables

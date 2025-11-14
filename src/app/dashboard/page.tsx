@@ -2672,36 +2672,39 @@ export default function Dashboard() {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <div className="relative group">
-                <button
-                  onClick={handleExport}
-                  disabled={isExporting || isPreparingExport || !hasSearched || data.length === 0}
-                  className={clsx(
-                    "px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 border",
-                    isExporting || isPreparingExport || !hasSearched || data.length === 0
-                      ? "bg-gray-50 text-gray-400 cursor-not-allowed border-gray-200"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm"
-                  )}
-                  title={isExporting ? 'Exporting all data...' : isPreparingExport ? 'Preparing export...' : 'Export all data to CSV with watermark (includes all pages)'}
-                >
-                  {isExporting || isPreparingExport ? (
-                    <span className="flex items-center gap-2">
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      {isExporting ? 'Exporting...' : 'Preparing...'}
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Export CSV
-                    </span>
-                  )}
-                </button>
-              </div>
+              {/* Export functionality temporarily disabled */}
+              {false && (
+                <div className="relative group">
+                  <button
+                    onClick={handleExport}
+                    disabled={isExporting || isPreparingExport || !hasSearched || data.length === 0}
+                    className={clsx(
+                      "px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 border",
+                      isExporting || isPreparingExport || !hasSearched || data.length === 0
+                        ? "bg-gray-50 text-gray-400 cursor-not-allowed border-gray-200"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400 shadow-sm"
+                    )}
+                    title={isExporting ? 'Exporting all data...' : isPreparingExport ? 'Preparing export...' : 'Export all data to CSV with watermark (includes all pages)'}
+                  >
+                    {isExporting || isPreparingExport ? (
+                      <span className="flex items-center gap-2">
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {isExporting ? 'Exporting...' : 'Preparing...'}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Export CSV
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
               <button
                 onClick={() => setIsTableExpanded(prev => !prev)}
                 className="px-3 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 transition-colors"
@@ -2712,8 +2715,8 @@ export default function Dashboard() {
             </div>
           </div>
           
-          {/* Usage Info Display */}
-          {exportUsage && (
+          {/* Usage Info Display - Temporarily disabled */}
+          {false && exportUsage && (
             <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-blue-800">
@@ -2729,8 +2732,8 @@ export default function Dashboard() {
             </div>
           )}
           
-          {/* CSV Export Warning Modal */}
-          {showCsvWarningModal && pendingCsvExport && exportUsage && (
+          {/* CSV Export Warning Modal - Temporarily disabled */}
+          {false && showCsvWarningModal && pendingCsvExport && exportUsage && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
               <div className="bg-white rounded-lg p-6 max-w-lg mx-4 shadow-xl">
                 <div className="flex items-center gap-3 mb-4">
