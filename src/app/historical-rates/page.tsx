@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import type { Dispatch, SetStateAction } from 'react';
 import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
+import HistoricalRatesTemplatesIcon from "@/app/components/HistoricalRatesTemplatesIcon";
 
 interface ServiceData {
   state_name: string;
@@ -1479,8 +1480,78 @@ export default function HistoricalRates() {
   const availableDurationUnits = getAvailableOptionsForFilter('duration_unit', selections, filterOptionsData) as string[];
   const availableModifiers = getAvailableOptionsForFilter('modifier_1', selections, filterOptionsData) as string[];
 
+  // Handler for loading templates
+  const handleLoadTemplate = async (templateData: {
+    selections: Record<string, string | null>;
+    selectedEntry?: ServiceData | null;
+  }) => {
+    console.log('📥 Loading template and triggering search...');
+    
+    // Load selections
+    if (templateData.selections) {
+      setSelections(templateData.selections);
+    }
+
+    // Wait for React to process state updates, then trigger search
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Trigger search by calling refreshData with the loaded selections
+    const loadedSelections = templateData.selections;
+    if (loadedSelections.service_category && loadedSelections.state_name && (loadedSelections.service_code || loadedSelections.service_description)) {
+      const filters: Record<string, string> = {};
+      if (loadedSelections.service_category) filters.service_category = loadedSelections.service_category;
+      if (loadedSelections.state_name) filters.state_name = loadedSelections.state_name;
+      if (loadedSelections.service_code) filters.service_code = loadedSelections.service_code;
+      if (loadedSelections.service_description) filters.service_description = loadedSelections.service_description;
+      if (loadedSelections.program) filters.program = loadedSelections.program;
+      if (loadedSelections.location_region) filters.location_region = loadedSelections.location_region;
+      if (loadedSelections.provider_type) filters.provider_type = loadedSelections.provider_type;
+      if (loadedSelections.duration_unit) filters.duration_unit = loadedSelections.duration_unit;
+      if (loadedSelections.modifier_1) filters.modifier_1 = loadedSelections.modifier_1;
+      filters.page = String(currentPage);
+      filters.itemsPerPage = String(itemsPerPage);
+      
+      console.log('🚀 Calling refreshData with template filters...');
+      const result = await refreshData(filters);
+      
+      // After data loads, set the selected entry if it exists
+      if (templateData.selectedEntry && result && result.data) {
+        // Wait a bit more for filteredData to update
+        await new Promise(resolve => setTimeout(resolve, 200));
+        // Find matching entry in loaded data
+        const matchingEntry = result.data.find((item: ServiceData) => 
+          item.state_name === templateData.selectedEntry?.state_name &&
+          item.service_category === templateData.selectedEntry?.service_category &&
+          item.service_code === templateData.selectedEntry?.service_code &&
+          item.service_description === templateData.selectedEntry?.service_description &&
+          item.program === templateData.selectedEntry?.program &&
+          item.location_region === templateData.selectedEntry?.location_region &&
+          item.modifier_1 === templateData.selectedEntry?.modifier_1 &&
+          item.modifier_1_details === templateData.selectedEntry?.modifier_1_details &&
+          item.modifier_2 === templateData.selectedEntry?.modifier_2 &&
+          item.modifier_2_details === templateData.selectedEntry?.modifier_2_details &&
+          item.modifier_3 === templateData.selectedEntry?.modifier_3 &&
+          item.modifier_3_details === templateData.selectedEntry?.modifier_3_details &&
+          item.modifier_4 === templateData.selectedEntry?.modifier_4 &&
+          item.modifier_4_details === templateData.selectedEntry?.modifier_4_details &&
+          item.duration_unit === templateData.selectedEntry?.duration_unit &&
+          item.provider_type === templateData.selectedEntry?.provider_type
+        );
+        
+        if (matchingEntry) {
+          setSelectedEntry(matchingEntry);
+        }
+      }
+    }
+  };
+
   return (
     <AppLayout activeTab="historicalRates">
+      <HistoricalRatesTemplatesIcon
+        onLoadTemplate={handleLoadTemplate}
+        currentSelections={selections}
+        currentSelectedEntry={selectedEntry}
+      />
       <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         <ErrorMessage error={error} />
         {authError && (
