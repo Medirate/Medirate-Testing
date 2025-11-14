@@ -800,7 +800,7 @@ export default function StatePaymentComparison() {
   };
 
   // Handler for loading templates
-  const handleLoadTemplate = (templateData: {
+  const handleLoadTemplate = async (templateData: {
     selections: Record<string, string | null>;
     filterSets: FilterSet[];
     selectedTableRows: { [state: string]: string[] };
@@ -808,6 +808,8 @@ export default function StatePaymentComparison() {
     selectedEntries?: { [state: string]: any[] };
     stateSelectedForAverage?: { [state: string]: string[] }; // Array of row keys (will be converted to Sets)
   }) => {
+    console.log('📥 Loading template and triggering search...');
+    
     // Load selections
     if (templateData.selections) {
       setSelections(templateData.selections);
@@ -840,11 +842,18 @@ export default function StatePaymentComparison() {
       console.log(`✅ Loaded stateSelectedForAverage for ${Object.keys(templateData.stateSelectedForAverage).length} states (pending until data loads)`);
     }
 
-    // Trigger auto-search after template loads
-    // Use a longer delay to ensure everything is set up
-    setTimeout(() => {
-      setShouldAutoSearch(true);
-    }, 100);
+    // Wait for React to process state updates, then trigger search directly
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // Now call handleSearch directly - it will use the updated filterSets from state
+    console.log('🚀 Calling handleSearch directly after template load...');
+    if (handleSearchRef.current) {
+      await handleSearchRef.current();
+    } else {
+      // If ref isn't ready, try the event system as fallback
+      console.log('⏳ handleSearchRef not ready, using event fallback...');
+      window.dispatchEvent(new CustomEvent('triggerSearch'));
+    }
   };
 
   // Move handleTableRowSelection to top level
