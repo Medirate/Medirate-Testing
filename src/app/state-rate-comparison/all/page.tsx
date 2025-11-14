@@ -841,7 +841,10 @@ export default function StatePaymentComparison() {
     }
 
     // Trigger auto-search after template loads
-    setShouldAutoSearch(true);
+    // Use a longer delay to ensure everything is set up
+    setTimeout(() => {
+      setShouldAutoSearch(true);
+    }, 100);
   };
 
   // Move handleTableRowSelection to top level
@@ -953,12 +956,20 @@ export default function StatePaymentComparison() {
     });
     setShouldAutoSearch(false);
     
-    // Use setTimeout to ensure filters are fully set and component is ready
+    // Use a longer delay and try multiple approaches
     const timer = setTimeout(() => {
-      // Trigger search via custom event
-      console.log('🚀 Dispatching triggerSearch event...');
-      window.dispatchEvent(new CustomEvent('triggerSearch'));
-    }, 300);
+      console.log('🚀 Attempting to trigger search...');
+      
+      // Try direct call first if ref is ready
+      if (handleSearchRef.current) {
+        console.log('✅ handleSearchRef is ready, calling directly');
+        handleSearchRef.current();
+      } else {
+        console.log('⏳ handleSearchRef not ready, dispatching event...');
+        // Fallback to event
+        window.dispatchEvent(new CustomEvent('triggerSearch'));
+      }
+    }, 500);
     
     return () => clearTimeout(timer);
   }, [shouldAutoSearch, filterSets]);
