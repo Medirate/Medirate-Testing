@@ -487,7 +487,18 @@ export default function DataExport() {
 
   const handleLoadTemplate = (templateData: DataExportTemplateData) => {
     if (templateData.selections) {
-      setSelections(templateData.selections);
+      setSelections({
+        state_name: templateData.selections.state_name ?? null,
+        service_category: templateData.selections.service_category ?? null,
+        service_code: templateData.selections.service_code ?? null,
+        service_description: templateData.selections.service_description ?? null,
+        program: templateData.selections.program ?? null,
+        location_region: templateData.selections.location_region ?? null,
+        provider_type: templateData.selections.provider_type ?? null,
+        duration_unit: templateData.selections.duration_unit ?? null,
+        modifier_1: templateData.selections.modifier_1 ?? null,
+        fee_schedule_date: templateData.selections.fee_schedule_date ?? null,
+      });
     }
 
     const applyDate = (
@@ -520,8 +531,6 @@ export default function DataExport() {
     } else {
       setSelectedColumns(ALL_COLUMN_OPTIONS.map((option) => option.key));
     }
-
-    setTemplateError(null);
   };
 
   const buildCsv = (rows: ServiceData[], columns: string[]) => {
@@ -597,7 +606,7 @@ export default function DataExport() {
     <AppLayout activeTab="dataExport">
       <DataExportTemplatesIcon
         onLoadTemplate={handleLoadTemplate}
-        currentSelections={selections}
+        currentSelections={selections as unknown as Record<string, string | null>}
         currentStartDate={startDate}
         currentEndDate={endDate}
         currentSelectedColumns={selectedColumns}
