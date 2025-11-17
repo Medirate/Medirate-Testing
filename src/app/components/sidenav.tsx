@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, memo } from "react";
+import { useEffect, useState, memo, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
 import { useAuth } from "@/context/AuthContext";
@@ -40,9 +40,22 @@ const adminRateDevLinks: { href: string; label: string; icon: React.ReactNode }[
 const SideNav = memo(() => {
   const { activeTab, setActiveTab, isSidebarCollapsed, toggleSidebar } = useSideNav();
   const pathname = usePathname();
-  const [isClientSide, setIsClientSide] = useState(false);
   const { user } = useKindeBrowserClient();
   const auth = useAuth(); // Add auth context to check subscription status
+  const prevCollapsedRef = useRef(isSidebarCollapsed);
+  const [shouldTransition, setShouldTransition] = useState(false);
+  
+  // Track when collapsed state changes (only on toggle, not on navigation)
+  useEffect(() => {
+    if (prevCollapsedRef.current !== isSidebarCollapsed) {
+      // State changed - enable transition briefly
+      setShouldTransition(true);
+      prevCollapsedRef.current = isSidebarCollapsed;
+      // Disable transition after animation completes
+      const timer = setTimeout(() => setShouldTransition(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isSidebarCollapsed]);
   
   // Only show sidenav on authenticated pages (same logic as navbar)
   const authenticatedPages = [
@@ -152,11 +165,6 @@ const SideNav = memo(() => {
 
   // Tab mapping is now handled in SideNavContext
 
-  // Set isClientSide to true after the component mounts
-  useEffect(() => {
-    setIsClientSide(true);
-  }, []);
-
   // Auto-expand admin submenu if on an admin page
   useEffect(() => {
     if (pathname.startsWith("/admin-dashboard")) {
@@ -180,35 +188,32 @@ const SideNav = memo(() => {
   }
 
   return (
-    <>
-      {/* Only render sidebar on client to avoid hydration mismatch */}
-      {isClientSide ? (
-        <aside
-          className="shadow-lg"
-          style={{
-            width: isSidebarCollapsed ? "4rem" : "20rem",
-            transition: "width 0.3s ease-in-out",
-            backgroundColor: "rgb(1, 44, 97)",
-            color: "white",
-            position: "fixed", // Keeps it fixed
-            top: "5.5rem", // Height of the Navbar
-            bottom: "0", // Extend to the bottom of the viewport
-            left: 0, // Aligns to the left of the viewport
-            height: "calc(100vh - 5.5rem)", // Full height minus navbar
-            zIndex: 50, // Ensures it stays above the content
-            overflowY: "auto", // Allow scrolling when content overflows
-            overflowX: "hidden", // Hide horizontal scroll
-          }}
+    <aside
+      className="shadow-lg"
+      style={{
+        width: isSidebarCollapsed ? "4rem" : "20rem",
+        transition: shouldTransition ? "width 0.3s ease-in-out" : "none",
+        backgroundColor: "rgb(1, 44, 97)",
+        color: "white",
+        position: "fixed", // Keeps it fixed
+        top: "5.5rem", // Height of the Navbar
+        bottom: "0", // Extend to the bottom of the viewport
+        left: 0, // Aligns to the left of the viewport
+        height: "calc(100vh - 5.5rem)", // Full height minus navbar
+        zIndex: 50, // Ensures it stays above the content
+        overflowY: "auto", // Allow scrolling when content overflows
+        overflowX: "hidden", // Hide horizontal scroll
+      }}
+    >
+      {/* Sidebar Toggle Button */}
+      <div className="flex justify-end p-4">
+        <button
+          onClick={toggleSidebar}
+          className="p-2 text-white hover:bg-gray-800 rounded-md"
         >
-          {/* Sidebar Toggle Button */}
-          <div className="flex justify-end p-4">
-            <button
-              onClick={toggleSidebar}
-              className="p-2 text-white hover:bg-gray-800 rounded-md"
-            >
-              {isClientSide ? (isSidebarCollapsed ? <Menu size={20} /> : <X size={20} />) : <Menu size={20} />}
-            </button>
-          </div>
+          {isSidebarCollapsed ? <Menu size={20} /> : <X size={20} />}
+        </button>
+      </div>
 
           {/* Navigation Links */}
           <nav className="mt-6 pb-20">
@@ -720,26 +725,7 @@ const SideNav = memo(() => {
               </li>
             </ul>
           </nav>
-        </aside>
-      ) : (
-        // Server-side placeholder to prevent layout shift
-        <aside
-          className="transition-all duration-500 ease-in-out shadow-lg w-80"
-          style={{
-            backgroundColor: "rgb(1, 44, 97)",
-            color: "white",
-            position: "fixed",
-            top: "5.5rem",
-            bottom: "0",
-            left: 0,
-            height: "calc(100vh - 5.5rem)",
-            zIndex: 50,
-            overflowY: "auto",
-            overflowX: "hidden",
-          }}
-        />
-      )}
-    </>
+    </aside>
   );
 });
 

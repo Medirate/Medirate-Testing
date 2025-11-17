@@ -12,15 +12,24 @@ interface SideNavContextType {
 
 const SideNavContext = createContext<SideNavContextType | undefined>(undefined);
 
+// Read collapsed state synchronously before component renders
+const getInitialCollapsedState = (): boolean => {
+  if (typeof window === "undefined") {
+    return true; // Default to collapsed on server
+  }
+  try {
+    const stored = localStorage.getItem("isSidebarCollapsed");
+    return stored ? JSON.parse(stored) : true;
+  } catch {
+    return true; // Default to collapsed on error
+  }
+};
+
 export function SideNavProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [activeTab, setActiveTab] = useState<string>("dashboard");
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return JSON.parse(localStorage.getItem("isSidebarCollapsed") || "true");
-    }
-    return true;
-  });
+  // Use a ref to ensure we always use the same initial value
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(getInitialCollapsedState);
 
   // Update active tab based on pathname without causing re-renders
   useEffect(() => {
