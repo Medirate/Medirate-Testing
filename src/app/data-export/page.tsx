@@ -7,8 +7,13 @@ import Select from "react-select";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import clsx from "clsx";
+import { gunzipSync, strFromU8 } from "fflate";
+import { Calendar } from "lucide-react";
 
 interface FilterOptionsData {
+  filters: {
+    [key: string]: string[];
+  };
   combinations: Combination[];
 }
 
@@ -17,105 +22,15 @@ interface Combination {
 }
 
 interface ServiceData {
-  state_name: string;
-  service_category: string;
-  service_code: string;
-  service_description?: string;
-  modifier_1?: string;
-  modifier_1_details?: string;
-  modifier_2?: string;
-  modifier_2_details?: string;
-  modifier_3?: string;
-  modifier_3_details?: string;
-  modifier_4?: string;
-  modifier_4_details?: string;
-  rate: string;
-  rate_effective_date?: string;
-  program: string;
-  location_region: string;
-  rate_per_hour?: string;
-  duration_unit?: string;
-  provider_type?: string;
-  state_code?: string;
-  [key: string]: string | undefined;
-}
-
-interface SelectionModalData {
-  rowCount: number;
-  rowsRemaining: number;
-  rowsUsed: number;
-  rowsLimit: number;
-  selectedColumns: ColumnKey[];
+  [key: string]: any; // All columns from database
 }
 
 interface ColumnOption {
-  key: ColumnKey;
+  key: string;
   label: string;
   description: string;
   formatter?: (row: ServiceData) => string;
 }
-
-type ColumnKey =
-  | "state_name"
-  | "state_code"
-  | "service_category"
-  | "service_code"
-  | "service_description"
-  | "rate"
-  | "rate_per_hour"
-  | "duration_unit"
-  | "rate_effective_date"
-  | "program"
-  | "location_region"
-  | "provider_type"
-  | "modifier_1"
-  | "modifier_1_details"
-  | "modifier_2"
-  | "modifier_2_details"
-  | "modifier_3"
-  | "modifier_3_details"
-  | "modifier_4"
-  | "modifier_4_details";
-
-const COLUMN_OPTIONS: ColumnOption[] = [
-  { key: "state_name", label: "State", description: "Full state name" },
-  { key: "state_code", label: "State (Abbreviation)", description: "Two letter code" },
-  { key: "service_category", label: "Service Category", description: "Primary service line" },
-  { key: "service_code", label: "Service Code", description: "HCPCS/CPT or state code" },
-  { key: "service_description", label: "Service Description", description: "Plain language description" },
-  { key: "rate", label: "Rate per Base Unit", description: "Latest rate", formatter: (row) => formatRate(row.rate) },
-  { key: "rate_per_hour", label: "Rate per Hour", description: "Calculated hourly rate" },
-  { key: "duration_unit", label: "Duration Unit", description: "Unit of measure" },
-  { key: "rate_effective_date", label: "Effective Date", description: "Rate effective date", formatter: (row) => formatDate(row.rate_effective_date) },
-  { key: "program", label: "Program", description: "Waiver or program name" },
-  { key: "location_region", label: "Location / Region", description: "County or metro" },
-  { key: "provider_type", label: "Provider Type", description: "Provider category" },
-  { key: "modifier_1", label: "Modifier 1", description: "Modifier code" },
-  { key: "modifier_1_details", label: "Modifier 1 Details", description: "Modifier description" },
-  { key: "modifier_2", label: "Modifier 2", description: "Modifier code" },
-  { key: "modifier_2_details", label: "Modifier 2 Details", description: "Modifier description" },
-  { key: "modifier_3", label: "Modifier 3", description: "Modifier code" },
-  { key: "modifier_3_details", label: "Modifier 3 Details", description: "Modifier description" },
-  { key: "modifier_4", label: "Modifier 4", description: "Modifier code" },
-  { key: "modifier_4_details", label: "Modifier 4 Details", description: "Modifier description" },
-];
-
-const COLUMN_MAP = COLUMN_OPTIONS.reduce((acc, option) => {
-  acc[option.key] = option;
-  return acc;
-}, {} as Record<ColumnKey, ColumnOption>);
-
-const FILTER_FIELDS: Array<{ key: keyof Selections; label: string; placeholder: string }> = [
-  { key: "service_category", label: "Service Line", placeholder: "Select service line" },
-  { key: "state_name", label: "State", placeholder: "Select state" },
-  { key: "service_code", label: "Service Code", placeholder: "Select code" },
-  { key: "service_description", label: "Service Description", placeholder: "Select description" },
-  { key: "program", label: "Program", placeholder: "Select program" },
-  { key: "location_region", label: "Location / Region", placeholder: "Select region" },
-  { key: "provider_type", label: "Provider Type", placeholder: "Select provider type" },
-  { key: "duration_unit", label: "Duration Unit", placeholder: "Select unit" },
-  { key: "modifier_1", label: "Modifier 1", placeholder: "Select modifier" },
-];
 
 interface Selections {
   state_name: string | null;
@@ -129,6 +44,90 @@ interface Selections {
   modifier_1: string | null;
   fee_schedule_date: string | null;
 }
+
+interface UsageResponse {
+  rowsUsed: number;
+  rowsLimit: number;
+  rowsRemaining: number;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  canExport?: boolean;
+  message?: string;
+}
+
+interface SelectionModalData {
+  rowCount: number;
+  rowsRemaining: number;
+  rowsUsed: number;
+  rowsLimit: number;
+  selectedColumns: string[];
+}
+
+// All columns from master_data_sept_2 table based on schema
+const ALL_COLUMN_OPTIONS: ColumnOption[] = [
+  { key: "id", label: "ID", description: "Unique record identifier" },
+  { key: "new_field", label: "New Field", description: "Additional field" },
+  { key: "service_category", label: "Service Category", description: "Primary service line" },
+  { key: "service_sub_category", label: "Service Sub Category", description: "Sub-category classification" },
+  { key: "state_id_pk", label: "State ID", description: "State identifier" },
+  { key: "state_name", label: "State", description: "Full state name" },
+  { key: "state_code", label: "State Code", description: "Two letter abbreviation" },
+  { key: "filename", label: "Filename", description: "Source document filename" },
+  { key: "page_number", label: "Page Number", description: "Page in source document" },
+  { key: "service_id_pk", label: "Service ID", description: "Service identifier" },
+  { key: "service_code", label: "Service Code", description: "HCPCS/CPT or state code" },
+  { key: "service_description", label: "Service Description", description: "Plain language description" },
+  { key: "rate", label: "Rate per Base Unit", description: "Latest rate", formatter: (row) => formatRate(row.rate) },
+  { key: "rate_last_updated", label: "Rate Last Updated", description: "Last update timestamp" },
+  { key: "rate_effective_date", label: "Effective Date", description: "Rate effective date", formatter: (row) => formatDate(row.rate_effective_date) },
+  { key: "duration_unit", label: "Duration Unit", description: "Unit of measure" },
+  { key: "minutes", label: "Minutes", description: "Duration in minutes" },
+  { key: "program", label: "Program", description: "Waiver or program name" },
+  { key: "modifier_1", label: "Modifier 1", description: "Modifier code" },
+  { key: "modifier_1_details", label: "Modifier 1 Details", description: "Modifier description" },
+  { key: "modifier_2", label: "Modifier 2", description: "Modifier code" },
+  { key: "modifier_2_details", label: "Modifier 2 Details", description: "Modifier description" },
+  { key: "modifier_3", label: "Modifier 3", description: "Modifier code" },
+  { key: "modifier_3_details", label: "Modifier 3 Details", description: "Modifier description" },
+  { key: "modifier_4", label: "Modifier 4", description: "Modifier code" },
+  { key: "modifier_4_details", label: "Modifier 4 Details", description: "Modifier description" },
+  { key: "fee", label: "Fee", description: "Fee amount" },
+  { key: "max_fee", label: "Max Fee", description: "Maximum fee amount" },
+  { key: "modifier_id_pk", label: "Modifier ID", description: "Modifier identifier" },
+  { key: "service_id_fk", label: "Service Foreign Key", description: "Service reference" },
+  { key: "prior_auth_required", label: "Prior Auth Required", description: "Prior authorization requirement" },
+  { key: "comments", label: "Comments", description: "Additional comments" },
+  { key: "location_region", label: "Location / Region", description: "County or metro" },
+  { key: "update_id_pk", label: "Update ID", description: "Update identifier" },
+  { key: "times_rate_updated", label: "Times Rate Updated", description: "Number of rate updates" },
+  { key: "percentage_change", label: "Percentage Change", description: "Rate change percentage" },
+  { key: "last_database_refresh", label: "Last Database Refresh", description: "Last refresh timestamp" },
+  { key: "requires_pa", label: "Requires PA", description: "Prior authorization flag" },
+  { key: "rate_per_hour", label: "Rate per Hour", description: "Calculated hourly rate" },
+  { key: "provider_type", label: "Provider Type", description: "Provider category" },
+  { key: "age", label: "Age", description: "Age requirement" },
+  { key: "unnamed_40", label: "Unnamed 40", description: "Additional field 40" },
+  { key: "unnamed_41", label: "Unnamed 41", description: "Additional field 41" },
+  { key: "created_at", label: "Created At", description: "Record creation timestamp", formatter: (row) => formatDate(row.created_at) },
+  { key: "updated_at", label: "Updated At", description: "Record update timestamp", formatter: (row) => formatDate(row.updated_at) },
+];
+
+const COLUMN_MAP = ALL_COLUMN_OPTIONS.reduce((acc, option) => {
+  acc[option.key] = option;
+  return acc;
+}, {} as Record<string, ColumnOption>);
+
+const FILTER_FIELDS: Array<{ key: keyof Selections; label: string; placeholder: string }> = [
+  { key: "service_category", label: "Service Line", placeholder: "Select service line" },
+  { key: "state_name", label: "State", placeholder: "Select state" },
+  { key: "service_code", label: "Service Code", placeholder: "Select code" },
+  { key: "service_description", label: "Service Description", placeholder: "Select description" },
+  { key: "program", label: "Program", placeholder: "Select program" },
+  { key: "location_region", label: "Location / Region", placeholder: "Select region" },
+  { key: "provider_type", label: "Provider Type", placeholder: "Select provider type" },
+  { key: "duration_unit", label: "Duration Unit", placeholder: "Select unit" },
+  { key: "modifier_1", label: "Modifier 1", placeholder: "Select modifier" },
+];
 
 const buttonClasses =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-transparent bg-[#012C61] px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#001f44] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#001f44]";
@@ -148,9 +147,22 @@ export default function DataExport() {
     modifier_1: null,
     fee_schedule_date: null,
   });
+  // Helper function to format date for input (DD/MM/YYYY)
+  const formatDateInput = (date: Date | null): string => {
+    if (!date) return "";
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   const [startDate, setStartDate] = useState<Date | null>(new Date("2017-01-01"));
   const [endDate, setEndDate] = useState<Date | null>(new Date());
-  const [selectedColumns, setSelectedColumns] = useState<ColumnKey[]>(COLUMN_OPTIONS.map((option) => option.key));
+  const [startDateInput, setStartDateInput] = useState<string>("01/01/2017");
+  const [endDateInput, setEndDateInput] = useState<string>(formatDateInput(new Date()));
+  const [showStartCalendar, setShowStartCalendar] = useState(false);
+  const [showEndCalendar, setShowEndCalendar] = useState(false);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(ALL_COLUMN_OPTIONS.map((option) => option.key));
   const [exportUsage, setExportUsage] = useState<UsageResponse | null>(null);
   const [isPreparingExport, setIsPreparingExport] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -158,31 +170,121 @@ export default function DataExport() {
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [selectionReview, setSelectionReview] = useState<SelectionModalData | null>(null);
   const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [isLoadingFilters, setIsLoadingFilters] = useState(false);
 
+  // Load filter options from compressed file (same as dashboard)
   useEffect(() => {
-    (async () => {
+    async function loadUltraFilterOptions() {
       try {
-        const response = await fetch("/api/filter-options");
-        if (response.ok) {
-          const data = await response.json();
+        setIsLoadingFilters(true);
+        const res = await fetch("/filter_options.json.gz");
+        if (!res.ok) throw new Error(`Failed to fetch filter options: ${res.status} ${res.statusText}`);
+        const gzipped = new Uint8Array(await res.arrayBuffer());
+        const decompressed = gunzipSync(gzipped);
+        const jsonStr = strFromU8(decompressed);
+        const data = JSON.parse(jsonStr);
+        
+        // Handle new columnar format with mappings
+        if (data.m && data.v && data.c) {
+          const { m: mappings, v: values, c: columns } = data;
+          const numRows: number = values[0].length;
+          const combinations: any[] = [];
+          for (let i = 0; i < numRows; i++) {
+            const combo: Record<string, any> = {};
+            columns.forEach((col: string, colIndex: number) => {
+              const intValue = values[colIndex][i];
+              if (col === 'rate_effective_date') {
+                // Handle rate_effective_date as array of integers
+                if (Array.isArray(intValue)) {
+                  combo[col] = intValue.map(dateInt => 
+                    dateInt === -1 ? '' : mappings[col][String(dateInt)]
+                  ).filter(date => date !== '');
+                } else {
+                  combo[col] = intValue === -1 ? '' : mappings[col][String(intValue)];
+                }
+              } else {
+                combo[col] = intValue === -1 ? '' : mappings[col][String(intValue)];
+              }
+            });
+            combinations.push(combo);
+          }
+          
+          // Extract unique values for each filter
+          const filters: Record<string, string[]> = {};
+          columns.forEach((col: string) => {
+            if (col !== 'rate_effective_date') {
+              const uniqueValues = Array.from(new Set(
+                combinations.map(c => c[col]).filter(Boolean)
+              )).sort();
+              filters[col] = uniqueValues;
+            }
+          });
+          
+          setFilterOptionsData({ filters, combinations });
+        } else {
+          // Fallback to old format
           setFilterOptionsData(data);
         }
       } catch (error) {
         console.error("Failed to load filter options", error);
+      } finally {
+        setIsLoadingFilters(false);
       }
-    })();
+    }
+    loadUltraFilterOptions();
   }, []);
 
   useEffect(() => {
     checkExportUsage();
   }, []);
 
+  // Parse manual date input (DD/MM/YYYY format)
+  const parseDateInput = (input: string): Date | null => {
+    const parts = input.split("/");
+    if (parts.length !== 3) return null;
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+    const year = parseInt(parts[2], 10);
+    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+    const date = new Date(year, month, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
+    return date;
+  };
+
+  // Update date when input changes
+  useEffect(() => {
+    const parsed = parseDateInput(startDateInput);
+    if (parsed) {
+      setStartDate(parsed);
+    }
+  }, [startDateInput]);
+
+  useEffect(() => {
+    const parsed = parseDateInput(endDateInput);
+    if (parsed) {
+      setEndDate(parsed);
+    }
+  }, [endDateInput]);
+
+  // Update input when calendar date changes
+  useEffect(() => {
+    if (startDate) {
+      setStartDateInput(formatDateInput(startDate));
+    }
+  }, [startDate]);
+
+  useEffect(() => {
+    if (endDate) {
+      setEndDateInput(formatDateInput(endDate));
+    }
+  }, [endDate]);
+
   const columnSelectionCount = selectedColumns.length;
-  const allColumnsSelected = columnSelectionCount === COLUMN_OPTIONS.length;
+  const allColumnsSelected = columnSelectionCount === ALL_COLUMN_OPTIONS.length;
 
   const columnGroups = useMemo(() => {
-    const midpoint = Math.ceil(COLUMN_OPTIONS.length / 2);
-    return [COLUMN_OPTIONS.slice(0, midpoint), COLUMN_OPTIONS.slice(midpoint)];
+    const midpoint = Math.ceil(ALL_COLUMN_OPTIONS.length / 2);
+    return [ALL_COLUMN_OPTIONS.slice(0, midpoint), ALL_COLUMN_OPTIONS.slice(midpoint)];
   }, []);
 
   const buildFilters = () => {
@@ -224,14 +326,57 @@ export default function DataExport() {
     return result.totalCount || 0;
   };
 
-  const handleToggleColumn = (key: ColumnKey) => {
+  const handleToggleColumn = (key: string) => {
     setSelectedColumns((prev) =>
       prev.includes(key) ? prev.filter((col) => col !== key) : [...prev, key]
     );
   };
 
   const handleToggleAllColumns = () => {
-    setSelectedColumns(allColumnsSelected ? [] : COLUMN_OPTIONS.map((option) => option.key));
+    setSelectedColumns(allColumnsSelected ? [] : ALL_COLUMN_OPTIONS.map((option) => option.key));
+  };
+
+  const getAvailableOptions = (filterKey: keyof Selections) => {
+    if (!filterOptionsData || !filterOptionsData.combinations) return [];
+    
+    // Build filter conditions based on current selections
+    const conditions: ((combo: Combination) => boolean)[] = [];
+    
+    Object.entries(selections).forEach(([key, value]) => {
+      if (key !== filterKey && value) {
+        conditions.push(combo => {
+          if (key === 'fee_schedule_date') {
+            if (Array.isArray(combo.rate_effective_date)) {
+              return combo.rate_effective_date.includes(value);
+            }
+            return combo.rate_effective_date === value;
+          }
+          return combo[key] === value;
+        });
+      }
+    });
+    
+    // Filter combinations
+    const filteredCombinations = filterOptionsData.combinations.filter(combo => 
+      conditions.every(condition => condition(combo))
+    );
+    
+    // Extract unique values for this filter
+    const values = new Set<string>();
+    filteredCombinations.forEach((combo) => {
+      const value = combo[filterKey];
+      if (value) {
+        if (Array.isArray(value)) {
+          value.forEach(v => values.add(v));
+        } else {
+          values.add(value);
+        }
+      }
+    });
+    
+    return Array.from(values)
+      .sort()
+      .map((value) => ({ value, label: value }));
   };
 
   const prepareExport = async () => {
@@ -339,7 +484,7 @@ export default function DataExport() {
     return rows;
   };
 
-  const buildCsv = (rows: ServiceData[], columns: ColumnKey[]) => {
+  const buildCsv = (rows: ServiceData[], columns: string[]) => {
     const watermarkHeader = [
       "MEDIRATE - PROPRIETARY DATA",
       `Copyright © ${new Date().getFullYear()} MediRate. All Rights Reserved.`,
@@ -351,14 +496,17 @@ export default function DataExport() {
       "",
     ];
 
-    const headerRow = columns.map((column) => escapeCSV(COLUMN_MAP[column].label));
+    const headerRow = columns.map((column) => escapeCSV(COLUMN_MAP[column]?.label || column));
     const csvRows = [...watermarkHeader, headerRow.join(",")];
 
     rows.forEach((row) => {
       const values = columns.map((column) => {
         const option = COLUMN_MAP[column];
-        const rawValue = option.formatter ? option.formatter(row) : (row[column] ?? "");
-        return escapeCSV(rawValue);
+        if (option?.formatter) {
+          return escapeCSV(option.formatter(row));
+        }
+        const rawValue = row[column] ?? "";
+        return escapeCSV(String(rawValue));
       });
       csvRows.push(values.join(","));
     });
@@ -389,24 +537,12 @@ export default function DataExport() {
     });
     if (startDate || endDate) {
       activeFilters.push(
-        `Date Range: ${startDate ? formatDate(startDate.toISOString()) : "--"} - ${
-          endDate ? formatDate(endDate.toISOString()) : "--"
+        `Date Range: ${startDate ? formatDateInput(startDate) : "--"} - ${
+          endDate ? formatDateInput(endDate) : "--"
         }`
       );
     }
     return activeFilters.length > 0 ? activeFilters.join(" | ") : "None";
-  };
-
-  const getAvailableOptions = (filterKey: keyof Selections) => {
-    if (!filterOptionsData || !filterOptionsData.combinations) return [];
-    const values = new Set<string>();
-    filterOptionsData.combinations.forEach((combo) => {
-      const value = combo[filterKey];
-      if (value) values.add(value);
-    });
-    return Array.from(values)
-      .sort()
-      .map((value) => ({ value, label: value }));
   };
 
   if (isLoading) {
@@ -449,6 +585,7 @@ export default function DataExport() {
                     options={getAvailableOptions(field.key)}
                     isClearable
                     placeholder={field.placeholder}
+                    isLoading={isLoadingFilters}
                     value={
                       selections[field.key]
                         ? { value: selections[field.key]!, label: selections[field.key]! }
@@ -467,25 +604,73 @@ export default function DataExport() {
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Start Date
                 </label>
-                <div className="mt-2 rounded-xl border border-slate-200 p-2">
-                  <DayPicker
-                    mode="single"
-                    selected={startDate ?? undefined}
-                    onSelect={(date) => setStartDate(date ?? null)}
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={startDateInput}
+                    onChange={(e) => setStartDateInput(e.target.value)}
+                    placeholder="DD/MM/YYYY"
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#012C61] focus:outline-none focus:ring-1 focus:ring-[#012C61]"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowStartCalendar(!showStartCalendar)}
+                    className="flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50"
+                    title="Open calendar"
+                  >
+                    <Calendar className="h-4 w-4" />
+                  </button>
                 </div>
+                {showStartCalendar && (
+                  <div className="relative mt-2">
+                    <div className="absolute z-10 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                      <DayPicker
+                        mode="single"
+                        selected={startDate ?? undefined}
+                        onSelect={(date) => {
+                          setStartDate(date ?? null);
+                          setShowStartCalendar(false);
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   End Date
                 </label>
-                <div className="mt-2 rounded-xl border border-slate-200 p-2">
-                  <DayPicker
-                    mode="single"
-                    selected={endDate ?? undefined}
-                    onSelect={(date) => setEndDate(date ?? null)}
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={endDateInput}
+                    onChange={(e) => setEndDateInput(e.target.value)}
+                    placeholder="DD/MM/YYYY"
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#012C61] focus:outline-none focus:ring-1 focus:ring-[#012C61]"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowEndCalendar(!showEndCalendar)}
+                    className="flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50"
+                    title="Open calendar"
+                  >
+                    <Calendar className="h-4 w-4" />
+                  </button>
                 </div>
+                {showEndCalendar && (
+                  <div className="relative mt-2">
+                    <div className="absolute z-10 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+                      <DayPicker
+                        mode="single"
+                        selected={endDate ?? undefined}
+                        onSelect={(date) => {
+                          setEndDate(date ?? null);
+                          setShowEndCalendar(false);
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -541,7 +726,7 @@ export default function DataExport() {
               </p>
             </div>
             <p className="text-sm font-medium text-[#012C61]">
-              {columnSelectionCount} / {COLUMN_OPTIONS.length} selected
+              {columnSelectionCount} / {ALL_COLUMN_OPTIONS.length} selected
             </p>
           </div>
           <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -630,7 +815,7 @@ export default function DataExport() {
             <div className="mt-4 max-h-40 space-y-1 overflow-auto rounded-xl border border-slate-100 p-3 text-xs text-slate-500">
               {selectionReview.selectedColumns.map((column) => (
                 <span key={column} className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                  {COLUMN_MAP[column].label}
+                  {COLUMN_MAP[column]?.label || column}
                 </span>
               ))}
             </div>
@@ -655,11 +840,11 @@ export default function DataExport() {
   );
 }
 
-function formatDate(dateString?: string) {
+function formatDate(dateString?: string | Date) {
   if (!dateString) return "";
-  const parsed = new Date(dateString);
-  if (Number.isNaN(parsed.getTime())) return dateString;
-  return parsed.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
+  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
 }
 
 function formatRate(value?: string) {
@@ -680,16 +865,6 @@ function formatLabel(key: string) {
   return key
     .replace(/_/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-interface UsageResponse {
-  rowsUsed: number;
-  rowsLimit: number;
-  rowsRemaining: number;
-  currentPeriodStart?: string;
-  currentPeriodEnd?: string;
-  canExport?: boolean;
-  message?: string;
 }
 
 function ModalShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
