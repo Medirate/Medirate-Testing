@@ -17,12 +17,12 @@ import {
   Legend,
 } from 'chart.js';
 
-import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
-import { useRouter } from "next/navigation";
+import { useProtectedPage } from "@/context/AuthContext";
 import type { Dispatch, SetStateAction } from 'react';
 import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
 import HistoricalRatesTemplatesIcon from "@/app/components/HistoricalRatesTemplatesIcon";
+import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 interface ServiceData {
   state_name: string;
@@ -663,8 +663,7 @@ function formatDate(dateString: string | undefined): string {
 }
 
 export default function HistoricalRates() {
-  const { isAuthenticated, isLoading, user } = useKindeBrowserClient();
-  const router = useRouter();
+  const auth = useProtectedPage();
   
   // Add proper data state management
   const [data, setData] = useState<ServiceData[]>([]);
@@ -705,16 +704,7 @@ export default function HistoricalRates() {
     // This can be implemented later if needed for filter options
   };
 
-  const [isSubscriptionCheckComplete, setIsSubscriptionCheckComplete] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/api/auth/login");
-    } else if (isAuthenticated) {
-      checkSubscriptionAndSubUser();
-    }
-  }, [isAuthenticated, isLoading, router]);
+  // Auth is now handled by useProtectedPage hook
 
   // Add pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -1103,123 +1093,7 @@ export default function HistoricalRates() {
     }
   };
 
-  // Define checkSubscriptionAndSubUser before using it
-  const checkSubscriptionAndSubUser = async () => {
-    const userEmail = user?.email ?? "";
-    const kindeUserId = user?.id ?? "";
-    if (!userEmail || !kindeUserId) return;
-
-    try {
-      // Check if the user is a sub-user
-      const { data: subUserData, error: subUserError } = await supabase
-        .from("subscription_users")
-        .select("sub_users")
-        .contains("sub_users", JSON.stringify([userEmail]));
-
-      if (subUserError) {
-        return;
-      }
-
-      if (subUserData && subUserData.length > 0) {
-        // Check if the user already exists in the User table
-        const { data: existingUser, error: fetchError } = await supabase
-          .from("User")
-          .select("Email")
-          .eq("Email", userEmail)
-          .single();
-
-        if (fetchError && fetchError.code !== "PGRST116") { // Ignore "no rows found" error
-          return;
-        }
-
-        if (existingUser) {
-          // User exists, update their role to "sub-user"
-          const { error: updateError } = await supabase
-            .from("User")
-            .update({ Role: "sub-user", UpdatedAt: new Date().toISOString() })
-            .eq("Email", userEmail);
-
-          if (updateError) {
-            // Error handling
-          }
-        } else {
-          // User does not exist, insert them as a sub-user
-          const { error: insertError } = await supabase
-            .from("User")
-            .insert({
-              KindeUserID: kindeUserId,
-              Email: userEmail,
-              Role: "sub-user",
-              UpdatedAt: new Date().toISOString(),
-            });
-
-          if (insertError) {
-            // Error handling
-          }
-        }
-
-        // Allow sub-user to access the dashboard
-        setIsSubscriptionCheckComplete(true);
-        return;
-      }
-
-      // If not a sub-user, check for an active subscription
-      const response = await fetch("/api/stripe/subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: userEmail }),
-      });
-
-      const data = await response.json();
-      if (data.error || !data.status || data.status !== "active") {
-        router.push("/subscribe");
-      } else {
-        setIsSubscriptionCheckComplete(true);
-      }
-    } catch (error) {
-      router.push("/subscribe");
-    }
-  };
-
-  // Add periodic authentication check for long-running sessions
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const checkAuthStatus = async () => {
-      try {
-        const response = await fetch('/api/auth-check');
-        if (response.status === 401) {
-          router.push("/api/auth/login");
-        }
-      } catch (error) {
-        // Error handling
-      }
-    };
-
-    const authCheckInterval = setInterval(checkAuthStatus, 5 * 60 * 1000);
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden && isAuthenticated) {
-        checkAuthStatus();
-        
-        if (hasSearched && !authError && areFiltersApplied) {
-          // Refresh data if needed
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      clearInterval(authCheckInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isAuthenticated, router, hasSearched, authError, areFiltersApplied]);
-
-  // Now the useEffect can safely use checkSubscriptionAndSubUser
-  useEffect(() => {
-    checkSubscriptionAndSubUser();
-  }, [router]);
+  // Auth is now handled by useProtectedPage hook - no need for manual checks
 
   // Move all useEffect hooks here, before any conditional returns
   useEffect(() => {
@@ -1625,17 +1499,9 @@ export default function HistoricalRates() {
     loadUltraFilterOptions();
   }, []);
 
-  // Don't render anything until the subscription check is complete
-  if (isLoading || !isSubscriptionCheckComplete) {
-    return (
-      <div className="loader-overlay">
-        <div className="cssloader">
-          <div className="sh1"></div>
-          <div className="sh2"></div>
-          <h4 className="lt">loading</h4>
-        </div>
-      </div>
-    );
+  // Use LoaderOverlay component for consistent loading animation
+  if (auth.isLoading || auth.shouldRedirect) {
+    return <LoaderOverlay />;
   }
 
   // Add available options variables like dashboard
@@ -1704,22 +1570,6 @@ export default function HistoricalRates() {
       />
       <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         <ErrorMessage error={error} />
-        {authError && (
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
-            <div className="flex items-center">
-              <div className="h-5 w-5 text-yellow-500 mr-2">⚠️</div>
-              <div>
-                <p className="text-yellow-700 font-medium">{authError}</p>
-                <button
-                  onClick={() => router.push('/api/auth/login')}
-                  className="mt-2 px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors text-sm"
-                >
-                  Sign In Again
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8">
           <h1 className="text-xl sm:text-3xl md:text-4xl text-[#012C61] font-lemonMilkRegular uppercase mb-3 sm:mb-0">

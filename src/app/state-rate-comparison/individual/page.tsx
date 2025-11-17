@@ -18,6 +18,7 @@ import clsx from 'clsx';
 import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
 import IndividualStateRateTemplatesIcon from "@/app/components/IndividualStateRateTemplatesIcon";
+import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -3109,15 +3110,7 @@ export default function StatePaymentComparison() {
         </div>
 
         {/* Loading State */}
-        {(filterLoading || loading) && (
-          <div className="loader-overlay">
-            <div className="cssloader">
-              <div className="sh1"></div>
-              <div className="sh2"></div>
-              <h4 className="lt">loading</h4>
-            </div>
-          </div>
-        )}
+        {(filterLoading || loading) && <LoaderOverlay />}
 
         {!loading && (
           <>

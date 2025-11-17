@@ -12,6 +12,7 @@ import { Calendar } from "lucide-react";
 import ExcelJS from "exceljs";
 import { fixEncoding } from "@/lib/encoding-fix";
 import DataExportTemplatesIcon, { DataExportTemplateData } from "@/app/components/DataExportTemplatesIcon";
+import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 interface FilterOptionsData {
   filters: {
@@ -627,11 +628,7 @@ export default function DataExport() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#012C61]/30 border-t-[#012C61]" />
-      </div>
-    );
+    return <LoaderOverlay />;
   }
 
   return (

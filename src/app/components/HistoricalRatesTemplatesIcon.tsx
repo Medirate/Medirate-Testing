@@ -281,10 +281,9 @@ const HistoricalRatesTemplatesIcon = ({
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleLoadTemplate(template)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                          title="Load Template"
+                          className="px-4 py-2 bg-[#012C61] text-white rounded-md hover:bg-[#001a3d] transition-colors text-sm font-medium"
                         >
-                          <FaDownload className="h-4 w-4" />
+                          Load
                         </button>
                         <button
                           onClick={() => handleDeleteTemplate(template.id)}
