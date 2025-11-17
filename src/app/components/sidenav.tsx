@@ -149,6 +149,7 @@ const SideNav = ({
       "/settings": "settings",
       "/historical-rates": "historicalRates",
       "/admin-dashboard": "adminDashboard",
+      "/data-export": "dataExport",
     };
 
     // Match the exact path or paths that start with the base path
@@ -518,6 +519,45 @@ const SideNav = ({
                       style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                     >
                       Documents
+                    </span>
+                  </Link>
+                )}
+              </li>
+              
+              {/* Data Export */}
+              <li className="group">
+                {shouldRestrictSubscriptionManager ? (
+                  <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Database size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Data Export
+                    </span>
+                  </div>
+                ) : (
+                  <Link
+                    href="/data-export"
+                    onClick={() => setActiveTab("dataExport")}
+                    className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                      activeTab === "dataExport" ? "bg-gray-200/20" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Database size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Data Export
                     </span>
                   </Link>
                 )}
