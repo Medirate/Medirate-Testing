@@ -178,7 +178,7 @@ const SideNav = memo(() => {
       className="shadow-lg"
       style={{
         width: isSidebarCollapsed ? "4rem" : "20rem",
-        transition: isToggling ? "width 0.3s ease-in-out" : "none",
+        transition: isToggling ? "width 0.5s ease-in-out" : "none",
         backgroundColor: "rgb(1, 44, 97)",
         color: "white",
         position: "fixed", // Keeps it fixed

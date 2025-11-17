@@ -69,7 +69,7 @@ export function SideNavProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("isSidebarCollapsed", JSON.stringify(newState));
       }
       // Reset toggling flag after animation
-      setTimeout(() => setIsToggling(false), 350);
+      setTimeout(() => setIsToggling(false), 550);
       return newState;
     });
   };
