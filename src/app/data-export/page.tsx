@@ -10,6 +10,7 @@ import clsx from "clsx";
 import { gunzipSync, strFromU8 } from "fflate";
 import { Calendar } from "lucide-react";
 import ExcelJS from "exceljs";
+import { fixEncoding } from "@/lib/encoding-fix";
 import DataExportTemplatesIcon, { DataExportTemplateData } from "@/app/components/DataExportTemplatesIcon";
 
 interface FilterOptionsData {
@@ -583,10 +584,10 @@ export default function DataExport() {
       columns.forEach((column) => {
         const option = COLUMN_MAP[column];
         if (option?.formatter) {
-          rowData[column] = option.formatter(row);
+          rowData[column] = fixEncoding(option.formatter(row));
         } else {
           const rawValue = row[column] ?? "";
-          rowData[column] = rawValue;
+          rowData[column] = fixEncoding(rawValue);
         }
       });
       dataSheet.addRow(rowData);

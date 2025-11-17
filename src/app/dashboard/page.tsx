@@ -15,7 +15,9 @@ import { supabase } from "@/lib/supabase";
 import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
+import { fixEncoding } from "@/lib/encoding-fix";
 import TemplatesIcon from "@/app/components/TemplatesIcon";
+import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 // --- NEW: Types for client-side filtering ---
 interface FilterOptionsData {
@@ -1340,20 +1342,20 @@ export default function Dashboard() {
       // Add data rows
       allData.forEach(item => {
         const row = dataSheet.addRow({
-          state: item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || '',
-          serviceCategory: SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || '',
-          serviceCode: item.service_code || '',
-          serviceDescription: item.service_description || '',
+          state: fixEncoding(item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || ''),
+          serviceCategory: fixEncoding(SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || ''),
+          serviceCode: fixEncoding(item.service_code || ''),
+          serviceDescription: fixEncoding(item.service_description || ''),
           rate: formatRate(item.rate) === '-' ? '' : formatRate(item.rate),
-          durationUnit: item.duration_unit || '',
+          durationUnit: fixEncoding(item.duration_unit || ''),
           effectiveDate: formatDate(item.rate_effective_date) === '-' ? '' : formatDate(item.rate_effective_date),
-          providerType: item.provider_type || '',
-          modifier1: item.modifier_1 ? (item.modifier_1_details ? `${item.modifier_1} - ${item.modifier_1_details}` : item.modifier_1) : '',
-          modifier2: item.modifier_2 ? (item.modifier_2_details ? `${item.modifier_2} - ${item.modifier_2_details}` : item.modifier_2) : '',
-          modifier3: item.modifier_3 ? (item.modifier_3_details ? `${item.modifier_3} - ${item.modifier_3_details}` : item.modifier_3) : '',
-          modifier4: item.modifier_4 ? (item.modifier_4_details ? `${item.modifier_4} - ${item.modifier_4_details}` : item.modifier_4) : '',
-          program: item.program || '',
-          locationRegion: item.location_region || ''
+          providerType: fixEncoding(item.provider_type || ''),
+          modifier1: item.modifier_1 ? fixEncoding(item.modifier_1_details ? `${item.modifier_1} - ${item.modifier_1_details}` : item.modifier_1) : '',
+          modifier2: item.modifier_2 ? fixEncoding(item.modifier_2_details ? `${item.modifier_2} - ${item.modifier_2_details}` : item.modifier_2) : '',
+          modifier3: item.modifier_3 ? fixEncoding(item.modifier_3_details ? `${item.modifier_3} - ${item.modifier_3_details}` : item.modifier_3) : '',
+          modifier4: item.modifier_4 ? fixEncoding(item.modifier_4_details ? `${item.modifier_4} - ${item.modifier_4_details}` : item.modifier_4) : '',
+          program: fixEncoding(item.program || ''),
+          locationRegion: fixEncoding(item.location_region || '')
         });
 
         // Lock all cells in this row
@@ -1651,20 +1653,20 @@ export default function Dashboard() {
 
       for (const item of allData) {
         const row = [
-          escapeCSV(item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || ''),
-          escapeCSV(SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || ''),
-          escapeCSV(item.service_code || ''),
-          escapeCSV(item.service_description || ''),
+          escapeCSV(fixEncoding(item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || '')),
+          escapeCSV(fixEncoding(SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || '')),
+          escapeCSV(fixEncoding(item.service_code || '')),
+          escapeCSV(fixEncoding(item.service_description || '')),
           escapeCSV(formatRateForExport(item.rate)),
-          escapeCSV(item.duration_unit || ''),
+          escapeCSV(fixEncoding(item.duration_unit || '')),
           escapeCSV(formatDateForExport(item.rate_effective_date)),
-          escapeCSV(item.provider_type || ''),
-          escapeCSV(formatModifierForExport(item.modifier_1, item.modifier_1_details)),
-          escapeCSV(formatModifierForExport(item.modifier_2, item.modifier_2_details)),
-          escapeCSV(formatModifierForExport(item.modifier_3, item.modifier_3_details)),
-          escapeCSV(formatModifierForExport(item.modifier_4, item.modifier_4_details)),
-          escapeCSV(item.program || ''),
-          escapeCSV(item.location_region || '')
+          escapeCSV(fixEncoding(item.provider_type || '')),
+          escapeCSV(fixEncoding(formatModifierForExport(item.modifier_1, item.modifier_1_details))),
+          escapeCSV(fixEncoding(formatModifierForExport(item.modifier_2, item.modifier_2_details))),
+          escapeCSV(fixEncoding(formatModifierForExport(item.modifier_3, item.modifier_3_details))),
+          escapeCSV(fixEncoding(formatModifierForExport(item.modifier_4, item.modifier_4_details))),
+          escapeCSV(fixEncoding(item.program || '')),
+          escapeCSV(fixEncoding(item.location_region || ''))
         ];
         csvRows.push(row.join(','));
       }
@@ -2132,15 +2134,7 @@ export default function Dashboard() {
 
   // Only after all hooks, do any early returns:
   if (auth.isLoading || auth.shouldRedirect) {
-    return (
-      <div className="loader-overlay">
-        <div className="cssloader">
-          <div className="sh1"></div>
-          <div className="sh2"></div>
-          <h4 className="lt">loading</h4>
-        </div>
-      </div>
-    );
+    return <LoaderOverlay />;
   }
 
   // Debug mode removed - everything is working correctly!
@@ -2847,20 +2841,20 @@ export default function Dashboard() {
                   {sortedData.map((item: any, idx: number) => (
                     <tr key={`id-${item.id}-${item.service_code ?? ''}-${item.rate_effective_date ?? ''}-${idx}`}
                         className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.service_code || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-[220px] truncate" title={item.service_description || '-'}>{item.service_description || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || '-')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || '-')}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(item.service_code || '-')}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900 max-w-[220px] truncate" title={fixEncoding(item.service_description || '-')}>{fixEncoding(item.service_description || '-')}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatRate(item.rate)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.duration_unit || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(item.duration_unit || '-')}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(item.rate_effective_date)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.provider_type || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_1 ? (item.modifier_1_details ? `${item.modifier_1} - ${item.modifier_1_details}` : item.modifier_1) : '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_2 ? (item.modifier_2_details ? `${item.modifier_2} - ${item.modifier_2_details}` : item.modifier_2) : '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_3 ? (item.modifier_3_details ? `${item.modifier_3} - ${item.modifier_3_details}` : item.modifier_3) : '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_4 ? (item.modifier_4_details ? `${item.modifier_4} - ${item.modifier_4_details}` : item.modifier_4) : '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.program || '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.location_region || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(item.provider_type || '-')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_1 ? fixEncoding(item.modifier_1_details ? `${item.modifier_1} - ${item.modifier_1_details}` : item.modifier_1) : '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_2 ? fixEncoding(item.modifier_2_details ? `${item.modifier_2} - ${item.modifier_2_details}` : item.modifier_2) : '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_3 ? fixEncoding(item.modifier_3_details ? `${item.modifier_3} - ${item.modifier_3_details}` : item.modifier_3) : '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_4 ? fixEncoding(item.modifier_4_details ? `${item.modifier_4} - ${item.modifier_4_details}` : item.modifier_4) : '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(item.program || '-')}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(item.location_region || '-')}</td>
                   </tr>
                 ))}
               </tbody>
