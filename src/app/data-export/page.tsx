@@ -646,7 +646,7 @@ export default function DataExport() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-[#5c759c]">Export Center</p>
-            <h1 className="mt-1 text-3xl font-semibold text-[#012C61]">Data Export</h1>
+            <h1 className="mt-1 text-3xl font-lemonMilkRegular uppercase text-[#012C61]">Data Export</h1>
             <p className="text-sm text-slate-500">Select the exact columns and filters you need, then download a personalized Excel file.</p>
           </div>
           <button
