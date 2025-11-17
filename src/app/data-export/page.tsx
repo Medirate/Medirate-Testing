@@ -9,6 +9,7 @@ import "react-day-picker/dist/style.css";
 import clsx from "clsx";
 import { gunzipSync, strFromU8 } from "fflate";
 import { Calendar } from "lucide-react";
+import DataExportTemplatesIcon, { DataExportTemplateData } from "@/app/components/DataExportTemplatesIcon";
 
 interface FilterOptionsData {
   filters: {
@@ -484,6 +485,45 @@ export default function DataExport() {
     return rows;
   };
 
+  const handleLoadTemplate = (templateData: DataExportTemplateData) => {
+    if (templateData.selections) {
+      setSelections(templateData.selections);
+    }
+
+    const applyDate = (
+      isoDate: string | null | undefined,
+      setDate: (date: Date | null) => void,
+      setInput: (value: string) => void
+    ) => {
+      if (isoDate) {
+        const parsedDate = new Date(isoDate);
+        if (!Number.isNaN(parsedDate.getTime())) {
+          setDate(parsedDate);
+          setInput(formatDateInput(parsedDate));
+          return;
+        }
+      }
+      setDate(null);
+      setInput("");
+    };
+
+    applyDate(templateData.startDate, setStartDate, setStartDateInput);
+    applyDate(templateData.endDate, setEndDate, setEndDateInput);
+
+    if (Array.isArray(templateData.selectedColumns) && templateData.selectedColumns.length > 0) {
+      const validColumns = templateData.selectedColumns.filter((col) => COLUMN_MAP[col]);
+      if (validColumns.length > 0) {
+        setSelectedColumns(validColumns);
+      } else {
+        setSelectedColumns(ALL_COLUMN_OPTIONS.map((option) => option.key));
+      }
+    } else {
+      setSelectedColumns(ALL_COLUMN_OPTIONS.map((option) => option.key));
+    }
+
+    setTemplateError(null);
+  };
+
   const buildCsv = (rows: ServiceData[], columns: string[]) => {
     const watermarkHeader = [
       "MEDIRATE - PROPRIETARY DATA",
@@ -555,6 +595,13 @@ export default function DataExport() {
 
   return (
     <AppLayout activeTab="dataExport">
+      <DataExportTemplatesIcon
+        onLoadTemplate={handleLoadTemplate}
+        currentSelections={selections}
+        currentStartDate={startDate}
+        currentEndDate={endDate}
+        currentSelectedColumns={selectedColumns}
+      />
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-8">
         <div className="flex items-center justify-between">
           <div>
