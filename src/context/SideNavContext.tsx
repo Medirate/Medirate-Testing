@@ -8,6 +8,7 @@ interface SideNavContextType {
   setActiveTab: (tab: string) => void;
   isSidebarCollapsed: boolean;
   toggleSidebar: () => void;
+  isToggling: boolean;
 }
 
 const SideNavContext = createContext<SideNavContextType | undefined>(undefined);
@@ -58,12 +59,17 @@ export function SideNavProvider({ children }: { children: ReactNode }) {
     }
   }, [pathname]);
 
+  const [isToggling, setIsToggling] = useState(false);
+  
   const toggleSidebar = () => {
+    setIsToggling(true);
     setIsSidebarCollapsed((prev) => {
       const newState = !prev;
       if (typeof window !== "undefined") {
         localStorage.setItem("isSidebarCollapsed", JSON.stringify(newState));
       }
+      // Reset toggling flag after animation
+      setTimeout(() => setIsToggling(false), 350);
       return newState;
     });
   };
@@ -75,6 +81,7 @@ export function SideNavProvider({ children }: { children: ReactNode }) {
         setActiveTab,
         isSidebarCollapsed,
         toggleSidebar,
+        isToggling,
       }}
     >
       {children}

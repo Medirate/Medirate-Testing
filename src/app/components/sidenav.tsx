@@ -38,24 +38,10 @@ const adminRateDevLinks: { href: string; label: string; icon: React.ReactNode }[
 
 
 const SideNav = memo(() => {
-  const { activeTab, setActiveTab, isSidebarCollapsed, toggleSidebar } = useSideNav();
+  const { activeTab, setActiveTab, isSidebarCollapsed, toggleSidebar, isToggling } = useSideNav();
   const pathname = usePathname();
   const { user } = useKindeBrowserClient();
   const auth = useAuth(); // Add auth context to check subscription status
-  const prevCollapsedRef = useRef(isSidebarCollapsed);
-  const [shouldTransition, setShouldTransition] = useState(false);
-  
-  // Track when collapsed state changes (only on toggle, not on navigation)
-  useEffect(() => {
-    if (prevCollapsedRef.current !== isSidebarCollapsed) {
-      // State changed - enable transition briefly
-      setShouldTransition(true);
-      prevCollapsedRef.current = isSidebarCollapsed;
-      // Disable transition after animation completes
-      const timer = setTimeout(() => setShouldTransition(false), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isSidebarCollapsed]);
   
   // Only show sidenav on authenticated pages (same logic as navbar)
   const authenticatedPages = [
@@ -192,7 +178,7 @@ const SideNav = memo(() => {
       className="shadow-lg"
       style={{
         width: isSidebarCollapsed ? "4rem" : "20rem",
-        transition: shouldTransition ? "width 0.3s ease-in-out" : "none",
+        transition: isToggling ? "width 0.3s ease-in-out" : "none",
         backgroundColor: "rgb(1, 44, 97)",
         color: "white",
         position: "fixed", // Keeps it fixed
