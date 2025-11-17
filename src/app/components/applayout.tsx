@@ -6,6 +6,7 @@ import Footer from "@/app/components/footer";
 import CodeDefinitionsIcon from "@/app/components/CodeDefinitionsIcon";
 import TermsModal from "@/app/components/TermsModal";
 import { Analytics } from "@vercel/analytics/next";
+import { useSideNav } from "@/context/SideNavContext";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -13,44 +14,15 @@ interface AppLayoutProps {
 }
 
 const AppLayout = ({ children, activeTab }: AppLayoutProps) => {
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return JSON.parse(localStorage.getItem("isSidebarCollapsed") || "true");
-    }
-    return true;
-  });
-
+  const { isSidebarCollapsed } = useSideNav();
   const [isClient, setIsClient] = useState(false);
   useEffect(() => { setIsClient(true); }, []);
-
-  const toggleSidebar = () => {
-    setIsSidebarCollapsed((prev) => {
-      const newState = !prev;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("isSidebarCollapsed", JSON.stringify(newState));
-      }
-      return newState;
-    });
-  };
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedState = JSON.parse(localStorage.getItem("isSidebarCollapsed") || "true");
-      setIsSidebarCollapsed(savedState);
-    }
-  }, []);
 
   return (
     <div className="flex flex-col min-h-screen">
       {/* Main Content Container */}
       <div className="flex flex-grow">
-        {/* Side Navigation */}
-        <SideNav
-          activeTab={activeTab}
-          setActiveTab={() => {}}
-          isSidebarCollapsed={isSidebarCollapsed}
-          toggleSidebar={toggleSidebar}
-        />
+        {/* Side Navigation is now in root layout for persistence */}
 
         {/* Page Content */}
         {isClient && (

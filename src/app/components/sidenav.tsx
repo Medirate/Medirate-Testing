@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { usePathname } from "next/navigation";
 import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
 import { useAuth } from "@/context/AuthContext";
+import { useSideNav } from "@/context/SideNavContext";
 import {
   Menu,
   X,
@@ -36,23 +37,36 @@ const adminRateDevLinks: { href: string; label: string; icon: React.ReactNode }[
 ];
 
 
-interface SideNavProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  isSidebarCollapsed: boolean;
-  toggleSidebar: () => void;
-}
-
-const SideNav = ({
-  activeTab,
-  setActiveTab,
-  isSidebarCollapsed,
-  toggleSidebar,
-}: SideNavProps) => {
+const SideNav = memo(() => {
+  const { activeTab, setActiveTab, isSidebarCollapsed, toggleSidebar } = useSideNav();
   const pathname = usePathname();
   const [isClientSide, setIsClientSide] = useState(false);
   const { user } = useKindeBrowserClient();
   const auth = useAuth(); // Add auth context to check subscription status
+  
+  // Only show sidenav on authenticated pages (same logic as navbar)
+  const authenticatedPages = [
+    "/dashboard",
+    "/historical-rates",
+    "/rate-developments",
+    "/state-rate-comparison",
+    "/state-rate-comparison/all",
+    "/state-rate-comparison/individual",
+    "/email-preferences",
+    "/settings",
+    "/profile",
+    "/documents",
+    "/data-export",
+    "/admin-dashboard",
+    "/support",
+    "/state-profiles",
+    "/home",
+    "/recent-rate-changes",
+  ];
+  
+  const shouldShowSideNav = auth.isAuthenticated && authenticatedPages.some(page => 
+    pathname === page || pathname.startsWith(`${page}/`)
+  );
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminCheckComplete, setAdminCheckComplete] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
@@ -136,31 +150,7 @@ const SideNav = ({
     }
   }, [user]);
 
-  // Update the tab mapping
-  useEffect(() => {
-    const tabMapping: { [key: string]: string } = {
-      "/state-profiles": "home",
-      "/home": "home",
-      "/recent-rate-changes": "home",
-      "/dashboard": "dashboard",
-      "/rate-developments": "rateDevelopments",
-      "/email-preferences": "emailPreferences",
-      "/state-rate-comparison": "stateRateComparison",
-      "/settings": "settings",
-      "/historical-rates": "historicalRates",
-      "/admin-dashboard": "adminDashboard",
-      "/data-export": "dataExport",
-    };
-
-    // Match the exact path or paths that start with the base path
-    const activeTab = Object.keys(tabMapping).find(key => 
-      pathname === key || pathname.startsWith(`${key}/`)
-    );
-
-    if (activeTab && tabMapping[activeTab]) {
-      setActiveTab(tabMapping[activeTab]);
-    }
-  }, [pathname, setActiveTab]);
+  // Tab mapping is now handled in SideNavContext
 
   // Set isClientSide to true after the component mounts
   useEffect(() => {
@@ -183,6 +173,11 @@ const SideNav = ({
       setRateComparisonMenuOpen(true);
     }
   }, [pathname]);
+
+  // Don't render on non-authenticated pages
+  if (!shouldShowSideNav) {
+    return null;
+  }
 
   return (
     <>
@@ -728,6 +723,8 @@ const SideNav = ({
       )}
     </>
   );
-};
+});
+
+SideNav.displayName = "SideNav";
 
 export default SideNav;
