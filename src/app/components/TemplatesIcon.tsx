@@ -150,45 +150,6 @@ const TemplatesIcon = ({
     }
   };
 
-  const handleStartRename = (template: DashboardTemplate) => {
-    setEditingId(template.id);
-    setEditingName(template.template_name);
-  };
-
-  const handleCancelRename = () => {
-    setEditingId(null);
-    setEditingName('');
-  };
-
-  const handleSaveRename = async (id: string) => {
-    if (!editingName.trim()) {
-      setError('Template name is required');
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/dashboard-templates', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id,
-          template_name: editingName.trim(),
-        }),
-      });
-
-      const data = await response.json();
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setEditingId(null);
-        setEditingName('');
-        await fetchTemplates();
-      }
-    } catch (err) {
-      setError('Failed to rename template');
-      console.error('Error renaming template:', err);
-    }
-  };
 
   return (
     <>
@@ -208,7 +169,6 @@ const TemplatesIcon = ({
           setIsOpen(false);
           setNewTemplateName('');
           setError(null);
-          setEditingId(null);
           setSearchTerm('');
         }}
         width="max-w-2xl"

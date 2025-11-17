@@ -1221,7 +1221,6 @@ export default function HistoricalRates() {
     setData([]);
     setError(null);
     setLocalError(null);
-    setAuthError(null);
     setHasSearched(false);
     setComment(null);
     setShowDurationUnitWarning(false);
