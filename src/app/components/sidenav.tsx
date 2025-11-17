@@ -184,10 +184,10 @@ const SideNav = memo(() => {
       {/* Only render sidebar on client to avoid hydration mismatch */}
       {isClientSide ? (
         <aside
-          className={`transition-all duration-500 ease-in-out shadow-lg ${
-            isSidebarCollapsed ? "w-16" : "w-80"
-          }`}
+          className="shadow-lg"
           style={{
+            width: isSidebarCollapsed ? "4rem" : "20rem",
+            transition: "width 0.3s ease-in-out",
             backgroundColor: "rgb(1, 44, 97)",
             color: "white",
             position: "fixed", // Keeps it fixed
@@ -213,7 +213,7 @@ const SideNav = memo(() => {
           {/* Navigation Links */}
           <nav className="mt-6 pb-20">
             <ul className="space-y-2">
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -231,7 +231,13 @@ const SideNav = memo(() => {
                 ) : (
                   <Link
                     href="/dashboard"
-                    onClick={() => setActiveTab("dashboard")}
+                    onClick={(e) => {
+                      setActiveTab("dashboard");
+                      // Prevent any expansion when clicking in collapsed state
+                      if (isSidebarCollapsed) {
+                        e.stopPropagation();
+                      }
+                    }}
                     className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
                       activeTab === "dashboard" ? "bg-gray-200/20" : ""
                     }`}
@@ -251,7 +257,7 @@ const SideNav = memo(() => {
                 )}
               </li>
               {/* State Rate Comparison with submenu */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center w-full p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -272,7 +278,12 @@ const SideNav = memo(() => {
                 ) : (
                   <Link
                     href="/state-rate-comparison"
-                    onClick={() => setRateComparisonMenuOpen(open => !open)}
+                    onClick={(e) => {
+                      // Only toggle submenu if sidebar is expanded, otherwise just navigate
+                      if (!isSidebarCollapsed) {
+                        setRateComparisonMenuOpen(open => !open);
+                      }
+                    }}
                     className={`flex items-center w-full p-4 hover:bg-gray-200/20 transition-colors cursor-pointer focus:outline-none ${
                       pathname.startsWith("/state-rate-comparison") ? "bg-gray-200/20" : ""
                     }`}
@@ -326,7 +337,7 @@ const SideNav = memo(() => {
                   </ul>
                 )}
               </li>
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -364,7 +375,7 @@ const SideNav = memo(() => {
                 )}
               </li>
               {/* Rate Developments */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -403,7 +414,7 @@ const SideNav = memo(() => {
               </li>
               
               {/* State Profiles */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -442,7 +453,7 @@ const SideNav = memo(() => {
               </li>
               
               {/* Email Preferences */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -481,7 +492,7 @@ const SideNav = memo(() => {
               </li>
               
               {/* Documents */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -520,7 +531,7 @@ const SideNav = memo(() => {
               </li>
               
               {/* Data Export */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -559,7 +570,7 @@ const SideNav = memo(() => {
               </li>
               
               {/* Settings */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 <Link
                   href="/settings"
                   onClick={() => setActiveTab("settings")}
@@ -585,7 +596,7 @@ const SideNav = memo(() => {
               {(() => {
                 return adminCheckComplete && isAdmin;
               })() && (
-                <li className="group">
+                <li className={isSidebarCollapsed ? "" : "group"}>
                   <div className="flex items-center w-full p-4 hover:bg-gray-200/20 transition-colors cursor-pointer">
                     {/* Shield icon and label as a link */}
                     <Link
@@ -608,16 +619,18 @@ const SideNav = memo(() => {
                         Admin Dashboard
                       </span>
                     </Link>
-                    {/* Chevron toggles submenu */}
-                    <button
-                      type="button"
-                      onClick={() => setAdminMenuOpen((open) => !open)}
-                      className="ml-2 p-1 focus:outline-none bg-transparent text-white hover:text-blue-200"
-                      tabIndex={0}
-                      aria-label="Toggle Admin Dashboard submenu"
-                    >
-                      {adminMenuOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                    </button>
+                    {/* Chevron toggles submenu - only works when sidebar is expanded */}
+                    {!isSidebarCollapsed && (
+                      <button
+                        type="button"
+                        onClick={() => setAdminMenuOpen((open) => !open)}
+                        className="ml-2 p-1 focus:outline-none bg-transparent text-white hover:text-blue-200"
+                        tabIndex={0}
+                        aria-label="Toggle Admin Dashboard submenu"
+                      >
+                        {adminMenuOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                      </button>
+                    )}
                   </div>
                   {/* Rate Developments Submenu */}
                   {adminMenuOpen && !isSidebarCollapsed && (
@@ -625,7 +638,12 @@ const SideNav = memo(() => {
                       <li>
                         <button
                           type="button"
-                          onClick={() => setRateDevMenuOpen((open) => !open)}
+                          onClick={() => {
+                            // Only toggle submenu if sidebar is expanded
+                            if (!isSidebarCollapsed) {
+                              setRateDevMenuOpen((open) => !open);
+                            }
+                          }}
                           className={`flex items-center w-full px-4 py-2 rounded-md transition-all duration-200 focus:outline-none mb-1 ${
                             pathname.startsWith("/admin-dashboard/rate-developments")
                               ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold shadow"
@@ -679,7 +697,7 @@ const SideNav = memo(() => {
                 </li>
               )}
 
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 <Link
                   href="/support"
                   onClick={() => setActiveTab("support")}
