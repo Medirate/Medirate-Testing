@@ -23,6 +23,7 @@ import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
 import HistoricalRatesTemplatesIcon from "@/app/components/HistoricalRatesTemplatesIcon";
 import LoaderOverlay from "@/app/components/LoaderOverlay";
+import clsx from 'clsx';
 
 interface ServiceData {
   state_name: string;
@@ -1622,7 +1623,10 @@ export default function HistoricalRates() {
                     </div>
                     {/* State */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">State</label>
+                      <label className={clsx(
+                        "text-sm font-medium",
+                        (!selections.service_category || availableStates.length === 0) ? "text-gray-400" : "text-gray-700"
+                      )}>State</label>
                       <Select
                         instanceId="state_name_select"
                         options={availableStates.map((o: string) => ({ value: o, label: o }))}
@@ -1635,6 +1639,14 @@ export default function HistoricalRates() {
                         isDisabled={!selections.service_category || availableStates.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            opacity: state.isDisabled ? 0.6 : 1,
+                            cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                          }),
+                        }}
                       />
                       {selections.state_name && (
                         <button onClick={() => handleSelectionChange('state_name', null)} className="text-xs text-blue-500 hover:underline mt-1">Clear</button>
@@ -1642,7 +1654,10 @@ export default function HistoricalRates() {
                     </div>
                     {/* Service Code */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Service Code</label>
+                      <label className={clsx(
+                        "text-sm font-medium",
+                        (!selections.service_category || !selections.state_name || availableServiceCodes.length === 0) ? "text-gray-400" : "text-gray-700"
+                      )}>Service Code</label>
                       <Select
                         instanceId="service_code_select"
                         options={availableServiceCodes.map((o: string) => ({ value: o, label: o }))}
@@ -1654,6 +1669,14 @@ export default function HistoricalRates() {
                         isDisabled={!selections.service_category || !selections.state_name || availableServiceCodes.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            opacity: state.isDisabled ? 0.6 : 1,
+                            cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                          }),
+                        }}
                       />
                       {selections.service_code && (
                         <button onClick={() => handleSelectionChange('service_code', null)} className="text-xs text-blue-500 hover:underline mt-1">Clear</button>
@@ -1661,7 +1684,10 @@ export default function HistoricalRates() {
                     </div>
                     {/* Service Description */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Service Description</label>
+                      <label className={clsx(
+                        "text-sm font-medium",
+                        (!selections.service_category || !selections.state_name || availableServiceDescriptions.length === 0) ? "text-gray-400" : "text-gray-700"
+                      )}>Service Description</label>
                       <Select
                         instanceId="service_description_select"
                         options={availableServiceDescriptions.map((o: string) => ({ value: o, label: o }))}
@@ -1672,6 +1698,14 @@ export default function HistoricalRates() {
                         isDisabled={!selections.service_category || !selections.state_name || availableServiceDescriptions.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            opacity: state.isDisabled ? 0.6 : 1,
+                            cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                          }),
+                        }}
                       />
                       {selections.service_description && (
                         <button onClick={() => handleSelectionChange('service_description', null)} className="text-xs text-blue-500 hover:underline mt-1">Clear</button>
@@ -1679,7 +1713,10 @@ export default function HistoricalRates() {
                     </div>
                     {/* Program */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Program</label>
+                      <label className={clsx(
+                        "text-sm font-medium",
+                        (!selections.service_category || !selections.state_name || availablePrograms.length === 0) ? "text-gray-400" : "text-gray-700"
+                      )}>Program</label>
                       <Select
                         instanceId="program_select"
                         options={getDropdownOptions(availablePrograms, false)}
@@ -1693,6 +1730,14 @@ export default function HistoricalRates() {
                         isDisabled={!selections.service_category || !selections.state_name || availablePrograms.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            opacity: state.isDisabled ? 0.6 : 1,
+                            cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                          }),
+                        }}
                       />
                       {selections.program && (
                         <button onClick={() => handleSelectionChange('program', null)} className="text-xs text-blue-500 hover:underline mt-1">Clear</button>
@@ -1700,7 +1745,10 @@ export default function HistoricalRates() {
                     </div>
                     {/* Location/Region */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Location/Region</label>
+                      <label className={clsx(
+                        "text-sm font-medium",
+                        (!selections.service_category || !selections.state_name || availableLocationRegions.length === 0) ? "text-gray-400" : "text-gray-700"
+                      )}>Location/Region</label>
                       <Select
                         instanceId="location_region_select"
                         options={getDropdownOptions(availableLocationRegions, false)}
@@ -1714,6 +1762,14 @@ export default function HistoricalRates() {
                         isDisabled={!selections.service_category || !selections.state_name || availableLocationRegions.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            opacity: state.isDisabled ? 0.6 : 1,
+                            cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                          }),
+                        }}
                       />
                       {selections.location_region && (
                         <button onClick={() => handleSelectionChange('location_region', null)} className="text-xs text-blue-500 hover:underline mt-1">Clear</button>
@@ -1721,7 +1777,10 @@ export default function HistoricalRates() {
                     </div>
                     {/* Provider Type */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Provider Type</label>
+                      <label className={clsx(
+                        "text-sm font-medium",
+                        (!selections.service_category || !selections.state_name || availableProviderTypes.length === 0) ? "text-gray-400" : "text-gray-700"
+                      )}>Provider Type</label>
                       <Select
                         instanceId="provider_type_select"
                         options={getDropdownOptions(availableProviderTypes, false)}
@@ -1735,6 +1794,14 @@ export default function HistoricalRates() {
                         isDisabled={!selections.service_category || !selections.state_name || availableProviderTypes.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            opacity: state.isDisabled ? 0.6 : 1,
+                            cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                          }),
+                        }}
                       />
                       {selections.provider_type && (
                         <button onClick={() => handleSelectionChange('provider_type', null)} className="text-xs text-blue-500 hover:underline mt-1">Clear</button>
@@ -1742,7 +1809,10 @@ export default function HistoricalRates() {
                     </div>
                     {/* Duration Unit - Mandatory */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Duration Unit <span className="text-red-500">*</span></label>
+                      <label className={clsx(
+                        "text-sm font-medium",
+                        (!selections.service_category || !selections.state_name || availableDurationUnits.length === 0) ? "text-gray-400" : "text-gray-700"
+                      )}>Duration Unit <span className="text-red-500">*</span></label>
                       <Select
                         instanceId="duration_unit_select"
                         options={getDropdownOptions(availableDurationUnits, false)}
@@ -1753,6 +1823,14 @@ export default function HistoricalRates() {
                         isDisabled={!selections.service_category || !selections.state_name || availableDurationUnits.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            opacity: state.isDisabled ? 0.6 : 1,
+                            cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                          }),
+                        }}
                       />
                       {showDurationUnitWarning && !selections.duration_unit && (
                         <div className="text-xs text-red-500 mt-1">Duration unit is required</div>
@@ -1760,7 +1838,10 @@ export default function HistoricalRates() {
                     </div>
                     {/* Modifier */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Modifier</label>
+                      <label className={clsx(
+                        "text-sm font-medium",
+                        (!selections.service_category || !selections.state_name || availableModifiers.length === 0) ? "text-gray-400" : "text-gray-700"
+                      )}>Modifier</label>
                       <Select
                         instanceId="modifier_1_select"
                         options={[{ value: '-', label: '-' }, ...availableModifiers.map((o: string) => {
@@ -1792,6 +1873,14 @@ export default function HistoricalRates() {
                         isDisabled={!selections.service_category || !selections.state_name || availableModifiers.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
+                        styles={{
+                          control: (provided, state) => ({
+                            ...provided,
+                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            opacity: state.isDisabled ? 0.6 : 1,
+                            cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                          }),
+                        }}
                       />
                       {selections.modifier_1 && (
                         <button onClick={() => handleSelectionChange('modifier_1', null)} className="text-xs text-blue-500 hover:underline mt-1">Clear</button>
