@@ -17,7 +17,7 @@ import { useRequireSubscription } from "@/hooks/useRequireAuth";
 import clsx from 'clsx';
 import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
-// import IndividualStateRateTemplatesIcon from "@/app/components/IndividualStateRateTemplatesIcon"; // TEMPORARILY HIDDEN
+import IndividualStateRateTemplatesIcon from "@/app/components/IndividualStateRateTemplatesIcon";
 import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -3058,7 +3058,7 @@ export default function StatePaymentComparison() {
 
   return (
     <AppLayout activeTab="stateRateComparison">
-      {/* IndividualStateRateTemplatesIcon - TEMPORARILY HIDDEN */}
+      {/* Temporarily disabled */}
       {/* <IndividualStateRateTemplatesIcon
         onLoadTemplate={handleLoadTemplate}
         currentSelections={selections}

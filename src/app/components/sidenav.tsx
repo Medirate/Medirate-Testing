@@ -55,7 +55,7 @@ const SideNav = memo(() => {
     "/settings",
     "/profile",
     "/documents",
-    // "/data-export", // TEMPORARILY HIDDEN
+    "/data-export",
     "/admin-dashboard",
     "/support",
     "/state-profiles",
@@ -521,7 +521,7 @@ const SideNav = memo(() => {
                 )}
               </li>
               
-              {/* Data Export - TEMPORARILY HIDDEN */}
+              {/* Data Export - Temporarily disabled */}
               {/* <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
@@ -540,7 +540,12 @@ const SideNav = memo(() => {
                 ) : (
                   <Link
                     href="/data-export"
-                    onClick={() => setActiveTab("dataExport")}
+                    onClick={(e) => {
+                      setActiveTab("dataExport");
+                      if (isSidebarCollapsed) {
+                        e.stopPropagation();
+                      }
+                    }}
                     className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
                       activeTab === "dataExport" ? "bg-gray-200/20" : ""
                     }`}

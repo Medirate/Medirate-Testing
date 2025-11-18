@@ -11,7 +11,7 @@ import { gunzipSync, strFromU8 } from "fflate";
 import { Calendar } from "lucide-react";
 import ExcelJS from "exceljs";
 import { fixEncoding } from "@/lib/encoding-fix";
-// import DataExportTemplatesIcon, { DataExportTemplateData } from "@/app/components/DataExportTemplatesIcon"; // TEMPORARILY HIDDEN
+import DataExportTemplatesIcon, { DataExportTemplateData } from "@/app/components/DataExportTemplatesIcon";
 import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 interface FilterOptionsData {
@@ -340,6 +340,45 @@ export default function DataExport() {
     setSelectedColumns(allColumnsSelected ? [] : ALL_COLUMN_OPTIONS.map((option) => option.key));
   };
 
+  // Helper function to check if there are blank entries for a secondary filter
+  const hasBlankEntriesForFilter = (filterKey: keyof Selections): boolean => {
+    if (!filterOptionsData || !filterOptionsData.combinations) return false;
+    
+    // Build filter conditions based on current selections (same as getAvailableOptions)
+    const filteredCombinations = filterOptionsData.combinations.filter(combo => {
+      // If a fee_schedule_date is selected, only consider combos where the date matches
+      if (selections.fee_schedule_date) {
+        if (Array.isArray(combo.rate_effective_date)) {
+          if (!combo.rate_effective_date.includes(selections.fee_schedule_date)) return false;
+        } else {
+          if (combo.rate_effective_date !== selections.fee_schedule_date) return false;
+        }
+      }
+      
+      // Check all other selections except the current filterKey
+      return Object.entries(selections).every(([key, value]) => {
+        if (key === filterKey || key === 'fee_schedule_date') return true;
+        if (!value) return true;
+        
+        const comboValue = combo[key];
+        if (typeof comboValue !== 'string') return true; // Skip non-string fields
+        
+        // Handle multi-select values (arrays) vs single values (strings)
+        if (Array.isArray(value)) {
+          return value.includes(String(comboValue));
+        } else {
+          return comboValue === value;
+        }
+      });
+    });
+    
+    // Check if there are any entries where the specified field is blank/empty
+    return filteredCombinations.some(combo => {
+      const fieldValue = combo[filterKey];
+      return !fieldValue || (typeof fieldValue === 'string' && fieldValue.trim() === '');
+    });
+  };
+
   const getAvailableOptions = (filterKey: keyof Selections) => {
     if (!filterOptionsData || !filterOptionsData.combinations) return [];
     
@@ -378,9 +417,44 @@ export default function DataExport() {
       }
     });
     
-    return Array.from(values)
+    // Build options array
+    const options = Array.from(values)
       .sort()
       .map((value) => ({ value, label: value }));
+    
+    // For secondary filters, conditionally add "-" option if there are blank entries
+    const secondaryFilters = ['program', 'location_region', 'provider_type', 'modifier_1'];
+    if (secondaryFilters.includes(filterKey as string) && filterKey !== 'duration_unit') {
+      const hasBlankEntries = hasBlankEntriesForFilter(filterKey);
+      if (hasBlankEntries) {
+        return [{ value: '-', label: '-' }, ...options];
+      }
+    }
+    
+    return options;
+  };
+
+  // Helper function to check if a filter should be disabled
+  const isFilterDisabled = (filterKey: keyof Selections): boolean => {
+    const availableOptions = getAvailableOptions(filterKey);
+    
+    // Service category is never disabled (it's the first filter)
+    if (filterKey === 'service_category') {
+      return false;
+    }
+    
+    // State requires service category
+    if (filterKey === 'state_name') {
+      return !selections.service_category || availableOptions.length === 0;
+    }
+    
+    // All other filters require both service_category and state_name
+    if (!selections.service_category || !selections.state_name) {
+      return true;
+    }
+    
+    // Check if there are any available options
+    return availableOptions.length === 0;
   };
 
   const prepareExport = async () => {
@@ -487,54 +561,53 @@ export default function DataExport() {
     return rows;
   };
 
-  // handleLoadTemplate - TEMPORARILY HIDDEN (template feature disabled)
-  // const handleLoadTemplate = (templateData: DataExportTemplateData) => {
-  //   if (templateData.selections) {
-  //     setSelections({
-  //       state_name: templateData.selections.state_name ?? null,
-  //       service_category: templateData.selections.service_category ?? null,
-  //       service_code: templateData.selections.service_code ?? null,
-  //       service_description: templateData.selections.service_description ?? null,
-  //       program: templateData.selections.program ?? null,
-  //       location_region: templateData.selections.location_region ?? null,
-  //       provider_type: templateData.selections.provider_type ?? null,
-  //       duration_unit: templateData.selections.duration_unit ?? null,
-  //       modifier_1: templateData.selections.modifier_1 ?? null,
-  //       fee_schedule_date: templateData.selections.fee_schedule_date ?? null,
-  //     });
-  //   }
+  const handleLoadTemplate = (templateData: DataExportTemplateData) => {
+    if (templateData.selections) {
+      setSelections({
+        state_name: templateData.selections.state_name ?? null,
+        service_category: templateData.selections.service_category ?? null,
+        service_code: templateData.selections.service_code ?? null,
+        service_description: templateData.selections.service_description ?? null,
+        program: templateData.selections.program ?? null,
+        location_region: templateData.selections.location_region ?? null,
+        provider_type: templateData.selections.provider_type ?? null,
+        duration_unit: templateData.selections.duration_unit ?? null,
+        modifier_1: templateData.selections.modifier_1 ?? null,
+        fee_schedule_date: templateData.selections.fee_schedule_date ?? null,
+      });
+    }
 
-  //   const applyDate = (
-  //     isoDate: string | null | undefined,
-  //     setDate: (date: Date | null) => void,
-  //     setInput: (value: string) => void
-  //   ) => {
-  //     if (isoDate) {
-  //       const parsedDate = new Date(isoDate);
-  //       if (!Number.isNaN(parsedDate.getTime())) {
-  //         setDate(parsedDate);
-  //         setInput(formatDateInput(parsedDate));
-  //         return;
-  //       }
-  //     }
-  //     setDate(null);
-  //     setInput("");
-  //   };
+    const applyDate = (
+      isoDate: string | null | undefined,
+      setDate: (date: Date | null) => void,
+      setInput: (value: string) => void
+    ) => {
+      if (isoDate) {
+        const parsedDate = new Date(isoDate);
+        if (!Number.isNaN(parsedDate.getTime())) {
+          setDate(parsedDate);
+          setInput(formatDateInput(parsedDate));
+          return;
+        }
+      }
+      setDate(null);
+      setInput("");
+    };
 
-  //   applyDate(templateData.startDate, setStartDate, setStartDateInput);
-  //   applyDate(templateData.endDate, setEndDate, setEndDateInput);
+    applyDate(templateData.startDate, setStartDate, setStartDateInput);
+    applyDate(templateData.endDate, setEndDate, setEndDateInput);
 
-  //   if (Array.isArray(templateData.selectedColumns) && templateData.selectedColumns.length > 0) {
-  //     const validColumns = templateData.selectedColumns.filter((col) => COLUMN_MAP[col]);
-  //     if (validColumns.length > 0) {
-  //       setSelectedColumns(validColumns);
-  //     } else {
-  //       setSelectedColumns(ALL_COLUMN_OPTIONS.map((option) => option.key));
-  //     }
-  //   } else {
-  //     setSelectedColumns(ALL_COLUMN_OPTIONS.map((option) => option.key));
-  //   }
-  // };
+    if (Array.isArray(templateData.selectedColumns) && templateData.selectedColumns.length > 0) {
+      const validColumns = templateData.selectedColumns.filter((col) => COLUMN_MAP[col]);
+      if (validColumns.length > 0) {
+        setSelectedColumns(validColumns);
+      } else {
+        setSelectedColumns(ALL_COLUMN_OPTIONS.map((option) => option.key));
+      }
+    } else {
+      setSelectedColumns(ALL_COLUMN_OPTIONS.map((option) => option.key));
+    }
+  };
 
   const buildExcel = async (rows: ServiceData[], columns: string[]) => {
     const workbook = new ExcelJS.Workbook();
@@ -634,7 +707,7 @@ export default function DataExport() {
 
   return (
     <AppLayout activeTab="dataExport">
-      {/* DataExportTemplatesIcon - TEMPORARILY HIDDEN */}
+      {/* Temporarily disabled */}
       {/* <DataExportTemplatesIcon
         onLoadTemplate={handleLoadTemplate}
         currentSelections={selections as unknown as Record<string, string | null>}
@@ -661,29 +734,51 @@ export default function DataExport() {
           <div className="rounded-2xl bg-white p-6 shadow-sm lg:col-span-2">
             <h2 className="text-base font-semibold text-slate-900">Filters</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {FILTER_FIELDS.map((field) => (
-                <div key={field.key}>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {field.label}
-                  </label>
-                  <Select
-                    className="mt-1 text-sm"
-                    classNamePrefix="filter"
-                    options={getAvailableOptions(field.key)}
-                    isClearable
-                    placeholder={field.placeholder}
-                    isLoading={isLoadingFilters}
-                    value={
-                      selections[field.key]
-                        ? { value: selections[field.key]!, label: selections[field.key]! }
-                        : null
-                    }
-                    onChange={(option) =>
-                      setSelections((prev) => ({ ...prev, [field.key]: option?.value || null }))
-                    }
-                  />
-                </div>
-              ))}
+              {FILTER_FIELDS.map((field) => {
+                const isDisabled = isFilterDisabled(field.key);
+                const availableOptions = getAvailableOptions(field.key);
+                
+                return (
+                  <div key={field.key}>
+                    <label className={clsx(
+                      "text-xs font-semibold uppercase tracking-wide",
+                      isDisabled ? "text-slate-300" : "text-slate-500"
+                    )}>
+                      {field.label}
+                    </label>
+                    <Select
+                      className="mt-1 text-sm"
+                      classNamePrefix="filter"
+                      options={availableOptions}
+                      isClearable
+                      placeholder={field.placeholder}
+                      isLoading={isLoadingFilters}
+                      isDisabled={isDisabled}
+                      value={
+                        selections[field.key]
+                          ? { value: selections[field.key]!, label: selections[field.key]! }
+                          : null
+                      }
+                      onChange={(option) =>
+                        setSelections((prev) => ({ ...prev, [field.key]: option?.value || null }))
+                      }
+                      styles={{
+                        control: (provided, state) => ({
+                          ...provided,
+                          backgroundColor: isDisabled ? '#e5e7eb' : 'white',
+                          opacity: isDisabled ? 0.4 : 1,
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          borderColor: isDisabled ? '#d1d5db' : provided.borderColor,
+                        }),
+                        placeholder: (provided) => ({
+                          ...provided,
+                          color: isDisabled ? '#9ca3af' : '#6b7280',
+                        }),
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
 
             <div className="mt-6 grid gap-6 md:grid-cols-2">
@@ -774,7 +869,31 @@ export default function DataExport() {
             </div>
             <p className="mt-2 text-sm text-slate-500">Each subscription includes 20,000 export rows per month.</p>
             {exportUsage ? (
-              <div className="mt-4 space-y-2 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+              <div className="mt-4 space-y-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                {/* Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-600">Usage</span>
+                    <span className="font-semibold text-slate-900">
+                      {Math.round((exportUsage.rowsUsed / exportUsage.rowsLimit) * 100)}%
+                    </span>
+                  </div>
+                  <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full transition-all duration-500 ease-out"
+                      style={{
+                        width: `${Math.min((exportUsage.rowsUsed / exportUsage.rowsLimit) * 100, 100)}%`,
+                        backgroundColor:
+                          (exportUsage.rowsUsed / exportUsage.rowsLimit) * 100 >= 90
+                            ? "#ef4444" // red-500
+                            : (exportUsage.rowsUsed / exportUsage.rowsLimit) * 100 >= 75
+                            ? "#f59e0b" // amber-500
+                            : "#10b981", // emerald-500
+                      }}
+                    />
+                  </div>
+                </div>
+                
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-600">Rows Used</span>
                   <span className="font-semibold text-slate-900">
@@ -846,7 +965,8 @@ export default function DataExport() {
           </div>
         </div>
 
-        <div className="mt-8 flex flex-wrap items-center gap-3">
+        {/* Temporarily disabled */}
+        {/* <div className="mt-8 flex flex-wrap items-center gap-3">
           <button
             onClick={prepareExport}
             disabled={isPreparingExport || isExporting}
@@ -862,7 +982,7 @@ export default function DataExport() {
           <p className="text-xs text-slate-500">
             Excel files include watermark and usage tracking. You can regenerate the same export as many times as you like.
           </p>
-        </div>
+        </div> */}
 
         {showLimitModal && (
           <ModalShell onClose={() => setShowLimitModal(false)}>
