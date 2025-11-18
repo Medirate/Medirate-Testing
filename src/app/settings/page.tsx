@@ -6,6 +6,7 @@ import SettingsProfile from "./components/SettingsProfile";
 import ManageSubscription from "./components/ManageSubscription";
 import ManageSubscriptionUsers from "./components/ManageSubscriptionUsers";
 import TermsAndConditions from "./components/TermsAndConditions";
+import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("profile");
@@ -51,6 +52,10 @@ export default function Settings() {
         return <SettingsProfile />;
     }
   };
+
+  if (isLoadingRole) {
+    return <LoaderOverlay />;
+  }
 
   return (
     <AppLayout activeTab="settings">

@@ -192,6 +192,9 @@ const HistoricalRatesTemplatesIcon = ({
             <p className="text-sm text-gray-600 mt-1">
               Save and load your filter configurations and selected entry
             </p>
+            <p className="text-xs text-gray-500 mt-2 italic">
+              💡 Tip: Templates save your current filters and selected entries. Click "Load" to instantly restore a saved configuration.
+            </p>
           </div>
 
           {/* Error Message */}

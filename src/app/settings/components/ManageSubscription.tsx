@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRequireSubscription } from "@/hooks/useRequireAuth";
 import SubscriptionTermsModal from "@/app/components/SubscriptionTermsModal";
+import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 interface SubscriptionData {
   plan: string;
@@ -305,11 +306,7 @@ export default function ManageSubscription() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-gray-500">Loading subscription information...</div>
-      </div>
-    );
+    return <LoaderOverlay label="Loading subscription information..." />;
   }
 
   if (isSubUser) {

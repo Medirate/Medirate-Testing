@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { useProtectedPage } from "@/context/AuthContext";
 import { motion } from "framer-motion";
-import { MoonLoader } from "react-spinners";
 import AppLayout from "@/app/components/applayout";
+import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 // ✅ Full list of U.S. states
 const STATES = [
@@ -154,9 +154,7 @@ export default function EmailPreferences() {
         )}
 
         {loading ? (
-          <div className="flex justify-center items-center h-48">
-            <MoonLoader color="#012C61" size={40} />
-          </div>
+          <LoaderOverlay />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden">

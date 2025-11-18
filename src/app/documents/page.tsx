@@ -17,6 +17,7 @@ import {
   File,
   AlertCircle
 } from "lucide-react";
+import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 interface Document {
   id: string;
@@ -180,11 +181,7 @@ export default function Documents() {
   };
 
   if (auth.isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <LoaderOverlay />;
   }
 
   return (
@@ -282,12 +279,7 @@ export default function Documents() {
 
 
           {/* Loading State */}
-          {isLoading && (
-            <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-3 text-gray-600">Loading documents...</span>
-            </div>
-          )}
+          {isLoading && <LoaderOverlay label="Loading documents..." />}
 
           {/* Error State */}
           {error && (
