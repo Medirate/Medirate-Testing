@@ -11,7 +11,7 @@ import { gunzipSync, strFromU8 } from "fflate";
 import { Calendar } from "lucide-react";
 import ExcelJS from "exceljs";
 import { fixEncoding } from "@/lib/encoding-fix";
-// import DataExportTemplatesIcon, { DataExportTemplateData } from "@/app/components/DataExportTemplatesIcon"; // TEMPORARILY HIDDEN
+import DataExportTemplatesIcon, { DataExportTemplateData } from "@/app/components/DataExportTemplatesIcon";
 import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 interface FilterOptionsData {
@@ -487,54 +487,53 @@ export default function DataExport() {
     return rows;
   };
 
-  // handleLoadTemplate - TEMPORARILY HIDDEN (template feature disabled)
-  // const handleLoadTemplate = (templateData: DataExportTemplateData) => {
-  //   if (templateData.selections) {
-  //     setSelections({
-  //       state_name: templateData.selections.state_name ?? null,
-  //       service_category: templateData.selections.service_category ?? null,
-  //       service_code: templateData.selections.service_code ?? null,
-  //       service_description: templateData.selections.service_description ?? null,
-  //       program: templateData.selections.program ?? null,
-  //       location_region: templateData.selections.location_region ?? null,
-  //       provider_type: templateData.selections.provider_type ?? null,
-  //       duration_unit: templateData.selections.duration_unit ?? null,
-  //       modifier_1: templateData.selections.modifier_1 ?? null,
-  //       fee_schedule_date: templateData.selections.fee_schedule_date ?? null,
-  //     });
-  //   }
+  const handleLoadTemplate = (templateData: DataExportTemplateData) => {
+    if (templateData.selections) {
+      setSelections({
+        state_name: templateData.selections.state_name ?? null,
+        service_category: templateData.selections.service_category ?? null,
+        service_code: templateData.selections.service_code ?? null,
+        service_description: templateData.selections.service_description ?? null,
+        program: templateData.selections.program ?? null,
+        location_region: templateData.selections.location_region ?? null,
+        provider_type: templateData.selections.provider_type ?? null,
+        duration_unit: templateData.selections.duration_unit ?? null,
+        modifier_1: templateData.selections.modifier_1 ?? null,
+        fee_schedule_date: templateData.selections.fee_schedule_date ?? null,
+      });
+    }
 
-  //   const applyDate = (
-  //     isoDate: string | null | undefined,
-  //     setDate: (date: Date | null) => void,
-  //     setInput: (value: string) => void
-  //   ) => {
-  //     if (isoDate) {
-  //       const parsedDate = new Date(isoDate);
-  //       if (!Number.isNaN(parsedDate.getTime())) {
-  //         setDate(parsedDate);
-  //         setInput(formatDateInput(parsedDate));
-  //         return;
-  //       }
-  //     }
-  //     setDate(null);
-  //     setInput("");
-  //   };
+    const applyDate = (
+      isoDate: string | null | undefined,
+      setDate: (date: Date | null) => void,
+      setInput: (value: string) => void
+    ) => {
+      if (isoDate) {
+        const parsedDate = new Date(isoDate);
+        if (!Number.isNaN(parsedDate.getTime())) {
+          setDate(parsedDate);
+          setInput(formatDateInput(parsedDate));
+          return;
+        }
+      }
+      setDate(null);
+      setInput("");
+    };
 
-  //   applyDate(templateData.startDate, setStartDate, setStartDateInput);
-  //   applyDate(templateData.endDate, setEndDate, setEndDateInput);
+    applyDate(templateData.startDate, setStartDate, setStartDateInput);
+    applyDate(templateData.endDate, setEndDate, setEndDateInput);
 
-  //   if (Array.isArray(templateData.selectedColumns) && templateData.selectedColumns.length > 0) {
-  //     const validColumns = templateData.selectedColumns.filter((col) => COLUMN_MAP[col]);
-  //     if (validColumns.length > 0) {
-  //       setSelectedColumns(validColumns);
-  //     } else {
-  //       setSelectedColumns(ALL_COLUMN_OPTIONS.map((option) => option.key));
-  //     }
-  //   } else {
-  //     setSelectedColumns(ALL_COLUMN_OPTIONS.map((option) => option.key));
-  //   }
-  // };
+    if (Array.isArray(templateData.selectedColumns) && templateData.selectedColumns.length > 0) {
+      const validColumns = templateData.selectedColumns.filter((col) => COLUMN_MAP[col]);
+      if (validColumns.length > 0) {
+        setSelectedColumns(validColumns);
+      } else {
+        setSelectedColumns(ALL_COLUMN_OPTIONS.map((option) => option.key));
+      }
+    } else {
+      setSelectedColumns(ALL_COLUMN_OPTIONS.map((option) => option.key));
+    }
+  };
 
   const buildExcel = async (rows: ServiceData[], columns: string[]) => {
     const workbook = new ExcelJS.Workbook();
@@ -634,14 +633,13 @@ export default function DataExport() {
 
   return (
     <AppLayout activeTab="dataExport">
-      {/* DataExportTemplatesIcon - TEMPORARILY HIDDEN */}
-      {/* <DataExportTemplatesIcon
+      <DataExportTemplatesIcon
         onLoadTemplate={handleLoadTemplate}
         currentSelections={selections as unknown as Record<string, string | null>}
         currentStartDate={startDate}
         currentEndDate={endDate}
         currentSelectedColumns={selectedColumns}
-      /> */}
+      />
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-8">
         <div className="flex items-center justify-between">
           <div>
