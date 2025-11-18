@@ -751,6 +751,18 @@ export default function DataExport() {
             <h2 className="text-base font-semibold text-slate-900">Filters</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               {FILTER_FIELDS.map((field) => {
+                const isMultiFilter = field.key !== "service_category";
+                const fieldValue = selections[field.key];
+                const selectValue = isMultiFilter
+                  ? Array.isArray(fieldValue)
+                    ? fieldValue.map((val) => ({ value: val, label: val }))
+                    : fieldValue
+                    ? [{ value: fieldValue, label: fieldValue }]
+                    : []
+                  : fieldValue
+                  ? { value: fieldValue, label: fieldValue }
+                  : null;
+
                 const isDisabled = isFilterDisabled(field.key);
                 const availableOptions = getAvailableOptions(field.key);
                 
@@ -767,31 +779,30 @@ export default function DataExport() {
                       classNamePrefix="filter"
                       options={availableOptions}
                       isClearable
-                      isMulti={field.key !== 'service_category'}
+                      isMulti={isMultiFilter}
+                      closeMenuOnSelect={!isMultiFilter}
+                      hideSelectedOptions={!isMultiFilter}
                       placeholder={field.placeholder}
                       isLoading={isLoadingFilters}
                       isDisabled={isDisabled}
-                      value={
-                        field.key === 'service_category'
-                          ? (selections[field.key]
-                              ? { value: selections[field.key]!, label: selections[field.key]! }
-                              : null)
-                          : (Array.isArray(selections[field.key])
-                              ? selections[field.key]!.map(val => ({ value: val, label: val }))
-                              : selections[field.key]
-                              ? [{ value: selections[field.key]!, label: selections[field.key]! }]
-                              : [])
-                      }
+                      value={selectValue}
                       onChange={(option) => {
-                        if (field.key === 'service_category') {
-                          setSelections((prev) => ({ ...prev, [field.key]: (option as { value: string; label: string } | null)?.value || null }));
+                        if (!isMultiFilter) {
+                          const singleOption = option as { value: string; label: string } | null;
+                          setSelections((prev) => ({
+                            ...prev,
+                            [field.key]: singleOption?.value || null,
+                          }));
                         } else {
                           const selectedValues = Array.isArray(option)
-                            ? option.map(opt => opt.value)
+                            ? option.map((opt) => opt.value)
                             : option
                             ? [option.value]
                             : [];
-                          setSelections((prev) => ({ ...prev, [field.key]: selectedValues.length > 0 ? selectedValues : null }));
+                          setSelections((prev) => ({
+                            ...prev,
+                            [field.key]: selectedValues.length > 0 ? selectedValues : null,
+                          }));
                         }
                       }}
                       styles={{
