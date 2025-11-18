@@ -521,8 +521,8 @@ const SideNav = memo(() => {
                 )}
               </li>
               
-              {/* Data Export - Temporarily disabled */}
-              {/* <li className={isSidebarCollapsed ? "" : "group"}>
+              {/* Data Export */}
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -563,7 +563,7 @@ const SideNav = memo(() => {
                     </span>
                   </Link>
                 )}
-              </li> */}
+              </li>
               
               {/* Settings */}
               <li className={isSidebarCollapsed ? "" : "group"}>

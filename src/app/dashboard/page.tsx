@@ -2294,15 +2294,14 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* Temporarily disabled */}
-      {/* <TemplatesIcon
+      <TemplatesIcon
         onLoadTemplate={handleLoadTemplate}
         currentSelections={selections}
         currentStartDate={startDate}
         currentEndDate={endDate}
         currentSortConfig={sortConfig}
         currentDisplayedItems={displayedItems}
-      /> */}
+      />
       <AppLayout activeTab="dashboard">
         <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         {/* Error Messages */}

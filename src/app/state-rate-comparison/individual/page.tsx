@@ -3058,14 +3058,13 @@ export default function StatePaymentComparison() {
 
   return (
     <AppLayout activeTab="stateRateComparison">
-      {/* Temporarily disabled */}
-      {/* <IndividualStateRateTemplatesIcon
+      <IndividualStateRateTemplatesIcon
         onLoadTemplate={handleLoadTemplate}
         currentSelections={selections}
         currentFilterSets={filterSets}
         currentSelectedTableRows={selectedTableRows}
         currentSelectedEntries={selectedEntries}
-      /> */}
+      />
       <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         {/* Error Messages */}
         <div className="mb-4 sm:mb-8">
