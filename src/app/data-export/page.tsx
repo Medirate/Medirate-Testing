@@ -772,7 +772,31 @@ export default function DataExport() {
             </div>
             <p className="mt-2 text-sm text-slate-500">Each subscription includes 20,000 export rows per month.</p>
             {exportUsage ? (
-              <div className="mt-4 space-y-2 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+              <div className="mt-4 space-y-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+                {/* Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-600">Usage</span>
+                    <span className="font-semibold text-slate-900">
+                      {Math.round((exportUsage.rowsUsed / exportUsage.rowsLimit) * 100)}%
+                    </span>
+                  </div>
+                  <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full transition-all duration-500 ease-out"
+                      style={{
+                        width: `${Math.min((exportUsage.rowsUsed / exportUsage.rowsLimit) * 100, 100)}%`,
+                        backgroundColor:
+                          (exportUsage.rowsUsed / exportUsage.rowsLimit) * 100 >= 90
+                            ? "#ef4444" // red-500
+                            : (exportUsage.rowsUsed / exportUsage.rowsLimit) * 100 >= 75
+                            ? "#f59e0b" // amber-500
+                            : "#10b981", // emerald-500
+                      }}
+                    />
+                  </div>
+                </div>
+                
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-600">Rows Used</span>
                   <span className="font-semibold text-slate-900">
