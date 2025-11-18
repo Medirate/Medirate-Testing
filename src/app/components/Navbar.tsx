@@ -138,7 +138,7 @@ const Navbar = () => {
     "/state-rate-comparison/individual",
     "/historical-rates",
     "/documents",
-    "/data-export",
+    // "/data-export", // TEMPORARILY HIDDEN
     "/admin-dashboard",
     "/admin-dashboard/rate-developments",
     "/admin-dashboard/rate-developments/edit",

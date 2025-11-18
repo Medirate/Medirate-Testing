@@ -45,7 +45,7 @@ export function SideNavProvider({ children }: { children: ReactNode }) {
       "/settings": "settings",
       "/historical-rates": "historicalRates",
       "/admin-dashboard": "adminDashboard",
-      "/data-export": "dataExport",
+      // "/data-export": "dataExport", // TEMPORARILY HIDDEN
       "/documents": "documents",
       "/support": "support",
     };
