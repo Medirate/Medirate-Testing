@@ -48,9 +48,12 @@ export async function GET(request: NextRequest) {
         );
         if (hasArchiveFolder) return false;
         // Exclude BILLING_MANUALS folder - should not be visible to users
-        const hasBillingManuals = pathParts.some(part => 
-          part.toUpperCase() === 'BILLING_MANUALS'
-        );
+        // Check for various naming patterns: BILLING_MANUALS, BILLING MANUALS, BILLING-MANUALS, etc.
+        const hasBillingManuals = pathParts.some(part => {
+          const normalized = part.toUpperCase().replace(/[_\s-]/g, ''); // Remove underscores, spaces, hyphens
+          return normalized === 'BILLINGMANUALS' || 
+                 (part.toUpperCase().includes('BILLING') && part.toUpperCase().includes('MANUAL'));
+        });
         if (hasBillingManuals) return false;
         return true;
       })
