@@ -637,26 +637,33 @@ export default function Dashboard() {
     try {
       const filters: any = {};
       for (const [key, value] of Object.entries(selections)) {
+        // Include "-" values as they represent null/empty filters
         if (value) filters[key] = value;
       }
       if (startDate) filters.start_date = startDate.toISOString().split('T')[0];
       if (endDate) filters.end_date = endDate.toISOString().split('T')[0];
       filters.page = String(currentPage);
       filters.itemsPerPage = String(itemsPerPage);
+      // modifier_1 is already included in the loop above, but keeping this for backward compatibility
       if (selections.modifier_1) filters.modifier_1 = selections.modifier_1;
       
       // DEBUG: Log the filters being sent
       console.log('🔍 Dashboard Search - Filters being sent:', filters);
       console.log('🔍 Dashboard Search - Current selections:', selections);
+      console.log('🔍 Dashboard Search - Provider type value:', selections.provider_type);
+      console.log('🔍 Dashboard Search - Is provider_type "-"?:', selections.provider_type === '-');
       
       // Remove sort config from API call since we're doing client-side sorting
       const result = await refreshData(filters) as RefreshDataResponse | null;
       
       // DEBUG: Log the API response
       console.log('🔍 Dashboard Search - API Response:', result);
+      console.log('🔍 Dashboard Search - Data array length:', result?.data?.length || 0);
+      console.log('🔍 Dashboard Search - Total count:', result?.totalCount || 0);
       
       if (result?.data) {
         console.log('✅ Dashboard Search - Data received:', result.data.length, 'records');
+        console.log('🔍 Dashboard Search - First record sample:', result.data[0] || 'No records');
         setTotalCount(result.totalCount);
         setAuthError(null);
       } else {
