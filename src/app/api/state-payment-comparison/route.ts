@@ -481,7 +481,50 @@ export async function GET(request: Request) {
     }
     if (providerType) {
       if (providerType === '-') {
+        // Query for null or empty string - use or() with proper PostgREST syntax
+        console.log('🔍 API Debug - Filtering for provider_type with "-" (null or empty)');
+        console.log('🔍 API Debug - Current filters before provider_type:', {
+          serviceCategory: serviceCategory || 'NOT_SET',
+          state: state || 'NOT_SET',
+          serviceCode: serviceCode || 'NOT_SET'
+        });
+        
+        // Use or() to check for null OR empty string
+        // PostgREST syntax: column.is.null OR column.eq.value
         query = query.or('provider_type.is.null,provider_type.eq.');
+        
+        // DEBUG: Test query to verify data exists with current filters
+        let testQueryForDash = supabase
+          .from('master_data_sept_2')
+          .select('provider_type, state_name, service_category, service_code', { count: 'exact' });
+        
+        // Apply same filters as main query
+        if (serviceCategory) {
+          const trimmedCategory = serviceCategory.trim();
+          testQueryForDash = testQueryForDash.ilike('service_category', `%${trimmedCategory}%`);
+        }
+        if (state) {
+          const trimmedState = state.trim();
+          testQueryForDash = testQueryForDash.or(`state_name.eq.${trimmedState},state_name.ilike.${trimmedState}%`);
+        }
+        if (serviceCode) {
+          testQueryForDash = testQueryForDash.eq('service_code', serviceCode.trim());
+        }
+        // Apply the provider_type filter
+        testQueryForDash = testQueryForDash.or('provider_type.is.null,provider_type.eq.');
+        
+        const { data: testDashData, error: testDashError, count: testDashCount } = await testQueryForDash.limit(5);
+        console.log('🔍 API Debug - Test query for provider_type="-":', {
+          count: testDashCount || 0,
+          dataLength: testDashData?.length || 0,
+          error: testDashError?.message || null,
+          sample: testDashData?.slice(0, 2).map((item: any) => ({
+            provider_type: item.provider_type,
+            state_name: item.state_name,
+            service_category: item.service_category,
+            service_code: item.service_code
+          })) || []
+        });
       } else if (providerType.includes(',')) {
         // Handle multi-select - split by comma and use OR with ILIKE
         const types = providerType.split(',').map(t => t.trim()).filter(t => t);
