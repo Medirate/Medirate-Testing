@@ -741,7 +741,7 @@ export default function DataExport() {
                   <div key={field.key}>
                     <label className={clsx(
                       "text-xs font-semibold uppercase tracking-wide",
-                      isDisabled ? "text-slate-400" : "text-slate-500"
+                      isDisabled ? "text-slate-300" : "text-slate-500"
                     )}>
                       {field.label}
                     </label>
@@ -764,9 +764,10 @@ export default function DataExport() {
                       styles={{
                         control: (provided, state) => ({
                           ...provided,
-                          backgroundColor: isDisabled ? '#f9fafb' : 'white',
-                          opacity: isDisabled ? 0.6 : 1,
+                          backgroundColor: isDisabled ? '#e5e7eb' : 'white',
+                          opacity: isDisabled ? 0.4 : 1,
                           cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          borderColor: isDisabled ? '#d1d5db' : provided.borderColor,
                         }),
                         placeholder: (provided) => ({
                           ...provided,

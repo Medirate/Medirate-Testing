@@ -637,8 +637,10 @@ export default function Dashboard() {
     try {
       const filters: any = {};
       for (const [key, value] of Object.entries(selections)) {
-        // Include "-" values as they represent null/empty filters
-        if (value) filters[key] = value;
+        // Include "-" values as they represent null/empty filters - these MUST be sent to API
+        if (value !== null && value !== undefined) {
+          filters[key] = value;
+        }
       }
       if (startDate) filters.start_date = startDate.toISOString().split('T')[0];
       if (endDate) filters.end_date = endDate.toISOString().split('T')[0];
@@ -2446,7 +2448,7 @@ export default function Dashboard() {
                 <div className="space-y-1">
                   <label className={clsx(
                     "text-sm font-medium",
-                    (!selections.service_category || availableStates.length === 0) ? "text-gray-400" : "text-gray-700"
+                    (!selections.service_category || availableStates.length === 0) ? "text-gray-300" : "text-gray-700"
                   )}>
                     State
                   </label>
@@ -2465,9 +2467,14 @@ export default function Dashboard() {
                     styles={{
                       control: (provided, state) => ({
                         ...provided,
-                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                        opacity: state.isDisabled ? 0.6 : 1,
+                        backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
+                        opacity: state.isDisabled ? 0.4 : 1,
                         cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                        borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
+                      }),
+                      placeholder: (provided, state) => ({
+                        ...provided,
+                        color: state.isDisabled ? '#9ca3af' : provided.color,
                       }),
                     }}
                   />
@@ -2478,7 +2485,7 @@ export default function Dashboard() {
                 <div className="space-y-1">
                   <label className={clsx(
                     "text-sm font-medium",
-                    (!selections.service_category || !selections.state_name || availableServiceCodes.length === 0) ? "text-gray-400" : "text-gray-700"
+                    (!selections.service_category || !selections.state_name || availableServiceCodes.length === 0) ? "text-gray-300" : "text-gray-700"
                   )}>
                     Service Code
                   </label>
@@ -2497,9 +2504,14 @@ export default function Dashboard() {
                     styles={{
                       control: (provided, state) => ({
                         ...provided,
-                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                        opacity: state.isDisabled ? 0.6 : 1,
+                        backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
+                        opacity: state.isDisabled ? 0.4 : 1,
                         cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                        borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
+                      }),
+                      placeholder: (provided, state) => ({
+                        ...provided,
+                        color: state.isDisabled ? '#9ca3af' : provided.color,
                       }),
                     }}
                   />
@@ -2510,7 +2522,7 @@ export default function Dashboard() {
                 <div className="space-y-1">
                   <label className={clsx(
                     "text-sm font-medium",
-                    (!selections.service_category || !selections.state_name || availableServiceDescriptions.length === 0) ? "text-gray-400" : "text-gray-700"
+                    (!selections.service_category || !selections.state_name || availableServiceDescriptions.length === 0) ? "text-gray-300" : "text-gray-700"
                   )}>
                     Service Description
                   </label>
@@ -2527,9 +2539,14 @@ export default function Dashboard() {
                     styles={{
                       control: (provided, state) => ({
                         ...provided,
-                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                        opacity: state.isDisabled ? 0.6 : 1,
+                        backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
+                        opacity: state.isDisabled ? 0.4 : 1,
                         cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                        borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
+                      }),
+                      placeholder: (provided, state) => ({
+                        ...provided,
+                        color: state.isDisabled ? '#9ca3af' : provided.color,
                       }),
                     }}
                   />
@@ -2540,7 +2557,7 @@ export default function Dashboard() {
                 <div className="space-y-1">
                   <label className={clsx(
                     "text-sm font-medium",
-                    (!selections.service_category || !selections.state_name || availablePrograms.length === 0) ? "text-gray-400" : "text-gray-700"
+                    (!selections.service_category || !selections.state_name || availablePrograms.length === 0) ? "text-gray-300" : "text-gray-700"
                   )}>
                     Program
                   </label>
@@ -2559,9 +2576,14 @@ export default function Dashboard() {
                     styles={{
                       control: (provided, state) => ({
                         ...provided,
-                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                        opacity: state.isDisabled ? 0.6 : 1,
+                        backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
+                        opacity: state.isDisabled ? 0.4 : 1,
                         cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                        borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
+                      }),
+                      placeholder: (provided, state) => ({
+                        ...provided,
+                        color: state.isDisabled ? '#9ca3af' : provided.color,
                       }),
                     }}
                   />
@@ -2572,7 +2594,7 @@ export default function Dashboard() {
                 <div className="space-y-1">
                   <label className={clsx(
                     "text-sm font-medium",
-                    (!selections.service_category || !selections.state_name || availableLocationRegions.length === 0) ? "text-gray-400" : "text-gray-700"
+                    (!selections.service_category || !selections.state_name || availableLocationRegions.length === 0) ? "text-gray-300" : "text-gray-700"
                   )}>
                     Location/Region
                   </label>
@@ -2592,9 +2614,14 @@ export default function Dashboard() {
                     styles={{
                       control: (provided, state) => ({
                         ...provided,
-                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                        opacity: state.isDisabled ? 0.6 : 1,
+                        backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
+                        opacity: state.isDisabled ? 0.4 : 1,
                         cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                        borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
+                      }),
+                      placeholder: (provided, state) => ({
+                        ...provided,
+                        color: state.isDisabled ? '#9ca3af' : provided.color,
                       }),
                     }}
                   />
@@ -2605,7 +2632,7 @@ export default function Dashboard() {
                 <div className="space-y-1">
                   <label className={clsx(
                     "text-sm font-medium",
-                    (!selections.service_category || !selections.state_name || availableProviderTypes.length === 0) ? "text-gray-400" : "text-gray-700"
+                    (!selections.service_category || !selections.state_name || availableProviderTypes.length === 0) ? "text-gray-300" : "text-gray-700"
                   )}>
                     Provider Type
                   </label>
@@ -2625,9 +2652,14 @@ export default function Dashboard() {
                     styles={{
                       control: (provided, state) => ({
                         ...provided,
-                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                        opacity: state.isDisabled ? 0.6 : 1,
+                        backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
+                        opacity: state.isDisabled ? 0.4 : 1,
                         cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                        borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
+                      }),
+                      placeholder: (provided, state) => ({
+                        ...provided,
+                        color: state.isDisabled ? '#9ca3af' : provided.color,
                       }),
                     }}
                   />
@@ -2638,7 +2670,7 @@ export default function Dashboard() {
                 <div className="space-y-1">
                   <label className={clsx(
                     "text-sm font-medium",
-                    (!selections.service_category || !selections.state_name || availableDurationUnits.length === 0) ? "text-gray-400" : "text-gray-700"
+                    (!selections.service_category || !selections.state_name || availableDurationUnits.length === 0) ? "text-gray-300" : "text-gray-700"
                   )}>
                     Duration Unit
                   </label>
@@ -2666,9 +2698,14 @@ export default function Dashboard() {
                     styles={{
                       control: (provided, state) => ({
                         ...provided,
-                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                        opacity: state.isDisabled ? 0.6 : 1,
+                        backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
+                        opacity: state.isDisabled ? 0.4 : 1,
                         cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                        borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
+                      }),
+                      placeholder: (provided, state) => ({
+                        ...provided,
+                        color: state.isDisabled ? '#9ca3af' : provided.color,
                       }),
                     }}
                   />
@@ -2679,7 +2716,7 @@ export default function Dashboard() {
                 <div className="space-y-1">
                   <label className={clsx(
                     "text-sm font-medium",
-                    (!selections.service_category || !selections.state_name || availableModifiers.length === 0) ? "text-gray-400" : "text-gray-700"
+                    (!selections.service_category || !selections.state_name || availableModifiers.length === 0) ? "text-gray-300" : "text-gray-700"
                   )}>
                     Modifier
                   </label>
@@ -2702,9 +2739,14 @@ export default function Dashboard() {
                     styles={{
                       control: (provided, state) => ({
                         ...provided,
-                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                        opacity: state.isDisabled ? 0.6 : 1,
+                        backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
+                        opacity: state.isDisabled ? 0.4 : 1,
                         cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                        borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
+                      }),
+                      placeholder: (provided, state) => ({
+                        ...provided,
+                        color: state.isDisabled ? '#9ca3af' : provided.color,
                       }),
                     }}
                     />

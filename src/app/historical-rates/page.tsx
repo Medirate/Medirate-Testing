@@ -1643,7 +1643,8 @@ export default function HistoricalRates() {
                           control: (provided, state) => ({
                             ...provided,
                             backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                            opacity: state.isDisabled ? 0.6 : 1,
+                            opacity: state.isDisabled ? 0.4 : 1,
+                            borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
                           }),
                         }}
@@ -1673,7 +1674,8 @@ export default function HistoricalRates() {
                           control: (provided, state) => ({
                             ...provided,
                             backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                            opacity: state.isDisabled ? 0.6 : 1,
+                            opacity: state.isDisabled ? 0.4 : 1,
+                            borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
                           }),
                         }}
@@ -1702,7 +1704,8 @@ export default function HistoricalRates() {
                           control: (provided, state) => ({
                             ...provided,
                             backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                            opacity: state.isDisabled ? 0.6 : 1,
+                            opacity: state.isDisabled ? 0.4 : 1,
+                            borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
                           }),
                         }}
@@ -1734,7 +1737,8 @@ export default function HistoricalRates() {
                           control: (provided, state) => ({
                             ...provided,
                             backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                            opacity: state.isDisabled ? 0.6 : 1,
+                            opacity: state.isDisabled ? 0.4 : 1,
+                            borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
                           }),
                         }}
@@ -1766,7 +1770,8 @@ export default function HistoricalRates() {
                           control: (provided, state) => ({
                             ...provided,
                             backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                            opacity: state.isDisabled ? 0.6 : 1,
+                            opacity: state.isDisabled ? 0.4 : 1,
+                            borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
                           }),
                         }}
@@ -1798,7 +1803,8 @@ export default function HistoricalRates() {
                           control: (provided, state) => ({
                             ...provided,
                             backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                            opacity: state.isDisabled ? 0.6 : 1,
+                            opacity: state.isDisabled ? 0.4 : 1,
+                            borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
                           }),
                         }}
@@ -1827,7 +1833,8 @@ export default function HistoricalRates() {
                           control: (provided, state) => ({
                             ...provided,
                             backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                            opacity: state.isDisabled ? 0.6 : 1,
+                            opacity: state.isDisabled ? 0.4 : 1,
+                            borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
                           }),
                         }}
@@ -1877,7 +1884,8 @@ export default function HistoricalRates() {
                           control: (provided, state) => ({
                             ...provided,
                             backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
-                            opacity: state.isDisabled ? 0.6 : 1,
+                            opacity: state.isDisabled ? 0.4 : 1,
+                            borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
                           }),
                         }}
