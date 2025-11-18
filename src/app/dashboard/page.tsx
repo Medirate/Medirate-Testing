@@ -2437,7 +2437,10 @@ export default function Dashboard() {
                 </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className={clsx(
+                    "text-sm font-medium",
+                    (!selections.service_category || availableStates.length === 0) ? "text-gray-400" : "text-gray-700"
+                  )}>
                     State
                   </label>
                   <Select
@@ -2452,13 +2455,24 @@ export default function Dashboard() {
                     isDisabled={!selections.service_category || availableStates.length === 0}
                     className={clsx("react-select-container", pendingFilters.has('state_name') ? 'pending-outline' : 'applied-outline')}
                     classNamePrefix="react-select"
+                    styles={{
+                      control: (provided, state) => ({
+                        ...provided,
+                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                        opacity: state.isDisabled ? 0.6 : 1,
+                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                      }),
+                    }}
                   />
                   <div className="mt-1">
                     <ClearButton filterKey="state_name" />
                 </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className={clsx(
+                    "text-sm font-medium",
+                    (!selections.service_category || !selections.state_name || availableServiceCodes.length === 0) ? "text-gray-400" : "text-gray-700"
+                  )}>
                     Service Code
                   </label>
                   <Select
@@ -2473,13 +2487,24 @@ export default function Dashboard() {
                     isDisabled={!selections.service_category || !selections.state_name || availableServiceCodes.length === 0}
                     className={clsx("react-select-container", pendingFilters.has('service_code') ? 'pending-outline' : 'applied-outline')}
                     classNamePrefix="react-select"
+                    styles={{
+                      control: (provided, state) => ({
+                        ...provided,
+                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                        opacity: state.isDisabled ? 0.6 : 1,
+                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                      }),
+                    }}
                   />
                   <div className="mt-1">
                     <ClearButton filterKey="service_code" />
                 </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className={clsx(
+                    "text-sm font-medium",
+                    (!selections.service_category || !selections.state_name || availableServiceDescriptions.length === 0) ? "text-gray-400" : "text-gray-700"
+                  )}>
                     Service Description
                   </label>
                   <Select
@@ -2492,13 +2517,24 @@ export default function Dashboard() {
                     isDisabled={!selections.service_category || !selections.state_name || availableServiceDescriptions.length === 0}
                     className={clsx("react-select-container", pendingFilters.has('service_description') ? 'pending-outline' : 'applied-outline')}
                     classNamePrefix="react-select"
+                    styles={{
+                      control: (provided, state) => ({
+                        ...provided,
+                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                        opacity: state.isDisabled ? 0.6 : 1,
+                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                      }),
+                    }}
                   />
                   <div className="mt-1">
                     <ClearButton filterKey="service_description" />
                 </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className={clsx(
+                    "text-sm font-medium",
+                    (!selections.service_category || !selections.state_name || availablePrograms.length === 0) ? "text-gray-400" : "text-gray-700"
+                  )}>
                     Program
                   </label>
                   <Select
@@ -2513,13 +2549,24 @@ export default function Dashboard() {
                     isDisabled={!selections.service_category || !selections.state_name || availablePrograms.length === 0}
                     className={clsx("react-select-container", pendingFilters.has('program') ? 'pending-outline' : 'applied-outline')}
                     classNamePrefix="react-select"
+                    styles={{
+                      control: (provided, state) => ({
+                        ...provided,
+                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                        opacity: state.isDisabled ? 0.6 : 1,
+                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                      }),
+                    }}
                   />
                   <div className="mt-1">
                     <ClearButton filterKey="program" />
                 </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className={clsx(
+                    "text-sm font-medium",
+                    (!selections.service_category || !selections.state_name || availableLocationRegions.length === 0) ? "text-gray-400" : "text-gray-700"
+                  )}>
                     Location/Region
                   </label>
                   <Select
@@ -2535,13 +2582,24 @@ export default function Dashboard() {
                     isDisabled={!selections.service_category || !selections.state_name || availableLocationRegions.length === 0}
                     className={clsx("react-select-container", pendingFilters.has('location_region') ? 'pending-outline' : 'applied-outline')}
                     classNamePrefix="react-select"
+                    styles={{
+                      control: (provided, state) => ({
+                        ...provided,
+                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                        opacity: state.isDisabled ? 0.6 : 1,
+                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                      }),
+                    }}
                   />
                   <div className="mt-1">
                     <ClearButton filterKey="location_region" />
                 </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className={clsx(
+                    "text-sm font-medium",
+                    (!selections.service_category || !selections.state_name || availableProviderTypes.length === 0) ? "text-gray-400" : "text-gray-700"
+                  )}>
                     Provider Type
                   </label>
                   <Select
@@ -2557,13 +2615,24 @@ export default function Dashboard() {
                     isDisabled={!selections.service_category || !selections.state_name || availableProviderTypes.length === 0}
                     className={clsx("react-select-container", pendingFilters.has('provider_type') ? 'pending-outline' : 'applied-outline')}
                     classNamePrefix="react-select"
+                    styles={{
+                      control: (provided, state) => ({
+                        ...provided,
+                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                        opacity: state.isDisabled ? 0.6 : 1,
+                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                      }),
+                    }}
                   />
                   <div className="mt-1">
                     <ClearButton filterKey="provider_type" />
                 </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className={clsx(
+                    "text-sm font-medium",
+                    (!selections.service_category || !selections.state_name || availableDurationUnits.length === 0) ? "text-gray-400" : "text-gray-700"
+                  )}>
                     Duration Unit
                   </label>
                   <Select
@@ -2587,13 +2656,24 @@ export default function Dashboard() {
                     isDisabled={!selections.service_category || !selections.state_name || availableDurationUnits.length === 0}
                     className={clsx("react-select-container", pendingFilters.has('duration_unit') ? 'pending-outline' : 'applied-outline')}
                     classNamePrefix="react-select"
+                    styles={{
+                      control: (provided, state) => ({
+                        ...provided,
+                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                        opacity: state.isDisabled ? 0.6 : 1,
+                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                      }),
+                    }}
                   />
                   <div className="mt-1">
                     <ClearButton filterKey="duration_unit" />
                 </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">
+                  <label className={clsx(
+                    "text-sm font-medium",
+                    (!selections.service_category || !selections.state_name || availableModifiers.length === 0) ? "text-gray-400" : "text-gray-700"
+                  )}>
                     Modifier
                   </label>
                     <Select
@@ -2612,6 +2692,14 @@ export default function Dashboard() {
                     isDisabled={!selections.service_category || !selections.state_name || availableModifiers.length === 0}
                     className={clsx("react-select-container", pendingFilters.has('modifier_1') ? 'pending-outline' : 'applied-outline')}
                         classNamePrefix="react-select"
+                    styles={{
+                      control: (provided, state) => ({
+                        ...provided,
+                        backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                        opacity: state.isDisabled ? 0.6 : 1,
+                        cursor: state.isDisabled ? 'not-allowed' : 'pointer',
+                      }),
+                    }}
                     />
                   <div className="mt-1">
                     <ClearButton filterKey="modifier_1" />

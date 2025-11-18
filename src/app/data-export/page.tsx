@@ -434,6 +434,29 @@ export default function DataExport() {
     return options;
   };
 
+  // Helper function to check if a filter should be disabled
+  const isFilterDisabled = (filterKey: keyof Selections): boolean => {
+    const availableOptions = getAvailableOptions(filterKey);
+    
+    // Service category is never disabled (it's the first filter)
+    if (filterKey === 'service_category') {
+      return false;
+    }
+    
+    // State requires service category
+    if (filterKey === 'state_name') {
+      return !selections.service_category || availableOptions.length === 0;
+    }
+    
+    // All other filters require both service_category and state_name
+    if (!selections.service_category || !selections.state_name) {
+      return true;
+    }
+    
+    // Check if there are any available options
+    return availableOptions.length === 0;
+  };
+
   const prepareExport = async () => {
     if (selectedColumns.length === 0) {
       alert("Please select at least one column before exporting.");
@@ -710,29 +733,50 @@ export default function DataExport() {
           <div className="rounded-2xl bg-white p-6 shadow-sm lg:col-span-2">
             <h2 className="text-base font-semibold text-slate-900">Filters</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              {FILTER_FIELDS.map((field) => (
-                <div key={field.key}>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {field.label}
-                  </label>
-                  <Select
-                    className="mt-1 text-sm"
-                    classNamePrefix="filter"
-                    options={getAvailableOptions(field.key)}
-                    isClearable
-                    placeholder={field.placeholder}
-                    isLoading={isLoadingFilters}
-                    value={
-                      selections[field.key]
-                        ? { value: selections[field.key]!, label: selections[field.key]! }
-                        : null
-                    }
-                    onChange={(option) =>
-                      setSelections((prev) => ({ ...prev, [field.key]: option?.value || null }))
-                    }
-                  />
-                </div>
-              ))}
+              {FILTER_FIELDS.map((field) => {
+                const isDisabled = isFilterDisabled(field.key);
+                const availableOptions = getAvailableOptions(field.key);
+                
+                return (
+                  <div key={field.key}>
+                    <label className={clsx(
+                      "text-xs font-semibold uppercase tracking-wide",
+                      isDisabled ? "text-slate-400" : "text-slate-500"
+                    )}>
+                      {field.label}
+                    </label>
+                    <Select
+                      className="mt-1 text-sm"
+                      classNamePrefix="filter"
+                      options={availableOptions}
+                      isClearable
+                      placeholder={field.placeholder}
+                      isLoading={isLoadingFilters}
+                      isDisabled={isDisabled}
+                      value={
+                        selections[field.key]
+                          ? { value: selections[field.key]!, label: selections[field.key]! }
+                          : null
+                      }
+                      onChange={(option) =>
+                        setSelections((prev) => ({ ...prev, [field.key]: option?.value || null }))
+                      }
+                      styles={{
+                        control: (provided, state) => ({
+                          ...provided,
+                          backgroundColor: isDisabled ? '#f9fafb' : 'white',
+                          opacity: isDisabled ? 0.6 : 1,
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                        }),
+                        placeholder: (provided) => ({
+                          ...provided,
+                          color: isDisabled ? '#9ca3af' : '#6b7280',
+                        }),
+                      }}
+                    />
+                  </div>
+                );
+              })}
             </div>
 
             <div className="mt-6 grid gap-6 md:grid-cols-2">
