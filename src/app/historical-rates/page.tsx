@@ -1625,7 +1625,7 @@ export default function HistoricalRates() {
                     <div className="space-y-2">
                       <label className={clsx(
                         "text-sm font-medium",
-                        (!selections.service_category || availableStates.length === 0) ? "text-gray-400" : "text-gray-700"
+                        (!selections.service_category || availableStates.length === 0) ? "text-gray-300" : "text-gray-700"
                       )}>State</label>
                       <Select
                         instanceId="state_name_select"
@@ -1642,7 +1642,7 @@ export default function HistoricalRates() {
                         styles={{
                           control: (provided, state) => ({
                             ...provided,
-                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
                             opacity: state.isDisabled ? 0.4 : 1,
                             borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
@@ -1657,7 +1657,7 @@ export default function HistoricalRates() {
                     <div className="space-y-2">
                       <label className={clsx(
                         "text-sm font-medium",
-                        (!selections.service_category || !selections.state_name || availableServiceCodes.length === 0) ? "text-gray-400" : "text-gray-700"
+                        (!selections.service_category || !selections.state_name || availableServiceCodes.length === 0) ? "text-gray-300" : "text-gray-700"
                       )}>Service Code</label>
                       <Select
                         instanceId="service_code_select"
@@ -1673,7 +1673,7 @@ export default function HistoricalRates() {
                         styles={{
                           control: (provided, state) => ({
                             ...provided,
-                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
                             opacity: state.isDisabled ? 0.4 : 1,
                             borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
@@ -1688,7 +1688,7 @@ export default function HistoricalRates() {
                     <div className="space-y-2">
                       <label className={clsx(
                         "text-sm font-medium",
-                        (!selections.service_category || !selections.state_name || availableServiceDescriptions.length === 0) ? "text-gray-400" : "text-gray-700"
+                        (!selections.service_category || !selections.state_name || availableServiceDescriptions.length === 0) ? "text-gray-300" : "text-gray-700"
                       )}>Service Description</label>
                       <Select
                         instanceId="service_description_select"
@@ -1703,7 +1703,7 @@ export default function HistoricalRates() {
                         styles={{
                           control: (provided, state) => ({
                             ...provided,
-                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
                             opacity: state.isDisabled ? 0.4 : 1,
                             borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
@@ -1718,7 +1718,7 @@ export default function HistoricalRates() {
                     <div className="space-y-2">
                       <label className={clsx(
                         "text-sm font-medium",
-                        (!selections.service_category || !selections.state_name || availablePrograms.length === 0) ? "text-gray-400" : "text-gray-700"
+                        (!selections.service_category || !selections.state_name || availablePrograms.length === 0) ? "text-gray-300" : "text-gray-700"
                       )}>Program</label>
                       <Select
                         instanceId="program_select"
@@ -1736,7 +1736,7 @@ export default function HistoricalRates() {
                         styles={{
                           control: (provided, state) => ({
                             ...provided,
-                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
                             opacity: state.isDisabled ? 0.4 : 1,
                             borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
@@ -1751,7 +1751,7 @@ export default function HistoricalRates() {
                     <div className="space-y-2">
                       <label className={clsx(
                         "text-sm font-medium",
-                        (!selections.service_category || !selections.state_name || availableLocationRegions.length === 0) ? "text-gray-400" : "text-gray-700"
+                        (!selections.service_category || !selections.state_name || availableLocationRegions.length === 0) ? "text-gray-300" : "text-gray-700"
                       )}>Location/Region</label>
                       <Select
                         instanceId="location_region_select"
@@ -1769,7 +1769,7 @@ export default function HistoricalRates() {
                         styles={{
                           control: (provided, state) => ({
                             ...provided,
-                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
                             opacity: state.isDisabled ? 0.4 : 1,
                             borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
@@ -1784,7 +1784,7 @@ export default function HistoricalRates() {
                     <div className="space-y-2">
                       <label className={clsx(
                         "text-sm font-medium",
-                        (!selections.service_category || !selections.state_name || availableProviderTypes.length === 0) ? "text-gray-400" : "text-gray-700"
+                        (!selections.service_category || !selections.state_name || availableProviderTypes.length === 0) ? "text-gray-300" : "text-gray-700"
                       )}>Provider Type</label>
                       <Select
                         instanceId="provider_type_select"
@@ -1802,7 +1802,7 @@ export default function HistoricalRates() {
                         styles={{
                           control: (provided, state) => ({
                             ...provided,
-                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
                             opacity: state.isDisabled ? 0.4 : 1,
                             borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
@@ -1817,7 +1817,7 @@ export default function HistoricalRates() {
                     <div className="space-y-2">
                       <label className={clsx(
                         "text-sm font-medium",
-                        (!selections.service_category || !selections.state_name || availableDurationUnits.length === 0) ? "text-gray-400" : "text-gray-700"
+                        (!selections.service_category || !selections.state_name || availableDurationUnits.length === 0) ? "text-gray-300" : "text-gray-700"
                       )}>Duration Unit <span className="text-red-500">*</span></label>
                       <Select
                         instanceId="duration_unit_select"
@@ -1832,7 +1832,7 @@ export default function HistoricalRates() {
                         styles={{
                           control: (provided, state) => ({
                             ...provided,
-                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
                             opacity: state.isDisabled ? 0.4 : 1,
                             borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
@@ -1847,7 +1847,7 @@ export default function HistoricalRates() {
                     <div className="space-y-2">
                       <label className={clsx(
                         "text-sm font-medium",
-                        (!selections.service_category || !selections.state_name || availableModifiers.length === 0) ? "text-gray-400" : "text-gray-700"
+                        (!selections.service_category || !selections.state_name || availableModifiers.length === 0) ? "text-gray-300" : "text-gray-700"
                       )}>Modifier</label>
                       <Select
                         instanceId="modifier_1_select"
@@ -1883,7 +1883,7 @@ export default function HistoricalRates() {
                         styles={{
                           control: (provided, state) => ({
                             ...provided,
-                            backgroundColor: state.isDisabled ? '#f9fafb' : 'white',
+                            backgroundColor: state.isDisabled ? '#e5e7eb' : 'white',
                             opacity: state.isDisabled ? 0.4 : 1,
                             borderColor: state.isDisabled ? '#d1d5db' : provided.borderColor,
                             cursor: state.isDisabled ? 'not-allowed' : 'pointer',
