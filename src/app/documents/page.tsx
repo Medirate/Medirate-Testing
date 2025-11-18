@@ -4,22 +4,18 @@ import { useEffect, useState } from "react";
 import AppLayout from "@/app/components/applayout";
 import { useProtectedPage } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DocumentUpload from "@/app/components/DocumentUpload";
 import { 
   FileText,
   Download,
   Calendar,
-  User,
   Search,
   Filter,
   ChevronDown,
   ChevronRight,
   Folder,
   File,
-  AlertCircle,
-  CheckCircle,
-  Clock
+  AlertCircle
 } from "lucide-react";
 
 interface Document {
@@ -45,6 +41,7 @@ export default function Documents() {
   const router = useRouter();
   
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [stateLinks, setStateLinks] = useState<Record<string, Array<string | { title: string; url: string }>>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,6 +65,7 @@ export default function Documents() {
         console.log('📄 Documents API response:', data);
         console.log('📄 Documents count:', data.documents?.length || 0);
         setDocuments(data.documents || []);
+        setStateLinks(data.stateLinks || {});
       } catch (err) {
         setError('Failed to load documents');
         console.error('Error fetching documents:', err);
@@ -114,7 +112,7 @@ export default function Documents() {
     key: state,
     label: state,
     icon: Folder,
-    description: `${Object.keys(subfolders).length} categories • ${Object.values(subfolders).flat().length} documents`,
+    description: `${Object.keys(subfolders).length} categories • ${Object.values(subfolders).flat().length} documents${stateLinks[state]?.length ? ` • ${stateLinks[state].length} links` : ''}`,
     subfolders: Object.entries(subfolders).map(([subfolder, docs]) => ({
       key: `${state}/${subfolder}`,
       label: subfolder,
@@ -191,64 +189,96 @@ export default function Documents() {
 
   return (
     <AppLayout activeTab="documents">
-      <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Documents & State Notes</h1>
-            <p className="text-gray-600">
-              Access policy documents, state notes, guidelines, and other important resources
-            </p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Hero Header Section */}
+          <div className="mb-12 relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#012C61]/10 via-blue-500/10 to-indigo-500/10 rounded-3xl blur-3xl"></div>
+            <div className="relative bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8 md:p-12">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <h1 className="text-4xl md:text-5xl font-lemonMilkRegular text-[#012C61] mb-4 tracking-tight">
+                    Document Library
+                  </h1>
+                  <p className="text-lg text-gray-600 max-w-2xl">
+                    Access comprehensive policy documents, state notes, guidelines, and essential resources
+                    for Medicaid rate analysis and program administration
+                  </p>
+                </div>
+                <div className="flex items-center gap-6 mt-4 md:mt-0">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-[#012C61]">{documents.length}</div>
+                    <div className="text-sm text-gray-500">Total Documents</div>
+                  </div>
+                  <div className="h-12 w-px bg-gray-300"></div>
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-[#012C61]">{states.length}</div>
+                    <div className="text-sm text-gray-500">States</div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Search and Filters */}
-          <Card className="mb-6">
-            <CardContent className="p-6">
+          {/* Enhanced Search and Filters */}
+          <div className="mb-8">
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 p-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Search */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <input
-                    type="text"
-                    placeholder="Search documents..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#012C61] h-5 w-5" />
+                    <input
+                      type="text"
+                      placeholder="Search documents, keywords, tags..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#012C61] focus:border-[#012C61] transition-all bg-white/50 backdrop-blur-sm text-gray-700 placeholder-gray-400"
+                    />
+                  </div>
                 </div>
 
                 {/* Category Filter */}
-                <div className="relative">
-                  <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
-                  >
-                    <option value="all">All Categories</option>
-                    {categories.map(category => (
-                      <option key={category} value={category}>{category}</option>
-                    ))}
-                  </select>
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="relative">
+                    <Filter className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#012C61] h-5 w-5 z-10" />
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#012C61] focus:border-[#012C61] transition-all bg-white/50 backdrop-blur-sm text-gray-700 appearance-none cursor-pointer"
+                    >
+                      <option value="all">All Categories</option>
+                      {categories.map(category => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
+                  </div>
                 </div>
 
                 {/* State Filter */}
-                <div className="relative">
-                  <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <select
-                    value={selectedState}
-                    onChange={(e) => setSelectedState(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
-                  >
-                    <option value="all">All States</option>
-                    {states.map(state => (
-                      <option key={state} value={state}>{state}</option>
-                    ))}
-                  </select>
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="relative">
+                    <Filter className="absolute left-4 top-1/2 transform -translate-y-1/2 text-[#012C61] h-5 w-5 z-10" />
+                    <select
+                      value={selectedState}
+                      onChange={(e) => setSelectedState(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#012C61] focus:border-[#012C61] transition-all bg-white/50 backdrop-blur-sm text-gray-700 appearance-none cursor-pointer"
+                    >
+                      <option value="all">All States</option>
+                      {states.map(state => (
+                        <option key={state} value={state}>{state}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
+                  </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
 
           {/* Loading State */}
@@ -261,107 +291,151 @@ export default function Documents() {
 
           {/* Error State */}
           {error && (
-            <Card className="mb-6">
-              <CardContent className="p-6">
-                <div className="flex items-center text-red-600">
-                  <AlertCircle className="h-5 w-5 mr-2" />
-                  <span>{error}</span>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-6 mb-6 shadow-sm">
+              <div className="flex items-center text-red-600">
+                <AlertCircle className="h-5 w-5 mr-2" />
+                <span className="font-medium">{error}</span>
+              </div>
+            </div>
           )}
 
           {/* Documents by State */}
           {!isLoading && !error && (
             <div className="space-y-6">
-              {documentTypes.map(stateInfo => {
+              {documentTypes.map((stateInfo, index) => {
                 const isExpanded = expandedSections.has(stateInfo.key);
+                const totalDocs = stateInfo.subfolders.reduce((total, sub) => total + sub.count, 0);
                 
                 return (
-                  <Card key={stateInfo.key}>
-                    <CardHeader 
-                      className="cursor-pointer hover:bg-gray-50 transition-colors"
-                      onClick={() => toggleSection(stateInfo.key)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <stateInfo.icon className="h-5 w-5 mr-3 text-blue-600" />
-                          <div>
-                            <CardTitle className="text-lg">{stateInfo.label}</CardTitle>
-                            <CardDescription>{stateInfo.description}</CardDescription>
+                  <div 
+                    key={stateInfo.key}
+                    className="group relative overflow-hidden"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#012C61]/5 via-blue-500/5 to-indigo-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden transition-all duration-300 hover:shadow-2xl hover:scale-[1.01]">
+                      <div 
+                        className="cursor-pointer p-6 hover:bg-gradient-to-r hover:from-[#012C61]/5 hover:to-blue-500/5 transition-all duration-300"
+                        onClick={() => toggleSection(stateInfo.key)}
+                      >
+                        <div className="flex items-center justify-between flex-wrap gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="p-2.5 bg-[#012C61]/10 rounded-lg border border-[#012C61]/20">
+                              <stateInfo.icon className="h-5 w-5 text-[#012C61]" />
+                            </div>
+                            <div>
+                              <h2 className="text-xl md:text-2xl font-bold text-[#012C61] mb-1 font-lemonMilkRegular">
+                                {stateInfo.label}
+                              </h2>
+                              <p className="text-sm text-gray-600">{stateInfo.description}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-6">
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-[#012C61]">{totalDocs}</div>
+                              <div className="text-xs text-gray-500">documents</div>
+                            </div>
+                            <div className={`p-2 rounded-lg transition-transform duration-300 ${isExpanded ? 'bg-[#012C61]/10 rotate-180' : 'bg-gray-100'}`}>
+                              <ChevronDown className="h-5 w-5 text-[#012C61]" />
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-4">
-                          <span className="text-sm text-gray-500">
-                            {stateInfo.subfolders.reduce((total, sub) => total + sub.count, 0)} documents
-                          </span>
-                          {isExpanded ? (
-                            <ChevronDown className="h-5 w-5 text-gray-400" />
-                          ) : (
-                            <ChevronRight className="h-5 w-5 text-gray-400" />
-                          )}
-                        </div>
                       </div>
-                    </CardHeader>
-                    
-                    {isExpanded && (
-                      <CardContent>
-                        <div className="space-y-6">
-                          {stateInfo.subfolders.map(subfolderInfo => {
-                            const isSubfolderExpanded = expandedSections.has(subfolderInfo.key);
-                            
-                            return (
-                              <div key={subfolderInfo.key} className="border border-gray-200 rounded-lg">
+                      
+                      {isExpanded && (
+                        <div className="px-6 pb-6 border-t border-gray-100">
+                          <div className="space-y-4 pt-6">
+                            {stateLinks[stateInfo.key]?.length ? (
+                              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-5 shadow-sm">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <FileText className="h-5 w-5 text-[#012C61]" />
+                                  <h3 className="text-lg font-semibold text-[#012C61]">External Manuals & Billing Links</h3>
+                                </div>
+                                <ul className="space-y-2">
+                                  {stateLinks[stateInfo.key].map((item, idx) => {
+                                    const linkObj = typeof item === 'string' ? { title: item, url: item } : item;
+                                    return (
+                                      <li key={idx} className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-[#012C61]"></div>
+                                        <a 
+                                          href={linkObj.url} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer" 
+                                          className="text-blue-600 hover:text-[#012C61] hover:underline break-all transition-colors font-medium"
+                                        >
+                                          {linkObj.title || linkObj.url}
+                                        </a>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            ) : null}
+                            {stateInfo.subfolders.map((subfolderInfo, subIndex) => {
+                              const isSubfolderExpanded = expandedSections.has(subfolderInfo.key);
+                              
+                              return (
                                 <div 
-                                  className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                                  onClick={() => toggleSection(subfolderInfo.key)}
+                                  key={subfolderInfo.key} 
+                                  className="bg-gradient-to-br from-gray-50 to-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300"
+                                  style={{ animationDelay: `${(index * 50) + (subIndex * 30)}ms` }}
                                 >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center">
-                                      <FileText className="h-4 w-4 mr-3 text-gray-600" />
-                                      <div>
-                                        <h3 className="text-md font-semibold text-gray-900">{subfolderInfo.label}</h3>
-                                        <p className="text-sm text-gray-500">{subfolderInfo.count} documents</p>
+                                  <div 
+                                    className="p-4 cursor-pointer hover:bg-gradient-to-r hover:from-[#012C61]/5 hover:to-blue-500/5 transition-all duration-300"
+                                    onClick={() => toggleSection(subfolderInfo.key)}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-3">
+                                        <div className="p-1.5 bg-gray-100 rounded-md border border-gray-200">
+                                          <FileText className="h-4 w-4 text-gray-600" />
+                                        </div>
+                                        <div>
+                                          <h3 className="text-base font-semibold text-gray-900">{subfolderInfo.label}</h3>
+                                          <p className="text-sm text-gray-500">{subfolderInfo.count} document{subfolderInfo.count !== 1 ? 's' : ''}</p>
+                                        </div>
+                                      </div>
+                                      <div className={`p-2 rounded-lg transition-all duration-300 ${isSubfolderExpanded ? 'bg-[#012C61]/10 rotate-180' : 'bg-gray-100'}`}>
+                                        <ChevronDown className="h-4 w-4 text-[#012C61]" />
                                       </div>
                                     </div>
-                                    {isSubfolderExpanded ? (
-                                      <ChevronDown className="h-4 w-4 text-gray-400" />
-                                    ) : (
-                                      <ChevronRight className="h-4 w-4 text-gray-400" />
-                                    )}
                                   </div>
-                                </div>
-                                
-                                {isSubfolderExpanded && (
-                                  <div className="px-4 pb-4">
-                                    <div className="space-y-3">
-                                      {subfolderInfo.documents.map(doc => (
-                                        <div key={doc.id} className="border border-gray-100 rounded-lg p-3 hover:shadow-sm transition-shadow bg-gray-50">
-                                          <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                              <div className="flex items-center mb-2">
-                                                {getTypeIcon(doc.type)}
-                                                <h4 className="text-sm font-medium text-gray-900 ml-2">{doc.title}</h4>
-                                                <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getTypeColor(doc.type)}`}>
-                                                  .{doc.type}
-                                                </span>
+                                  
+                                  {isSubfolderExpanded && (
+                                    <div className="px-4 pb-4 border-t border-gray-100 bg-white">
+                                      <div className="space-y-3 pt-4">
+                                        {subfolderInfo.documents.map((doc, docIndex) => (
+                                          <div 
+                                            key={doc.id} 
+                                            className="group relative bg-gradient-to-r from-white to-gray-50 border-2 border-gray-100 rounded-xl p-4 hover:border-[#012C61]/30 hover:shadow-lg transition-all duration-300 hover:scale-[1.02]"
+                                            style={{ animationDelay: `${(index * 50) + (subIndex * 30) + (docIndex * 20)}ms` }}
+                                          >
+                                            <div className="flex items-start justify-between gap-4">
+                                              <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                                                  <div className="p-1 bg-gray-100 rounded border border-gray-200">
+                                                    {getTypeIcon(doc.type)}
+                                                  </div>
+                                                  <h4 className="text-sm font-semibold text-gray-900 truncate">{doc.title}</h4>
+                                                  <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${getTypeColor(doc.type)} whitespace-nowrap`}>
+                                                    .{doc.type}
+                                                  </span>
+                                                </div>
+                                                
+                                                <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                                                  <div className="flex items-center gap-1.5">
+                                                    <Calendar className="h-3.5 w-3.5" />
+                                                    <span>{formatDate(doc.uploadDate)}</span>
+                                                  </div>
+                                                  <div className="flex items-center gap-1.5">
+                                                    <File className="h-3.5 w-3.5" />
+                                                    <span>{doc.fileSize}</span>
+                                                  </div>
+                                                </div>
                                               </div>
                                               
-                                              <div className="flex items-center space-x-3 text-xs text-gray-500 mb-2">
-                                                <div className="flex items-center">
-                                                  <Calendar className="h-3 w-3 mr-1" />
-                                                  <span>{formatDate(doc.uploadDate)}</span>
-                                                </div>
-                                                <div className="flex items-center">
-                                                  <File className="h-3 w-3 mr-1" />
-                                                  <span>{doc.fileSize}</span>
-                                                </div>
-                                              </div>
-                                            </div>
-                                            
-                                            <div className="ml-4">
                                               <button
-                                                onClick={async () => {
+                                                onClick={async (e) => {
+                                                  e.stopPropagation();
                                                   try {
                                                     const response = await fetch(`/api/documents/download?url=${encodeURIComponent(doc.downloadUrl)}`);
                                                     if (response.ok) {
@@ -379,25 +453,25 @@ export default function Documents() {
                                                     console.error('Download error:', error);
                                                   }
                                                 }}
-                                                className="flex items-center px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
+                                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#012C61] to-blue-600 text-white rounded-lg text-sm font-medium hover:from-[#014085] hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 whitespace-nowrap"
                                               >
-                                                <Download className="h-3 w-3 mr-1" />
+                                                <Download className="h-4 w-4" />
                                                 Download
                                               </button>
                                             </div>
                                           </div>
-                                        </div>
-                                      ))}
+                                        ))}
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </CardContent>
-                    )}
-                  </Card>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -405,15 +479,15 @@ export default function Documents() {
 
           {/* No Results */}
           {!isLoading && !error && filteredDocuments.length === 0 && (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No documents found</h3>
-                <p className="text-gray-500">
-                  Try adjusting your search terms or filters to find what you're looking for.
-                </p>
-              </CardContent>
-            </Card>
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-12 text-center">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full mb-6">
+                <FileText className="h-10 w-10 text-gray-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3 font-lemonMilkRegular">No documents found</h3>
+              <p className="text-gray-600 max-w-md mx-auto">
+                Try adjusting your search terms or filters to find what you're looking for.
+              </p>
+            </div>
           )}
         </div>
       </div>

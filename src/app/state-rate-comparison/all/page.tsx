@@ -24,6 +24,7 @@ import { useRequireSubscription } from "@/hooks/useRequireAuth";
 import clsx from 'clsx';
 import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
+// import StateRateTemplatesIcon from "@/app/components/StateRateTemplatesIcon"; // TEMPORARILY HIDDEN
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -742,6 +743,12 @@ export default function StatePaymentComparison() {
   const [providerTypes, setProviderTypes] = useState<string[]>([]);
   const [filterSetData, setFilterSetData] = useState<{ [index: number]: ServiceData[] }>({});
   const [selectedEntries, setSelectedEntries] = useState<{ [state: string]: ServiceData[] }>({});
+  // Store pending selections from template load (before data is fetched)
+  const [pendingSelectedEntries, setPendingSelectedEntries] = useState<{ [state: string]: any[] } | null>(null);
+  // Store pending stateSelectedForAverage from template load (before data is fetched)
+  const [pendingStateSelectedForAverage, setPendingStateSelectedForAverage] = useState<{ [state: string]: string[] } | null>(null);
+  // Flag to auto-trigger search after template load
+  const [shouldAutoSearch, setShouldAutoSearch] = useState(false);
   const [chartRefreshKey, setChartRefreshKey] = useState(0);
   // State to hold all states averages for All States mode
   const [allStatesAverages, setAllStatesAverages] = useState<{ state_name: string; avg_rate: number }[] | null>(null);
@@ -790,6 +797,78 @@ export default function StatePaymentComparison() {
   const formatText = (text: string | null | undefined) => {
     if (!text) return "-";
     return text.trim();
+  };
+
+  // Handler for loading templates
+  const handleLoadTemplate = async (templateData: {
+    selections: Record<string, string | null>;
+    filterSets: FilterSet[];
+    selectedTableRows: { [state: string]: string[] };
+    isAllStatesSelected: boolean;
+    selectedEntries?: { [state: string]: any[] };
+    stateSelectedForAverage?: { [state: string]: string[] }; // Array of row keys (will be converted to Sets)
+  }) => {
+    console.log('📥 Loading template and triggering search...');
+    
+    // Load selections
+    if (templateData.selections) {
+      setSelections(templateData.selections);
+    }
+
+    // Load filter sets
+    if (templateData.filterSets) {
+      setFilterSets(templateData.filterSets);
+    }
+
+    // Load table row selections
+    if (templateData.selectedTableRows) {
+      setSelectedTableRows(templateData.selectedTableRows);
+    }
+
+    // Load all states selection mode
+    if (templateData.isAllStatesSelected !== undefined) {
+      setIsAllStatesSelected(templateData.isAllStatesSelected);
+    }
+
+    // Load selected entries - store as pending until data is loaded
+    if (templateData.selectedEntries) {
+      setPendingSelectedEntries(templateData.selectedEntries);
+      // Don't set selectedEntries yet - wait for data to load
+    }
+
+    // Load stateSelectedForAverage (for All States mode) - store as pending until data loads
+    if (templateData.stateSelectedForAverage) {
+      setPendingStateSelectedForAverage(templateData.stateSelectedForAverage);
+      console.log(`✅ Loaded stateSelectedForAverage for ${Object.keys(templateData.stateSelectedForAverage).length} states (pending until data loads)`);
+    }
+
+    // Wait for React to process state updates, then trigger search directly
+    // Use a longer delay to ensure state is fully updated and handleSearch is ready
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Now call handleSearch directly - it will use the updated filterSets from state
+    console.log('🚀 Calling handleSearch directly after template load...');
+    
+    // Try multiple times to ensure handleSearch is ready
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (attempts < maxAttempts) {
+      if (handleSearchRef.current) {
+        console.log(`✅ handleSearchRef ready, calling search (attempt ${attempts + 1})`);
+        await handleSearchRef.current();
+        return; // Success, exit
+      }
+      attempts++;
+      if (attempts < maxAttempts) {
+        console.log(`⏳ handleSearchRef not ready, waiting... (attempt ${attempts}/${maxAttempts})`);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    // Final fallback - dispatch event
+    console.log('⚠️ handleSearchRef still not ready after all attempts, using event fallback');
+    window.dispatchEvent(new CustomEvent('triggerSearch'));
   };
 
   // Move handleTableRowSelection to top level
@@ -880,6 +959,44 @@ export default function StatePaymentComparison() {
     // Just initialize filters from the context
     extractFilters([]);
   }, [pendingSearch]);
+
+  // Auto-trigger search after template loads
+  useEffect(() => {
+    if (!shouldAutoSearch) return;
+    
+    // Check if filters are ready
+    const filterSet = filterSets[0];
+    if (!filterSet?.serviceCategory || !filterSet?.serviceCode) {
+      console.log('⏳ Waiting for filters to be set...', { 
+        hasServiceCategory: !!filterSet?.serviceCategory,
+        hasServiceCode: !!filterSet?.serviceCode 
+      });
+      return;
+    }
+    
+    console.log('🔄 Auto-triggering search after template load...', {
+      serviceCategory: filterSet.serviceCategory,
+      serviceCode: filterSet.serviceCode
+    });
+    setShouldAutoSearch(false);
+    
+    // Use a longer delay and try multiple approaches
+    const timer = setTimeout(() => {
+      console.log('🚀 Attempting to trigger search...');
+      
+      // Try direct call first if ref is ready
+      if (handleSearchRef.current) {
+        console.log('✅ handleSearchRef is ready, calling directly');
+        handleSearchRef.current();
+      } else {
+        console.log('⏳ handleSearchRef not ready, dispatching event...');
+        // Fallback to event
+        window.dispatchEvent(new CustomEvent('triggerSearch'));
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [shouldAutoSearch, filterSets]);
 
   // Update extractFilters to use filterOptions from context
   const extractFilters = (data: ServiceData[]) => {
@@ -2004,7 +2121,15 @@ export default function StatePaymentComparison() {
               if (!filterSet.states.includes(combo.state_name)) return false;
             }
             
-            if (filterSet.serviceCode && combo.service_code !== filterSet.serviceCode) return false;
+            // Handle multiple service codes (comma-separated)
+            if (filterSet.serviceCode) {
+              if (filterSet.serviceCode.includes(',')) {
+                const selectedCodes = filterSet.serviceCode.split(',').map(code => code.trim());
+                if (!selectedCodes.includes(combo.service_code?.trim() || '')) return false;
+              } else {
+                if (combo.service_code !== filterSet.serviceCode) return false;
+              }
+            }
             if (filterSet.serviceDescription && combo.service_description !== filterSet.serviceDescription) return false;
             if (filterSet.program && filterSet.program !== "-" && combo.program !== filterSet.program) return false;
             if (filterSet.locationRegion && filterSet.locationRegion !== "-" && combo.location_region !== filterSet.locationRegion) return false;
@@ -2815,6 +2940,7 @@ export default function StatePaymentComparison() {
     setSortOrder('default');
     setSelectedStateDetails(null);
     setSelectedEntries({});         // <-- Clear selected entries
+    setPendingSelectedEntries(null); // <-- Clear pending selections
     setClickedStates([]);          // <-- Clear clicked states
     setChartRefreshKey(k => k + 1); // <-- Force chart to re-render/reset
     
@@ -3026,8 +3152,19 @@ export default function StatePaymentComparison() {
     }
   }, [selections.service_category, selections.state_name, filterSets, refreshFilters]);
 
-  // Update the row selection handler to update selectedEntries and refresh chart
+  // Update the row selection handler to update selectedEntries, selectedTableRows, and refresh chart
   const handleRowSelection = (state: string, item: ServiceData) => {
+    // Create modifier key for selectedTableRows (same format as handleTableRowSelection)
+    const modifierKey = [
+      item.modifier_1?.trim().toUpperCase() || '',
+      item.modifier_2?.trim().toUpperCase() || '',
+      item.modifier_3?.trim().toUpperCase() || '',
+      item.modifier_4?.trim().toUpperCase() || '',
+      item.program?.trim().toUpperCase() || '',
+      item.location_region?.trim().toUpperCase() || ''
+    ].join('|');
+
+    // Update selectedEntries
     setSelectedEntries(prev => {
       const prevArr = prev[state] || [];
       // Check if already selected (by unique key)
@@ -3036,7 +3173,7 @@ export default function StatePaymentComparison() {
       let newArr;
       if (exists) {
         newArr = prevArr.filter(i => getRowKey(i) !== key);
-    } else {
+      } else {
         newArr = [...prevArr, item];
       }
       // If newArr is empty, remove the state key entirely
@@ -3046,9 +3183,148 @@ export default function StatePaymentComparison() {
       }
       return { ...prev, [state]: newArr };
     });
+
+    // Update selectedTableRows to keep it in sync
+    setSelectedTableRows(prev => {
+      const stateSelections = prev[state] || [];
+      const isSelected = stateSelections.includes(modifierKey);
+      const newSelections = isSelected
+        ? stateSelections.filter(key => key !== modifierKey)
+        : [...stateSelections, modifierKey];
+
+      // If newSelections is empty, remove the state key entirely
+      if (newSelections.length === 0) {
+        const { [state]: _, ...rest } = prev;
+        return rest;
+      }
+      return {
+        ...prev,
+        [state]: newSelections
+      };
+    });
+
     setChartRefreshKey(k => k + 1);
   };
 
+  // Match pending selected entries to loaded data after data is fetched
+  useEffect(() => {
+    if (!pendingSelectedEntries) return; // No pending selections
+    
+    // Get all loaded data (either from data or filterSetData)
+    const allLoadedData: ServiceData[] = [];
+    
+    if (!isAllStatesSelected && Object.keys(filterSetData).length > 0) {
+      // For individual states mode, use filterSetData
+      Object.values(filterSetData).forEach(stateData => {
+        if (Array.isArray(stateData)) {
+          allLoadedData.push(...stateData);
+        }
+      });
+    } else if (isAllStatesSelected && data.length > 0) {
+      // For all states mode, use data
+      allLoadedData.push(...data);
+    }
+    
+    // If no data loaded yet, wait
+    if (allLoadedData.length === 0) return;
+    
+    // Match pending entries to loaded data using row keys
+    const matchedEntries: { [state: string]: ServiceData[] } = {};
+    
+    Object.entries(pendingSelectedEntries).forEach(([state, savedEntries]) => {
+      if (!Array.isArray(savedEntries) || savedEntries.length === 0) return;
+      
+      const matched: ServiceData[] = [];
+      
+      savedEntries.forEach(savedEntry => {
+        // Create row key from saved entry
+        const savedKey = getRowKey(savedEntry as ServiceData);
+        
+        // Find matching entry in loaded data
+        const matchedEntry = allLoadedData.find(loadedItem => {
+          const loadedKey = getRowKey(loadedItem);
+          return loadedKey === savedKey;
+        });
+        
+        if (matchedEntry) {
+          matched.push(matchedEntry);
+        }
+      });
+      
+      if (matched.length > 0) {
+        matchedEntries[state] = matched;
+      }
+    });
+    
+    // Update selectedEntries with matched entries
+    if (Object.keys(matchedEntries).length > 0) {
+      setSelectedEntries(matchedEntries);
+      setChartRefreshKey(k => k + 1); // Refresh chart
+    }
+    
+    // Clear pending selections
+    setPendingSelectedEntries(null);
+  }, [data, filterSetData, pendingSelectedEntries, isAllStatesSelected]);
+
+  // Apply pending stateSelectedForAverage after data loads (for All States mode)
+  // This runs after search completes and data is loaded
+  useEffect(() => {
+    if (!isAllStatesSelected || data.length === 0 || !hasSearchedOnce) return;
+    if (!pendingStateSelectedForAverage) return;
+    
+    console.log('🔄 Applying pending stateSelectedForAverage after data load...');
+    
+    // Get all row keys from loaded data, grouped by state for accurate matching
+    const loadedRowKeysByState: { [state: string]: Set<string> } = {};
+    data.forEach(item => {
+      const state = item.state_name?.trim().toUpperCase();
+      if (state) {
+        if (!loadedRowKeysByState[state]) {
+          loadedRowKeysByState[state] = new Set();
+        }
+        loadedRowKeysByState[state].add(getRowKey(item));
+      }
+    });
+    
+    // Match pending selections to loaded data
+    const matchedSelections: { [state: string]: Set<string> } = {};
+    
+    Object.entries(pendingStateSelectedForAverage).forEach(([state, savedRowKeys]) => {
+      const stateUpper = state.toUpperCase();
+      const stateRowKeys = loadedRowKeysByState[stateUpper];
+      
+      if (!stateRowKeys) {
+        console.log(`⚠️ No data loaded for ${state}, skipping selections`);
+        return;
+      }
+      
+      const matchedSet = new Set<string>();
+      savedRowKeys.forEach(rowKey => {
+        if (stateRowKeys.has(rowKey)) {
+          matchedSet.add(rowKey);
+        } else {
+          console.log(`⚠️ Row key not found in loaded data for ${state}:`, rowKey.substring(0, 50) + '...');
+        }
+      });
+      
+      if (matchedSet.size > 0) {
+        matchedSelections[state] = matchedSet;
+        console.log(`✅ Matched ${matchedSet.size} out of ${savedRowKeys.length} selections for ${state}`);
+      } else {
+        console.log(`⚠️ No selections matched for ${state}`);
+      }
+    });
+    
+    // Apply matched selections
+    if (Object.keys(matchedSelections).length > 0) {
+      setStateSelectedForAverage(matchedSelections);
+      setChartRefreshKey(k => k + 1); // Refresh chart
+      console.log(`✅ Applied stateSelectedForAverage for ${Object.keys(matchedSelections).length} states`);
+    }
+    
+    // Clear pending selections
+    setPendingStateSelectedForAverage(null);
+  }, [data, isAllStatesSelected, hasSearchedOnce, pendingStateSelectedForAverage]);
 
   // Add filter options loading logic
   useEffect(() => {
@@ -3187,6 +3463,36 @@ export default function StatePaymentComparison() {
   const wrappedHandleServiceDescriptionChange = handleFilterChange(handleServiceDescriptionChange);
   const wrappedHandleProviderTypeChange = handleFilterChange(handleProviderTypeChange);
   const wrappedHandleDurationUnitChange = handleFilterChange(handleDurationUnitChange);
+
+  // Store handleSearch in a ref so we can call it from useEffect
+  const handleSearchRef = useRef<(() => Promise<void>) | null>(null);
+  
+  // Listen for auto-search trigger
+  useEffect(() => {
+    const handleTriggerSearch = () => {
+      console.log('📢 triggerSearch event received');
+      // Try multiple times with increasing delays
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      const trySearch = () => {
+        attempts++;
+        if (handleSearchRef.current) {
+          console.log(`🚀 Triggering auto-search from template load... (attempt ${attempts})`);
+          handleSearchRef.current();
+        } else if (attempts < maxAttempts) {
+          console.log(`⏳ handleSearchRef not ready, retrying... (attempt ${attempts}/${maxAttempts})`);
+          setTimeout(trySearch, 200);
+        } else {
+          console.error('❌ Failed to trigger auto-search after all attempts');
+        }
+      };
+      
+      setTimeout(trySearch, 100);
+    };
+    window.addEventListener('triggerSearch', handleTriggerSearch);
+    return () => window.removeEventListener('triggerSearch', handleTriggerSearch);
+  }, []);
 
   // Only fetch data when Search is clicked
   const handleSearch = async () => {
@@ -3478,7 +3784,11 @@ export default function StatePaymentComparison() {
         }
       }
       setChartRefreshKey(k => k + 1);
-      if (success) setHasSearchedOnce(true);
+      if (success) {
+        setHasSearchedOnce(true);
+        // Update ref after successful search
+        handleSearchRef.current = handleSearch;
+      }
     } catch (error) {
       console.error("Error fetching data on search:", error);
       setFetchError("Failed to fetch data. Please try again.");
@@ -3488,6 +3798,11 @@ export default function StatePaymentComparison() {
       setLoading(false);
     }
   };
+  
+  // Update handleSearch ref whenever handleSearch function changes
+  useEffect(() => {
+    handleSearchRef.current = handleSearch;
+  }, [filterSets, isAllStatesSelected]); // Dependencies that affect handleSearch behavior
 
   // Reset search state when key filters change to prevent showing stale chart data
   useEffect(() => {
@@ -3564,7 +3879,18 @@ export default function StatePaymentComparison() {
   const shouldRenderChart = !isInitialLoading && filterOptionsData && (hasSearchedOnce || !isAllStatesSelected);
 
   return (
-    <AppLayout activeTab="stateRateComparison">
+    <>
+      {/* StateRateTemplatesIcon - TEMPORARILY HIDDEN */}
+      {/* <StateRateTemplatesIcon
+        onLoadTemplate={handleLoadTemplate}
+        currentSelections={selections}
+        currentFilterSets={filterSets}
+        currentSelectedTableRows={selectedTableRows}
+        currentIsAllStatesSelected={isAllStatesSelected}
+        currentSelectedEntries={selectedEntries}
+        currentStateSelectedForAverage={stateSelectedForAverage}
+      /> */}
+      <AppLayout activeTab="stateRateComparison">
       <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         {/* Error Messages */}
         <div className="mb-4 sm:mb-8">
@@ -4407,6 +4733,7 @@ export default function StatePaymentComparison() {
           </>
         )}
       </div>
-    </AppLayout>
+      </AppLayout>
+    </>
   );
 }

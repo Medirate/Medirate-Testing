@@ -25,6 +25,7 @@ import {
   RecentRateChangesData,
   RecentRateChange
 } from "@/lib/enhanced-metrics";
+import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 interface RateChange {
   id: string;
@@ -302,15 +303,7 @@ export default function RecentRateChangesPage() {
 
   // Loading state
   if (auth.isLoading || auth.shouldRedirect) {
-    return (
-      <div className="loader-overlay">
-        <div className="cssloader">
-          <div className="sh1"></div>
-          <div className="sh2"></div>
-          <h4 className="lt">loading</h4>
-        </div>
-      </div>
-    );
+    return <LoaderOverlay />;
   }
 
   // Error state
@@ -525,59 +518,6 @@ export default function RecentRateChangesPage() {
         </div>
       </div>
 
-      {/* Custom CSS */}
-      <style jsx>{`
-        .loader-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100vw;
-          height: 100vh;
-          background: rgba(57,57,57,0.9);
-          z-index: 9999;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .cssloader {
-          padding-top: 0;
-        }
-        .sh1 {
-          width: 0;
-          height: 0;
-          border-style: solid;
-          border-width: 50px 50px 0 0;
-          border-color: #012C61 transparent transparent transparent;
-          margin: 0 auto;
-          animation: shk1 1s ease-in-out infinite normal;
-        }
-        .sh2 {
-          width: 0;
-          height: 0;
-          border-style: solid;
-          border-width: 0 0 50px 50px;
-          border-color: transparent transparent #3b82f6 transparent;
-          margin: -50px auto 0;
-          animation: shk2 1s ease-in-out infinite alternate;
-        }
-        @keyframes shk1 {
-          0% { transform: rotate(-360deg); }
-          100% {}
-        }
-        @keyframes shk2 {
-          0% { transform: rotate(360deg); }
-          100% {}
-        }
-        .lt {
-          color: #bdbdbd;
-          font-family: 'Roboto', 'Arial', sans-serif;
-          margin: 30px auto;
-          text-align: center;
-          font-weight: 100;
-          letter-spacing: 10px;
-          text-transform: lowercase;
-        }
-      `}</style>
     </AppLayout>
   );
 }

@@ -26,9 +26,20 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to fetch legislative updates" }, { status: 500 });
     }
 
+    // Fetch state plan amendments
+    const { data: statePlanAmendments, error: spaError } = await supabase
+      .from("state_plan_amendments")
+      .select("*");
+
+    if (spaError) {
+      console.error("Error fetching state plan amendments:", spaError);
+      return NextResponse.json({ error: "Failed to fetch state plan amendments" }, { status: 500 });
+    }
+
     return NextResponse.json({
       providerAlerts: providerAlerts || [],
-      bills: billsData || []
+      bills: billsData || [],
+      statePlanAmendments: statePlanAmendments || []
     });
 
   } catch (error) {

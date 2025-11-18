@@ -17,11 +17,12 @@ import {
   Legend,
 } from 'chart.js';
 
-import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
-import { useRouter } from "next/navigation";
+import { useProtectedPage } from "@/context/AuthContext";
 import type { Dispatch, SetStateAction } from 'react';
 import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
+// import HistoricalRatesTemplatesIcon from "@/app/components/HistoricalRatesTemplatesIcon"; // TEMPORARILY HIDDEN
+import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 interface ServiceData {
   state_name: string;
@@ -662,8 +663,7 @@ function formatDate(dateString: string | undefined): string {
 }
 
 export default function HistoricalRates() {
-  const { isAuthenticated, isLoading, user } = useKindeBrowserClient();
-  const router = useRouter();
+  const auth = useProtectedPage();
   
   // Add proper data state management
   const [data, setData] = useState<ServiceData[]>([]);
@@ -704,16 +704,7 @@ export default function HistoricalRates() {
     // This can be implemented later if needed for filter options
   };
 
-  const [isSubscriptionCheckComplete, setIsSubscriptionCheckComplete] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push("/api/auth/login");
-    } else if (isAuthenticated) {
-      checkSubscriptionAndSubUser();
-    }
-  }, [isAuthenticated, isLoading, router]);
+  // Auth is now handled by useProtectedPage hook
 
   // Add pagination state
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -721,7 +712,89 @@ export default function HistoricalRates() {
   const itemsPerPage: number = 50;
 
   // Keep only the states that are still needed
-  const [selectedEntry, setSelectedEntry] = useState<ServiceData | null>(null);
+  // Changed to array to support multiple selections
+  const [selectedEntries, setSelectedEntries] = useState<ServiceData[]>([]);
+  // Store pending selected entries from template load to match after filteredData updates
+  const [pendingSelectedEntriesForMatching, setPendingSelectedEntriesForMatching] = useState<ServiceData[]>([]);
+  
+  // Helper function to check if an entry is selected
+  const isEntrySelected = (entry: ServiceData): boolean => {
+    return selectedEntries.some(selected => 
+      selected.state_name === entry.state_name &&
+      selected.service_category === entry.service_category &&
+      selected.service_code === entry.service_code &&
+      selected.service_description === entry.service_description &&
+      selected.program === entry.program &&
+      selected.location_region === entry.location_region &&
+      selected.modifier_1 === entry.modifier_1 &&
+      selected.modifier_1_details === entry.modifier_1_details &&
+      selected.modifier_2 === entry.modifier_2 &&
+      selected.modifier_2_details === entry.modifier_2_details &&
+      selected.modifier_3 === entry.modifier_3 &&
+      selected.modifier_3_details === entry.modifier_3_details &&
+      selected.modifier_4 === entry.modifier_4 &&
+      selected.modifier_4_details === entry.modifier_4_details &&
+      selected.duration_unit === entry.duration_unit &&
+      selected.provider_type === entry.provider_type &&
+      selected.rate_effective_date === entry.rate_effective_date
+    );
+  };
+  
+  // Helper function to toggle entry selection
+  const toggleEntrySelection = (entry: ServiceData) => {
+    setSelectedEntries(prev => {
+      const isSelected = isEntrySelected(entry);
+      if (isSelected) {
+        // Remove from selection
+        return prev.filter(selected => 
+          !(selected.state_name === entry.state_name &&
+            selected.service_category === entry.service_category &&
+            selected.service_code === entry.service_code &&
+            selected.service_description === entry.service_description &&
+            selected.program === entry.program &&
+            selected.location_region === entry.location_region &&
+            selected.modifier_1 === entry.modifier_1 &&
+            selected.modifier_1_details === entry.modifier_1_details &&
+            selected.modifier_2 === entry.modifier_2 &&
+            selected.modifier_2_details === entry.modifier_2_details &&
+            selected.modifier_3 === entry.modifier_3 &&
+            selected.modifier_3_details === entry.modifier_3_details &&
+            selected.modifier_4 === entry.modifier_4 &&
+            selected.modifier_4_details === entry.modifier_4_details &&
+            selected.duration_unit === entry.duration_unit &&
+            selected.provider_type === entry.provider_type &&
+            selected.rate_effective_date === entry.rate_effective_date)
+        );
+      } else {
+        // Add to selection
+        return [...prev, entry];
+      }
+    });
+  };
+  
+  // Helper function to get the color for a selected entry
+  const getEntryColor = (entry: ServiceData): string | null => {
+    const index = selectedEntries.findIndex(selected => 
+      selected.state_name === entry.state_name &&
+      selected.service_category === entry.service_category &&
+      selected.service_code === entry.service_code &&
+      selected.service_description === entry.service_description &&
+      selected.program === entry.program &&
+      selected.location_region === entry.location_region &&
+      selected.modifier_1 === entry.modifier_1 &&
+      selected.modifier_1_details === entry.modifier_1_details &&
+      selected.modifier_2 === entry.modifier_2 &&
+      selected.modifier_2_details === entry.modifier_2_details &&
+      selected.modifier_3 === entry.modifier_3 &&
+      selected.modifier_3_details === entry.modifier_3_details &&
+      selected.modifier_4 === entry.modifier_4 &&
+      selected.modifier_4_details === entry.modifier_4_details &&
+      selected.duration_unit === entry.duration_unit &&
+      selected.provider_type === entry.provider_type &&
+      selected.rate_effective_date === entry.rate_effective_date
+    );
+    return index >= 0 ? chartColors[index % chartColors.length] : null;
+  };
   const [showRatePerHour, setShowRatePerHour] = useState(false);
   const [comment, setComment] = useState<string | null>(null);
   const [filterStep, setFilterStep] = useState(1);
@@ -730,6 +803,7 @@ export default function HistoricalRates() {
   const [isLoadingFilters, setIsLoadingFilters] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [dataQualityWarning, setDataQualityWarning] = useState<string | null>(null);
+  const [showDurationUnitWarning, setShowDurationUnitWarning] = useState(false);
 
   // Replace individual filter states with selections state
   const [selections, setSelections] = useState<Selections>({
@@ -744,8 +818,8 @@ export default function HistoricalRates() {
     modifier_1: null,
   });
 
-  // Update areFiltersApplied to use selections state
-  const areFiltersApplied = selections.service_category && selections.state_name && (selections.service_code || selections.service_description);
+  // Update areFiltersApplied to use selections state - duration_unit is now mandatory
+  const areFiltersApplied = selections.service_category && selections.state_name && (selections.service_code || selections.service_description) && selections.duration_unit;
 
   // Generic handler to update selections state
   const handleSelectionChange = (field: keyof Selections, value: string | null) => {
@@ -765,15 +839,21 @@ export default function HistoricalRates() {
     setSelections(newSelections);
     setCurrentPage(1); // Reset to first page when filter changes
     
-    // Clear selected entry and search state when filters change
-    setSelectedEntry(null);
+    // Clear selected entries and search state when filters change
+    setSelectedEntries([]);
     setHasSearched(false);
     setData([]);
+    
+    // Clear duration unit warning when duration_unit is selected
+    if (field === 'duration_unit' && value) {
+      setShowDurationUnitWarning(false);
+    }
   };
 
   const filteredData = useMemo(() => {
     // Only show data after a search has been performed
-    if (!hasSearched || !selections.service_category || !selections.state_name || (!selections.service_code && !selections.service_description)) return [];
+    // Duration unit is now mandatory
+    if (!hasSearched || !selections.service_category || !selections.state_name || (!selections.service_code && !selections.service_description) || !selections.duration_unit) return [];
 
     console.log('🏁 TABLE DATA SOURCE (filteredData) - Starting with raw data:', data.length, 'entries');
 
@@ -909,9 +989,53 @@ export default function HistoricalRates() {
     selections.duration_unit
   ]);
 
+  // Match pending selected entries to filteredData after search completes
   useEffect(() => {
-    // Filtered data processing
-  }, [filteredData]);
+    if (pendingSelectedEntriesForMatching.length === 0 || !hasSearched || filteredData.length === 0) return;
+
+    console.log('🔍 Matching pending selected entries to filteredData...', {
+      pendingEntriesCount: pendingSelectedEntriesForMatching.length,
+      filteredDataLength: filteredData.length
+    });
+
+    // Find matching entries in filteredData (this is what's displayed in the table)
+    const matchedEntries: ServiceData[] = [];
+    
+    pendingSelectedEntriesForMatching.forEach(pendingEntry => {
+      const matchingEntry = filteredData.find((item: ServiceData) => 
+        item.state_name === pendingEntry.state_name &&
+        item.service_category === pendingEntry.service_category &&
+        item.service_code === pendingEntry.service_code &&
+        item.service_description === pendingEntry.service_description &&
+        item.program === pendingEntry.program &&
+        item.location_region === pendingEntry.location_region &&
+        item.modifier_1 === pendingEntry.modifier_1 &&
+        item.modifier_1_details === pendingEntry.modifier_1_details &&
+        item.modifier_2 === pendingEntry.modifier_2 &&
+        item.modifier_2_details === pendingEntry.modifier_2_details &&
+        item.modifier_3 === pendingEntry.modifier_3 &&
+        item.modifier_3_details === pendingEntry.modifier_3_details &&
+        item.modifier_4 === pendingEntry.modifier_4 &&
+        item.modifier_4_details === pendingEntry.modifier_4_details &&
+        item.duration_unit === pendingEntry.duration_unit &&
+        item.provider_type === pendingEntry.provider_type &&
+        item.rate_effective_date === pendingEntry.rate_effective_date
+      );
+      
+      if (matchingEntry) {
+        matchedEntries.push(matchingEntry);
+      }
+    });
+    
+    if (matchedEntries.length > 0) {
+      console.log(`✅ Found ${matchedEntries.length} matching entries, setting selectedEntries`);
+      setSelectedEntries(matchedEntries);
+      setPendingSelectedEntriesForMatching([]); // Clear pending
+    } else {
+      console.log('⚠️ Could not find any matching entries in filteredData');
+      setPendingSelectedEntriesForMatching([]); // Clear pending even if not found
+    }
+  }, [filteredData, hasSearched, pendingSelectedEntriesForMatching]);
 
   const getVisibleColumns = useMemo(() => {
     const columns = {
@@ -969,123 +1093,7 @@ export default function HistoricalRates() {
     }
   };
 
-  // Define checkSubscriptionAndSubUser before using it
-  const checkSubscriptionAndSubUser = async () => {
-    const userEmail = user?.email ?? "";
-    const kindeUserId = user?.id ?? "";
-    if (!userEmail || !kindeUserId) return;
-
-    try {
-      // Check if the user is a sub-user
-      const { data: subUserData, error: subUserError } = await supabase
-        .from("subscription_users")
-        .select("sub_users")
-        .contains("sub_users", JSON.stringify([userEmail]));
-
-      if (subUserError) {
-        return;
-      }
-
-      if (subUserData && subUserData.length > 0) {
-        // Check if the user already exists in the User table
-        const { data: existingUser, error: fetchError } = await supabase
-          .from("User")
-          .select("Email")
-          .eq("Email", userEmail)
-          .single();
-
-        if (fetchError && fetchError.code !== "PGRST116") { // Ignore "no rows found" error
-          return;
-        }
-
-        if (existingUser) {
-          // User exists, update their role to "sub-user"
-          const { error: updateError } = await supabase
-            .from("User")
-            .update({ Role: "sub-user", UpdatedAt: new Date().toISOString() })
-            .eq("Email", userEmail);
-
-          if (updateError) {
-            // Error handling
-          }
-        } else {
-          // User does not exist, insert them as a sub-user
-          const { error: insertError } = await supabase
-            .from("User")
-            .insert({
-              KindeUserID: kindeUserId,
-              Email: userEmail,
-              Role: "sub-user",
-              UpdatedAt: new Date().toISOString(),
-            });
-
-          if (insertError) {
-            // Error handling
-          }
-        }
-
-        // Allow sub-user to access the dashboard
-        setIsSubscriptionCheckComplete(true);
-        return;
-      }
-
-      // If not a sub-user, check for an active subscription
-      const response = await fetch("/api/stripe/subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: userEmail }),
-      });
-
-      const data = await response.json();
-      if (data.error || !data.status || data.status !== "active") {
-        router.push("/subscribe");
-      } else {
-        setIsSubscriptionCheckComplete(true);
-      }
-    } catch (error) {
-      router.push("/subscribe");
-    }
-  };
-
-  // Add periodic authentication check for long-running sessions
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const checkAuthStatus = async () => {
-      try {
-        const response = await fetch('/api/auth-check');
-        if (response.status === 401) {
-          router.push("/api/auth/login");
-        }
-      } catch (error) {
-        // Error handling
-      }
-    };
-
-    const authCheckInterval = setInterval(checkAuthStatus, 5 * 60 * 1000);
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden && isAuthenticated) {
-        checkAuthStatus();
-        
-        if (hasSearched && !authError && areFiltersApplied) {
-          // Refresh data if needed
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      clearInterval(authCheckInterval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isAuthenticated, router, hasSearched, authError, areFiltersApplied]);
-
-  // Now the useEffect can safely use checkSubscriptionAndSubUser
-  useEffect(() => {
-    checkSubscriptionAndSubUser();
-  }, [router]);
+  // Auth is now handled by useProtectedPage hook - no need for manual checks
 
   // Move all useEffect hooks here, before any conditional returns
   useEffect(() => {
@@ -1167,9 +1175,11 @@ export default function HistoricalRates() {
     handleSelectionChange('service_description', desc);
   };
 
-  // Add useEffect for pagination
+  // Remove auto-search on filter changes - user must click Search button
+  // Only auto-fetch when page changes (pagination)
   useEffect(() => {
-    if (areFiltersApplied) {
+    // Only fetch if we've already searched (hasSearched is true) and page changes
+    if (hasSearched && areFiltersApplied) {
       const filters: Record<string, string> = {};
       if (selections.service_category) filters.service_category = selections.service_category;
       if (selections.state_name) filters.state_name = selections.state_name;
@@ -1189,7 +1199,7 @@ export default function HistoricalRates() {
         }
       });
     }
-  }, [currentPage, areFiltersApplied, selections, itemsPerPage]);
+  }, [currentPage, hasSearched]); // Only depend on currentPage and hasSearched, not selections
 
   // Update resetFilters to use selections state
   const resetFilters = async () => {
@@ -1204,15 +1214,16 @@ export default function HistoricalRates() {
       duration_unit: null,
       modifier_1: null,
     });
-    setSelectedEntry(null);
+    setSelectedEntries([]);
+    setPendingSelectedEntriesForMatching([]);
     setCurrentPage(1);
     setTotalCount(0);
     setData([]);
     setError(null);
     setLocalError(null);
-    setAuthError(null);
     setHasSearched(false);
     setComment(null);
+    setShowDurationUnitWarning(false);
     if (typeof refreshFilters === 'function') {
       await refreshFilters();
     }
@@ -1229,175 +1240,207 @@ export default function HistoricalRates() {
     return `$${numericRate.toFixed(2)}`;
   };
 
+  // Color palette for multiple lines
+  const chartColors = [
+    '#3b82f6', // Blue
+    '#ef4444', // Red
+    '#10b981', // Green
+    '#f59e0b', // Amber
+    '#8b5cf6', // Purple
+    '#ec4899', // Pink
+    '#06b6d4', // Cyan
+    '#f97316', // Orange
+    '#84cc16', // Lime
+    '#6366f1', // Indigo
+  ];
+
   const getGraphData = useMemo(() => {
-    if (!selectedEntry) return { xAxis: [], series: [] };
+    if (selectedEntries.length === 0) return { xAxis: [], series: [] };
 
-    console.log('📊 CHART - Generating chart for:', selectedEntry.service_description, 'Rate:', selectedEntry.rate);
+    console.log('📊 CHART - Generating chart for', selectedEntries.length, 'selected entries');
 
-    const filteredEntries = data.filter((item: ServiceData) => 
-      item.state_name === selectedEntry.state_name &&
-      item.service_category === selectedEntry.service_category &&
-      (() => {
-        // Handle multiple service codes for chart filtering
-        if (selectedEntry.service_code && selectedEntry.service_code.includes(',')) {
-          const selectedCodes = selectedEntry.service_code.split(',').map(code => code.trim());
-          return selectedCodes.includes(item.service_code?.trim() || '');
-        } else {
-          return item.service_code === selectedEntry.service_code;
+    // Process each selected entry to create a series
+    const allSeries: any[] = [];
+    const allDates = new Set<string>();
+
+    selectedEntries.forEach((selectedEntry, entryIndex) => {
+      const filteredEntries = data.filter((item: ServiceData) => 
+        item.state_name === selectedEntry.state_name &&
+        item.service_category === selectedEntry.service_category &&
+        (() => {
+          // Handle multiple service codes for chart filtering
+          if (selectedEntry.service_code && selectedEntry.service_code.includes(',')) {
+            const selectedCodes = selectedEntry.service_code.split(',').map(code => code.trim());
+            return selectedCodes.includes(item.service_code?.trim() || '');
+          } else {
+            return item.service_code === selectedEntry.service_code;
+          }
+        })() &&
+        item.service_description === selectedEntry.service_description &&
+        item.program === selectedEntry.program &&
+        item.location_region === selectedEntry.location_region &&
+        item.modifier_1 === selectedEntry.modifier_1 &&
+        item.modifier_1_details === selectedEntry.modifier_1_details &&
+        item.modifier_2 === selectedEntry.modifier_2 &&
+        item.modifier_2_details === selectedEntry.modifier_2_details &&
+        item.modifier_3 === selectedEntry.modifier_3 &&
+        item.modifier_3_details === selectedEntry.modifier_3_details &&
+        item.modifier_4 === selectedEntry.modifier_4 &&
+        item.modifier_4_details === selectedEntry.modifier_4_details &&
+        item.duration_unit === selectedEntry.duration_unit &&
+        item.provider_type === selectedEntry.provider_type
+      );
+
+      console.log(`📊 CHART - Processing entry ${entryIndex + 1}/${selectedEntries.length}:`, {
+        service_description: selectedEntry.service_description,
+        rate: selectedEntry.rate,
+        date: selectedEntry.rate_effective_date,
+        program: selectedEntry.program,
+        location_region: selectedEntry.location_region,
+        modifier_1: selectedEntry.modifier_1,
+        provider_type: selectedEntry.provider_type,
+        duration_unit: selectedEntry.duration_unit
+      });
+
+      // Sort entries by date
+      const sortedEntries = filteredEntries.sort((a, b) => {
+        const dateA = parseDateString(a.rate_effective_date);
+        const dateB = parseDateString(b.rate_effective_date);
+        return dateA.getTime() - dateB.getTime();
+      });
+
+      // Group entries by date to detect and resolve duplicates
+      const entriesByDate = sortedEntries.reduce((acc, entry) => {
+        const date = entry.rate_effective_date;
+        if (!acc[date]) {
+          acc[date] = [];
         }
-      })() &&
-      item.service_description === selectedEntry.service_description &&
-      item.program === selectedEntry.program &&
-      item.location_region === selectedEntry.location_region &&
-      item.modifier_1 === selectedEntry.modifier_1 &&
-      item.modifier_1_details === selectedEntry.modifier_1_details &&
-      item.modifier_2 === selectedEntry.modifier_2 &&
-      item.modifier_2_details === selectedEntry.modifier_2_details &&
-      item.modifier_3 === selectedEntry.modifier_3 &&
-      item.modifier_3_details === selectedEntry.modifier_3_details &&
-      item.modifier_4 === selectedEntry.modifier_4 &&
-      item.modifier_4_details === selectedEntry.modifier_4_details &&
-      item.duration_unit === selectedEntry.duration_unit &&
-      item.provider_type === selectedEntry.provider_type
-    );
-    
-    console.log('📊 CHART - Before initial sort, filtered entries:', filteredEntries.map(e => ({ 
-      date: e.rate_effective_date, 
-      parsed: parseDateString(e.rate_effective_date).toISOString(),
-      rate: e.rate 
-    })));
-    
-    const entries = filteredEntries.sort((a, b) => {
-      const dateA = parseDateString(a.rate_effective_date);
-      const dateB = parseDateString(b.rate_effective_date);
-      const result = dateA.getTime() - dateB.getTime();
-      console.log(`📊 CHART - Initial sorting: ${a.rate_effective_date} (${dateA.toISOString()}) vs ${b.rate_effective_date} (${dateB.toISOString()}) = ${result}`);
-      return result;
+        acc[date].push(entry);
+        return acc;
+      }, {} as Record<string, ServiceData[]>);
+
+      // Detect duplicates and choose the highest rate for each date
+      const deduplicatedEntries: ServiceData[] = [];
+      Object.entries(entriesByDate).forEach(([date, dateEntries]) => {
+        if (dateEntries.length > 1) {
+          // Choose the entry with the highest rate
+          const highestRateEntry = dateEntries.reduce((highest, current) => {
+            const highestRate = parseRate(highest.rate);
+            const currentRate = parseRate(current.rate);
+            return currentRate > highestRate ? current : highest;
+          });
+          deduplicatedEntries.push(highestRateEntry);
+        } else {
+          deduplicatedEntries.push(dateEntries[0]);
+        }
+      });
+
+      // Sort the deduplicated entries by date
+      const finalEntries = deduplicatedEntries.sort((a, b) => {
+        const dateA = parseDateString(a.rate_effective_date);
+        const dateB = parseDateString(b.rate_effective_date);
+        return dateA.getTime() - dateB.getTime();
+      });
+
+      // Collect all dates
+      finalEntries.forEach(entry => {
+        allDates.add(entry.rate_effective_date);
+      });
+
+      // Create series data for this entry
+      const seriesData = finalEntries.map(entry => {
+        const rateValue = parseRate(entry.rate);
+        return {
+          value: rateValue,
+          displayValue: null,
+          state: entry.state_name,
+          serviceCode: entry.service_code,
+          program: entry.program,
+          locationRegion: entry.location_region,
+          durationUnit: entry.duration_unit,
+          date: entry.rate_effective_date,
+          modifier1: entry.modifier_1,
+          modifier1Details: entry.modifier_1_details,
+          modifier2: entry.modifier_2,
+          modifier2Details: entry.modifier_2_details,
+          modifier3: entry.modifier_3,
+          modifier3Details: entry.modifier_3_details,
+          modifier4: entry.modifier_4,
+          modifier4Details: entry.modifier_4_details,
+          entryIndex, // Track which entry this belongs to
+        };
+      });
+
+      // Create a label for this series
+      const seriesLabel = [
+        selectedEntry.state_name,
+        selectedEntry.service_code,
+        selectedEntry.program || '-',
+        selectedEntry.location_region || '-',
+        selectedEntry.provider_type || '-',
+        selectedEntry.modifier_1 || '-'
+      ].filter(Boolean).join(' | ');
+
+      allSeries.push({
+        name: seriesLabel,
+        data: seriesData,
+        type: 'line',
+        smooth: false,
+        color: chartColors[entryIndex % chartColors.length],
+        itemStyle: {
+          color: chartColors[entryIndex % chartColors.length]
+        },
+        lineStyle: {
+          width: 2
+        }
+      });
     });
 
-    console.log('📊 CHART - Selected Entry for filtering:', {
-      service_description: selectedEntry.service_description,
-      rate: selectedEntry.rate,
-      date: selectedEntry.rate_effective_date,
-      program: selectedEntry.program,
-      location_region: selectedEntry.location_region,
-      modifier_1: selectedEntry.modifier_1,
-      provider_type: selectedEntry.provider_type,
-      duration_unit: selectedEntry.duration_unit
+    // Create unified xAxis with all dates from all series
+    const sortedDates = Array.from(allDates).sort((a, b) => {
+      const dateA = parseDateString(a);
+      const dateB = parseDateString(b);
+      return dateA.getTime() - dateB.getTime();
     });
 
-    console.log('📊 CHART - Found', entries.length, 'matching entries (before deduplication)');
-    console.log('📊 CHART - All entries:', entries.map(e => ({ 
-      rate: e.rate, 
-      date: e.rate_effective_date,
-      service_code: e.service_code 
-    })));
-    
-    // Group entries by date to detect and resolve duplicates
-    const entriesByDate = entries.reduce((acc, entry) => {
-      const date = entry.rate_effective_date;
-      if (!acc[date]) {
-        acc[date] = [];
-      }
-      acc[date].push(entry);
-      return acc;
-    }, {} as Record<string, ServiceData[]>);
-
-    // Detect duplicates and choose the highest rate for each date
-    const deduplicatedEntries: ServiceData[] = [];
-    let hasDuplicates = false;
-    
-    Object.entries(entriesByDate).forEach(([date, dateEntries]) => {
-      if (dateEntries.length > 1) {
-        hasDuplicates = true;
-        console.log(`⚠️ DUPLICATE DETECTED for date ${date}:`, dateEntries.map(e => `$${e.rate}`).join(', '));
-        // Choose the entry with the highest rate
-        const highestRateEntry = dateEntries.reduce((highest, current) => {
-          const highestRate = parseRate(highest.rate);
-          const currentRate = parseRate(current.rate);
-          return currentRate > highestRate ? current : highest;
-        });
-        deduplicatedEntries.push(highestRateEntry);
-        console.log(`✅ Using highest rate: $${highestRateEntry.rate} for ${date}`);
-      } else {
-        deduplicatedEntries.push(dateEntries[0]);
-      }
-    });
-
-    // Sort the deduplicated entries by date
-    console.log('📊 CHART - Before sorting, entries:', deduplicatedEntries.map(e => ({ 
-      date: e.rate_effective_date, 
-      parsed: parseDateString(e.rate_effective_date).toISOString(),
-      rate: e.rate 
-    })));
-    
-    const finalEntries = deduplicatedEntries.sort((a, b) => {
-      const dateA = parseDateString(a.rate_effective_date);
-      const dateB = parseDateString(b.rate_effective_date);
-      const result = dateA.getTime() - dateB.getTime();
-      console.log(`📊 CHART - Sorting: ${a.rate_effective_date} (${dateA.toISOString()}) vs ${b.rate_effective_date} (${dateB.toISOString()}) = ${result}`);
-      return result;
-    });
-
-    console.log('📊 CHART - After sorting, final entries:', finalEntries.map(e => ({ 
-      date: e.rate_effective_date, 
-      parsed: parseDateString(e.rate_effective_date).toISOString(),
-      rate: e.rate 
-    })));
-    
-    console.log('📊 CHART - After deduplication:', finalEntries.length, 'entries');
-    if (hasDuplicates) {
-      console.log('⚠️ Data quality issue detected: Multiple rates found for the same date. Using highest rate for each date.');
-      setDataQualityWarning('Data quality issue detected: Multiple rates found for the same effective date. Chart shows the highest rate for each date.');
-    } else {
-      setDataQualityWarning(null);
+    // Add today if needed
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+    if (sortedDates.length > 0 && formatDate(sortedDates[sortedDates.length - 1]) !== todayStr) {
+      sortedDates.push(todayStr);
     }
 
-    let xAxis = finalEntries.map(entry => entry.rate_effective_date);
-    let series = finalEntries.map(entry => {
-      const rateValue = parseRate(entry.rate);
-      const durationUnit = entry.duration_unit?.toUpperCase();
-      let value = rateValue;
-      let displayValue: string | null = null;
-
-      // Use actual rate value without any conversion
-
-      return {
-        value: displayValue ? null : value,
-        displayValue,
-        state: entry.state_name,
-        serviceCode: entry.service_code,
-        program: entry.program,
-        locationRegion: entry.location_region,
-        durationUnit: entry.duration_unit,
-        date: entry.rate_effective_date,
-        modifier1: entry.modifier_1,
-        modifier1Details: entry.modifier_1_details,
-        modifier2: entry.modifier_2,
-        modifier2Details: entry.modifier_2_details,
-        modifier3: entry.modifier_3,
-        modifier3Details: entry.modifier_3_details,
-        modifier4: entry.modifier_4,
-        modifier4Details: entry.modifier_4_details
-      };
+    // Map each series data to match the unified xAxis dates
+    const mappedSeries = allSeries.map(series => {
+      const dataMap = new Map(series.data.map((d: any) => [d.date, d]));
+      let lastValue: any = null;
+      const mappedData: any[] = [];
+      
+      sortedDates.forEach(date => {
+        const existingData = dataMap.get(date) as any;
+        if (existingData && existingData.value !== null && existingData.value !== undefined) {
+          lastValue = existingData;
+          mappedData.push(existingData);
+        } else if (lastValue && lastValue.value !== null && lastValue.value !== undefined) {
+          // Forward fill: use the last known value for missing dates
+          mappedData.push({ 
+            ...lastValue, 
+            value: lastValue.value, 
+            date,
+            // Mark as forward-filled for potential styling
+            isForwardFilled: true
+          });
+        }
+        // If no previous data exists, skip this date for this series
+        // (don't add anything, creating a gap in the line)
+      });
+      
+      return { ...series, data: mappedData };
     });
 
-    // Add a point for today if latest date is not today (ignore time)
-    if (series.length > 0) {
-      const latestDate = parseDateString(xAxis[xAxis.length - 1]);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayStr = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
-      // Only add if the latest date string is not today's string (MM/DD/YYYY)
-      if (formatDate(xAxis[xAxis.length - 1]) !== todayStr) {
-        xAxis = [...xAxis, todayStr];
-        const last = series[series.length - 1];
-        series = [...series, { ...last, date: todayStr }];
-      }
-    }
-
-    return { xAxis, series };
-  }, [selectedEntry, data, showRatePerHour]);
+    return { xAxis: sortedDates, series: mappedSeries };
+  }, [selectedEntries, data, showRatePerHour]);
 
   // Derived loading state for service code options
   const serviceCodeOptionsLoading =
@@ -1455,17 +1498,9 @@ export default function HistoricalRates() {
     loadUltraFilterOptions();
   }, []);
 
-  // Don't render anything until the subscription check is complete
-  if (isLoading || !isSubscriptionCheckComplete) {
-    return (
-      <div className="loader-overlay">
-        <div className="cssloader">
-          <div className="sh1"></div>
-          <div className="sh2"></div>
-          <h4 className="lt">loading</h4>
-        </div>
-      </div>
-    );
+  // Use LoaderOverlay component for consistent loading animation
+  if (auth.isLoading || auth.shouldRedirect) {
+    return <LoaderOverlay />;
   }
 
   // Add available options variables like dashboard
@@ -1479,26 +1514,62 @@ export default function HistoricalRates() {
   const availableDurationUnits = getAvailableOptionsForFilter('duration_unit', selections, filterOptionsData) as string[];
   const availableModifiers = getAvailableOptionsForFilter('modifier_1', selections, filterOptionsData) as string[];
 
+  // Handler for loading templates
+  const handleLoadTemplate = async (templateData: {
+    selections: Record<string, string | null>;
+    selectedEntries?: ServiceData[];
+  }) => {
+    console.log('📥 Loading template and triggering search...');
+    
+    // Load selections
+    if (templateData.selections) {
+      setSelections(templateData.selections);
+    }
+
+    // Wait for React to process state updates, then trigger search
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Trigger search by calling refreshData with the loaded selections
+    const loadedSelections = templateData.selections;
+    if (loadedSelections.service_category && loadedSelections.state_name && (loadedSelections.service_code || loadedSelections.service_description)) {
+      const filters: Record<string, string> = {};
+      if (loadedSelections.service_category) filters.service_category = loadedSelections.service_category;
+      if (loadedSelections.state_name) filters.state_name = loadedSelections.state_name;
+      if (loadedSelections.service_code) filters.service_code = loadedSelections.service_code;
+      if (loadedSelections.service_description) filters.service_description = loadedSelections.service_description;
+      if (loadedSelections.program) filters.program = loadedSelections.program;
+      if (loadedSelections.location_region) filters.location_region = loadedSelections.location_region;
+      if (loadedSelections.provider_type) filters.provider_type = loadedSelections.provider_type;
+      if (loadedSelections.duration_unit) filters.duration_unit = loadedSelections.duration_unit;
+      if (loadedSelections.modifier_1) filters.modifier_1 = loadedSelections.modifier_1;
+      filters.page = String(currentPage);
+      filters.itemsPerPage = String(itemsPerPage);
+      
+      console.log('🚀 Calling refreshData with template filters...');
+      const result = await refreshData(filters);
+      
+      // After data loads, set the selected entries if they exist
+      // We need to wait for filteredData to be computed, then match against it
+      if (templateData.selectedEntries && templateData.selectedEntries.length > 0) {
+        // Wait for filteredData to update (it depends on data and selections)
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Set pending entries to be matched in useEffect
+        setPendingSelectedEntriesForMatching(templateData.selectedEntries);
+      }
+    }
+  };
+
   return (
     <AppLayout activeTab="historicalRates">
+      {/* HistoricalRatesTemplatesIcon - TEMPORARILY HIDDEN */}
+      {/* <HistoricalRatesTemplatesIcon
+        onLoadTemplate={handleLoadTemplate}
+        currentSelections={selections}
+        currentSelectedEntries={selectedEntries}
+      /> */}
       <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         <ErrorMessage error={error} />
-        {authError && (
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
-            <div className="flex items-center">
-              <div className="h-5 w-5 text-yellow-500 mr-2">⚠️</div>
-              <div>
-                <p className="text-yellow-700 font-medium">{authError}</p>
-                <button
-                  onClick={() => router.push('/api/auth/login')}
-                  className="mt-2 px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition-colors text-sm"
-                >
-                  Sign In Again
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 sm:mb-8">
           <h1 className="text-xl sm:text-3xl md:text-4xl text-[#012C61] font-lemonMilkRegular uppercase mb-3 sm:mb-0">
@@ -1670,9 +1741,9 @@ export default function HistoricalRates() {
                         <button onClick={() => handleSelectionChange('provider_type', null)} className="text-xs text-blue-500 hover:underline mt-1">Clear</button>
                       )}
                     </div>
-                    {/* Duration Unit */}
+                    {/* Duration Unit - Mandatory */}
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">Duration Unit</label>
+                      <label className="text-sm font-medium text-gray-700">Duration Unit <span className="text-red-500">*</span></label>
                       <Select
                         instanceId="duration_unit_select"
                         options={getDropdownOptions(availableDurationUnits, false)}
@@ -1680,13 +1751,12 @@ export default function HistoricalRates() {
                         onChange={(options) => handleSelectionChange('duration_unit', options ? options.map(opt => opt.value).join(',') : null)}
                         placeholder="Select Duration Unit"
                         isMulti
-                        isClearable
                         isDisabled={!selections.service_category || !selections.state_name || availableDurationUnits.length === 0}
                         className="react-select-container"
                         classNamePrefix="react-select"
                       />
-                      {selections.duration_unit && (
-                        <button onClick={() => handleSelectionChange('duration_unit', null)} className="text-xs text-blue-500 hover:underline mt-1">Clear</button>
+                      {showDurationUnitWarning && !selections.duration_unit && (
+                        <div className="text-xs text-red-500 mt-1">Duration unit is required</div>
                       )}
                     </div>
                     {/* Modifier */}
@@ -1733,6 +1803,15 @@ export default function HistoricalRates() {
                   <div className="mt-6 flex items-center justify-end space-x-4">
                     <button 
                       onClick={async () => {
+                        // Check if duration_unit is missing
+                        if (!selections.duration_unit) {
+                          setShowDurationUnitWarning(true);
+                          return;
+                        }
+                        
+                        // Clear warning if duration_unit is present
+                        setShowDurationUnitWarning(false);
+                        
                         if (areFiltersApplied) {
                           setHasSearched(true);
                           const filters: Record<string, string> = {};
@@ -1750,7 +1829,7 @@ export default function HistoricalRates() {
                           await refreshData(filters);
                         }
                       }}
-                      disabled={!areFiltersApplied || loading} 
+                      disabled={loading} 
                       className="px-6 py-2 text-sm bg-[#012C61] text-white rounded-lg hover:bg-blue-800 disabled:bg-gray-400 transition-colors"
                     >
                       {loading ? 'Searching...' : 'Search'}
@@ -1774,7 +1853,7 @@ export default function HistoricalRates() {
               </div>
             )}
 
-            {selectedEntry && (
+            {selectedEntries.length > 0 && (
               <>
                 {comment && (
                   <div className="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-200">
@@ -1785,13 +1864,23 @@ export default function HistoricalRates() {
                 )}
 
                 <div className="p-6 bg-white rounded-xl shadow-lg">
-                  <h2 className="text-xl font-semibold mb-4 text-gray-800">Rate History</h2>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold text-gray-800">Rate History Comparison</h2>
+                    {selectedEntries.length > 0 && (
+                      <button
+                        onClick={() => setSelectedEntries([])}
+                        className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                      >
+                        Clear All Selections
+                      </button>
+                    )}
+                  </div>
                   
                   {/* Helpful explanation */}
                   <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-700">
-                      <strong>📊 Chart Explanation:</strong> This chart shows how the rate for <strong>"{selectedEntry.service_description}"</strong> has changed over time. 
-                      Each point represents a different effective date when the rate was updated.
+                      <strong>📊 Chart Explanation:</strong> This chart shows rate history comparison for <strong>{selectedEntries.length}</strong> selected {selectedEntries.length === 1 ? 'entry' : 'entries'}. 
+                      Each line represents a different rate configuration. Click on table rows to add more comparisons.
                     </p>
                   </div>
                   
@@ -1799,31 +1888,84 @@ export default function HistoricalRates() {
                     <ReactECharts
                       option={{
                         tooltip: {
-                          trigger: 'axis',
+                          trigger: 'item',
                           formatter: (params: any) => {
-                            const data = params[0].data;
-                            if (data.displayValue) {
-                              return data.displayValue;
-                            }
-                            const rate = data.value ? `$${data.value.toFixed(2)}` : '-';
+                            if (!params || !params.data) return '';
                             
-                            const modifiers = [
-                              data.modifier1 ? `${data.modifier1}${data.modifier1Details ? ` - ${data.modifier1Details}` : ''}` : null,
-                              data.modifier2 ? `${data.modifier2}${data.modifier2Details ? ` - ${data.modifier2Details}` : ''}` : null,
-                              data.modifier3 ? `${data.modifier3}${data.modifier3Details ? ` - ${data.modifier3Details}` : ''}` : null,
-                              data.modifier4 ? `${data.modifier4}${data.modifier4Details ? ` - ${data.modifier4Details}` : ''}` : null
-                            ].filter(Boolean).join('<br>');
+                            const data = params.data;
+                            if (data.value === null || data.value === undefined) return '';
+                            
+                            // Check if there are other points overlapping at this exact position (same date and same rate)
+                            const currentDate = data.date;
+                            const currentRate = data.value;
+                            
+                            // Find all series that have a point at this exact date and rate
+                            const overlappingPoints: any[] = [];
+                            getGraphData.series.forEach((series: any) => {
+                              const point = series.data.find((d: any) => 
+                                d.date === currentDate && 
+                                d.value !== null && 
+                                d.value !== undefined &&
+                                Math.abs(d.value - currentRate) < 0.01 // Allow small floating point differences
+                              );
+                              if (point) {
+                                overlappingPoints.push({
+                                  series: series,
+                                  data: point,
+                                  color: series.color || series.itemStyle?.color
+                                });
+                              }
+                            });
+                            
+                            // If only one point (no overlap), show just that one
+                            if (overlappingPoints.length <= 1) {
+                              const rate = data.value ? `$${data.value.toFixed(2)}` : '-';
+                              const modifiers = [
+                                data.modifier1 ? `${data.modifier1}${data.modifier1Details ? ` - ${data.modifier1Details}` : ''}` : null,
+                                data.modifier2 ? `${data.modifier2}${data.modifier2Details ? ` - ${data.modifier2Details}` : ''}` : null,
+                                data.modifier3 ? `${data.modifier3}${data.modifier3Details ? ` - ${data.modifier3Details}` : ''}` : null,
+                                data.modifier4 ? `${data.modifier4}${data.modifier4Details ? ` - ${data.modifier4Details}` : ''}` : null
+                              ].filter(Boolean).join('<br>');
 
-                            return `
-                              <b>State:</b> ${data.state || '-'}<br>
-                              <b>Service Code:</b> ${data.serviceCode || '-'}<br>
-                              <b>Program:</b> ${data.program || '-'}<br>
-                              <b>Location/Region:</b> ${data.locationRegion || '-'}<br>
-                              <b>${showRatePerHour ? 'Hourly Equivalent Rate' : 'Rate Per Base Unit'}:</b> ${rate}<br>
-                              <b>Duration Unit:</b> ${data.durationUnit || '-'}<br>
-                              <b>Effective Date:</b> ${formatDate(data.date) || '-'}<br>
-                              ${modifiers ? `<b>Modifiers:</b><br>${modifiers}` : ''}
-                            `;
+                              return `
+                                <b style="color: ${params.color};">${params.seriesName}</b><br>
+                                <b>Date:</b> ${formatDate(data.date) || '-'}<br>
+                                <b>Rate:</b> ${rate}<br>
+                                <b>State:</b> ${data.state || '-'}<br>
+                                <b>Service Code:</b> ${data.serviceCode || '-'}<br>
+                                <b>Program:</b> ${data.program || '-'}<br>
+                                <b>Location/Region:</b> ${data.locationRegion || '-'}<br>
+                                <b>Duration Unit:</b> ${data.durationUnit || '-'}<br>
+                                ${modifiers ? `<b>Modifiers:</b><br>${modifiers}` : ''}
+                              `;
+                            }
+                            
+                            // Multiple overlapping points - show all of them
+                            let tooltip = `<b>Date:</b> ${formatDate(currentDate) || '-'}<br><b>Rate:</b> $${currentRate.toFixed(2)}<br><br>`;
+                            
+                            overlappingPoints.forEach((overlap, index) => {
+                              const pointData = overlap.data;
+                              const modifiers = [
+                                pointData.modifier1 ? `${pointData.modifier1}${pointData.modifier1Details ? ` - ${pointData.modifier1Details}` : ''}` : null,
+                                pointData.modifier2 ? `${pointData.modifier2}${pointData.modifier2Details ? ` - ${pointData.modifier2Details}` : ''}` : null,
+                                pointData.modifier3 ? `${pointData.modifier3}${pointData.modifier3Details ? ` - ${pointData.modifier3Details}` : ''}` : null,
+                                pointData.modifier4 ? `${pointData.modifier4}${pointData.modifier4Details ? ` - ${pointData.modifier4Details}` : ''}` : null
+                              ].filter(Boolean).join('<br>');
+
+                              tooltip += `
+                                <div style="margin-bottom: ${index < overlappingPoints.length - 1 ? '8px' : '0'}; padding-bottom: ${index < overlappingPoints.length - 1 ? '8px' : '0'}; ${index < overlappingPoints.length - 1 ? 'border-bottom: 1px solid #e5e7eb;' : ''}">
+                                  <b style="color: ${overlap.color};">${overlap.series.name}</b><br>
+                                  <b>State:</b> ${pointData.state || '-'}<br>
+                                  <b>Service Code:</b> ${pointData.serviceCode || '-'}<br>
+                                  <b>Program:</b> ${pointData.program || '-'}<br>
+                                  <b>Location/Region:</b> ${pointData.locationRegion || '-'}<br>
+                                  <b>Duration Unit:</b> ${pointData.durationUnit || '-'}<br>
+                                  ${modifiers ? `<b>Modifiers:</b><br>${modifiers}` : ''}
+                                </div>
+                              `;
+                            });
+                            
+                            return tooltip;
                           }
                         },
                         xAxis: {
@@ -1833,56 +1975,26 @@ export default function HistoricalRates() {
                           nameLocation: 'middle',
                           nameGap: 30,
                           axisLabel: {
-                            formatter: (value: string) => formatDate(value)
+                            formatter: (value: string) => formatDate(value),
+                            rotate: 45
                           }
                         },
                         yAxis: {
                           type: 'value',
                           name: showRatePerHour ? 'Hourly Equivalent Rate ($)' : 'Rate Per Base Unit ($)',
                           nameLocation: 'middle',
-                          nameGap: 40,
+                          nameGap: 50,
                           scale: true,
-                          min: (value: { min: number }) => value.min * 0.95,
-                          max: (value: { max: number }) => value.max * 1.05,
                           axisLabel: {
                             formatter: (value: number) => value.toFixed(2)
                           }
                         },
-                        series: [
-                          {
-                            data: getGraphData.series,
-                            type: 'line',
-                            smooth: false,
-                            itemStyle: {
-                              color: showRatePerHour ? '#ef4444' : '#3b82f6'
-                            },
-                            label: {
-                              show: true,
-                              position: 'top',
-                              formatter: (params: any) => {
-                                if (params.data.displayValue) {
-                                  return params.data.displayValue;
-                                }
-                                return `$${params.value.toFixed(2)}`;
-                              },
-                              fontSize: 12,
-                              color: '#374151'
-                            }
+                        series: getGraphData.series.map((series: any) => ({
+                          ...series,
+                          label: {
+                            show: false // Hide labels for cleaner multi-line chart
                           }
-                        ],
-                        graphic: getGraphData.series.some(data => data.displayValue) ? [
-                          {
-                            type: 'text',
-                            left: 'center',
-                            top: 'middle',
-                            style: {
-                              text: `Hourly equivalent rates not available as the duration unit is "${getGraphData.series.find(data => data.displayValue)?.durationUnit || 'Unknown'}"`,
-                              fontSize: 16,
-                              fontWeight: 'bold',
-                              fill: '#666'
-                            }
-                          }
-                        ] : [],
+                        })),
                         grid: {
                           containLabel: true,
                           left: '10%',
@@ -1974,25 +2086,8 @@ export default function HistoricalRates() {
                   <tbody className="divide-y divide-gray-200">
                       {tableData.map((item, index) => {
                         const entry = item as ServiceData;
-                        const isSelected =
-                          selectedEntry &&
-                          selectedEntry.state_name === entry.state_name &&
-                          selectedEntry.service_category === entry.service_category &&
-                          selectedEntry.service_code === entry.service_code &&
-                          selectedEntry.service_description === entry.service_description &&
-                          selectedEntry.program === entry.program &&
-                          selectedEntry.location_region === entry.location_region &&
-                          selectedEntry.modifier_1 === entry.modifier_1 &&
-                          selectedEntry.modifier_1_details === entry.modifier_1_details &&
-                          selectedEntry.modifier_2 === entry.modifier_2 &&
-                          selectedEntry.modifier_2_details === entry.modifier_2_details &&
-                          selectedEntry.modifier_3 === entry.modifier_3 &&
-                          selectedEntry.modifier_3_details === entry.modifier_3_details &&
-                          selectedEntry.modifier_4 === entry.modifier_4 &&
-                          selectedEntry.modifier_4_details === entry.modifier_4_details &&
-                          selectedEntry.duration_unit === entry.duration_unit &&
-                          selectedEntry.provider_type === entry.provider_type &&
-                          selectedEntry.rate_effective_date === entry.rate_effective_date;
+                        const isSelected = isEntrySelected(entry);
+                        const entryColor = getEntryColor(entry);
 
                         const rateValue = parseRate(entry.rate);
                         const durationUnit = entry.duration_unit?.toUpperCase();
@@ -2003,18 +2098,28 @@ export default function HistoricalRates() {
                           key={index} 
                           className={`group relative transition-all duration-200 ease-in-out cursor-pointer ${
                             isSelected 
-                              ? 'bg-blue-50 shadow-[0_0_0_1px_rgba(59,130,246,0.2)]' 
+                              ? `shadow-[0_0_0_2px_${entryColor}]` 
                               : 'hover:bg-gray-50 hover:shadow-[0_2px_4px_rgba(0,0,0,0.05)] hover:scale-[1.01] hover:z-10'
                           }`}
-                          onClick={() => setSelectedEntry(entry)}
+                          style={isSelected && entryColor ? { 
+                            backgroundColor: `${entryColor}15`, // 15 = ~8% opacity
+                            borderLeft: `4px solid ${entryColor}`
+                          } : {}}
+                          onClick={() => toggleEntrySelection(entry)}
                         >
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
-                                isSelected 
-                                  ? 'border-blue-500 bg-blue-500 shadow-[0_0_0_3px_rgba(59,130,246,0.2)]' 
-                                  : 'border-gray-300 group-hover:border-blue-300 group-hover:shadow-[0_0_0_2px_rgba(59,130,246,0.1)]'
-                              }`}>
+                              <div 
+                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+                                  isSelected 
+                                    ? 'shadow-[0_0_0_3px_rgba(0,0,0,0.1)]' 
+                                    : 'border-gray-300 group-hover:border-blue-300 group-hover:shadow-[0_0_0_2px_rgba(59,130,246,0.1)]'
+                                }`}
+                                style={isSelected && entryColor ? {
+                                  backgroundColor: entryColor,
+                                  borderColor: entryColor
+                                } : {}}
+                              >
                                 {isSelected && (
                                   <svg 
                                     className="w-3 h-3 text-white transition-transform duration-200" 
@@ -2033,7 +2138,7 @@ export default function HistoricalRates() {
                               </div>
                               {isSelected && (
                                 <button
-                                  onClick={e => { e.stopPropagation(); setSelectedEntry(null); }}
+                                  onClick={e => { e.stopPropagation(); toggleEntrySelection(entry); }}
                                   className="ml-2 text-gray-400 hover:text-red-500 transition-colors duration-200"
                                   title="Deselect"
                                 >
@@ -2125,16 +2230,16 @@ export default function HistoricalRates() {
               </div>
             )}
 
-            {areFiltersApplied && !selectedEntry && (
+            {areFiltersApplied && !loading && filteredData.length > 0 && selectedEntries.length === 0 && (
               <div className="p-6 bg-white rounded-xl shadow-lg text-center">
                 <div className="flex justify-center items-center mb-4">
                   <FaChartLine className="h-8 w-8 text-blue-500" />
                 </div>
                 <p className="text-lg font-medium text-gray-700 mb-2">
-                  Select a rate entry to view its historical data
+                  Select rate entries to view historical data comparison
                 </p>
                 <p className="text-sm text-gray-500">
-                  Click on any row in the table above to see the rate history graph
+                  Click on rows in the table above to add them to the comparison chart. You can select multiple rows to compare different rate configurations.
                 </p>
               </div>
             )}

@@ -57,7 +57,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("🔍 AuthContext: Checking user status for:", userEmail);
 
     try {
-      // FIRST: Check registration form to get user role
+      // FIRST: Check if user is an admin - admins bypass all subscription checks
+      console.log("🔍 AuthContext: Checking if user is admin...");
+      const adminResponse = await fetch("/api/admin-users");
+      if (adminResponse.ok) {
+        const adminData = await adminResponse.json();
+        if (adminData.isAdmin && adminData.adminUser?.is_active !== false) {
+          console.log("✅ AuthContext: User is admin - GRANTING FULL ACCESS (no subscription check)");
+          
+          // Initialize email preferences for fresh login
+          try {
+            console.log("🔍 AuthContext: Initializing email preferences for admin user...");
+            const prefResponse = await fetch("/api/user/initialize-email-preferences", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ user_email: userEmail }),
+            });
+            
+            if (prefResponse.ok) {
+              const prefData = await prefResponse.json();
+              console.log("✅ AuthContext: Email preferences initialized:", prefData.message);
+            } else {
+              console.log("⚠️ AuthContext: Email preferences initialization failed, but continuing...");
+            }
+          } catch (prefError) {
+            console.log("⚠️ AuthContext: Email preferences initialization error, but continuing:", prefError);
+          }
+          
+          setAuthState({
+            isPrimaryUser: true, // Admins are treated as primary users
+            isSubUser: false,
+            hasActiveSubscription: true, // Grant access
+            hasFormData: true,
+            isCheckComplete: true,
+            subscriptionData: {
+              status: 'active',
+              plan: 'Admin Account',
+              amount: 0,
+              currency: 'USD',
+              billingInterval: 'admin'
+            }
+          });
+          return; // Exit early - no subscription checks needed
+        }
+      }
+      console.log("🔍 AuthContext: User is not an admin, proceeding with subscription checks...");
+
+      // SECOND: Check registration form to get user role
       console.log("🔍 AuthContext: Checking registration form for role...");
       const formResponse = await fetch(`/api/registrationform?email=${encodeURIComponent(userEmail)}`);
       let userRole = null;
@@ -72,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // SECOND: Check Stripe subscription
+      // THIRD: Check Stripe subscription
       console.log("🔍 AuthContext: Checking Stripe subscription...");
       const stripeResponse = await fetch("/api/stripe/subscription", {
         method: "POST",
@@ -116,12 +162,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // THIRD: If no Stripe subscription, check if user is a sub user
+      // FOURTH: If no Stripe subscription, check if user is a sub user
       console.log("❌ AuthContext: No active Stripe subscription found, checking if user is a sub user...");
       
       const subUserResponse = await fetch("/api/subscription-users");
       let isSubUser = false;
-      let primaryUserEmail = null;
+      let primaryUserEmail: string | null = null;
       
       if (subUserResponse.ok) {
         const subUserData = await subUserResponse.json();
@@ -130,84 +176,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("🔍 AuthContext: Sub user check result:", { isSubUser, primaryUserEmail });
         
         // If user is a sub user, check if their primary user has an active subscription
+        // Check BOTH Stripe subscription AND wire transfer subscription
         if (isSubUser && primaryUserEmail) {
-          console.log("🔍 AuthContext: Checking primary user's subscription status...");
+          console.log("🔍 AuthContext: Checking primary user's subscription status (both Stripe and wire transfer)...");
+          
+          // Check Stripe subscription for primary user
           const primaryUserStripeResponse = await fetch("/api/stripe/subscription", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email: primaryUserEmail }),
           });
           
+          let primaryUserHasActiveSubscription = false;
+          let primaryUserSubscriptionData = null;
+          
           if (primaryUserStripeResponse.ok) {
             const primaryUserStripeData = await primaryUserStripeResponse.json();
-            const primaryUserHasActiveSubscription = primaryUserStripeData.status === 'active';
-            
-            console.log("🔍 AuthContext: Primary user subscription status:", { 
+            primaryUserHasActiveSubscription = primaryUserStripeData.status === 'active';
+            primaryUserSubscriptionData = primaryUserStripeData;
+            console.log("🔍 AuthContext: Primary user Stripe subscription status:", { 
               primaryUserEmail, 
               hasActiveSubscription: primaryUserHasActiveSubscription 
             });
+          }
+          
+          // If no Stripe subscription, check wire transfer subscription for primary user
+          if (!primaryUserHasActiveSubscription && primaryUserEmail) {
+            console.log("🔍 AuthContext: Primary user has no Stripe subscription, checking wire transfer...");
             
-            if (primaryUserHasActiveSubscription) {
-              console.log("✅ AuthContext: Sub user has access through primary user's active subscription");
-              setAuthState({
-                isPrimaryUser: false,
-                isSubUser: true,
-                hasActiveSubscription: false, // Sub user doesn't have their own subscription
-                hasFormData: hasFormData,
-                isCheckComplete: true,
-                subscriptionData: primaryUserStripeData,
-                primaryUserEmail: primaryUserEmail
+            // Check wire transfer via check-email-access API which accepts email parameter
+            try {
+              const wireTransferCheckResponse = await fetch("/api/check-email-access", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ emails: [primaryUserEmail] }),
               });
-              return;
-            } else {
-              console.log("❌ AuthContext: Primary user does not have active Stripe subscription, checking wire transfer...");
               
-              // Check if primary user has wire transfer subscription
-              const primaryUserWireTransferResponse = await fetch(`/api/wire-transfer-subscriptions?email=${encodeURIComponent(primaryUserEmail)}`);
-              
-              if (primaryUserWireTransferResponse.ok) {
-                const primaryUserWireTransferData = await primaryUserWireTransferResponse.json();
-                const primaryUserHasWireTransfer = primaryUserWireTransferData.isWireTransferUser;
+              if (wireTransferCheckResponse.ok) {
+                const wireTransferCheckData = await wireTransferCheckResponse.json();
+                const primaryUserResult = wireTransferCheckData.results?.find((r: any) => 
+                  r.email.toLowerCase() === primaryUserEmail!.toLowerCase()
+                );
                 
-                console.log("🔍 AuthContext: Primary user wire transfer check result:", { 
-                  primaryUserEmail, 
-                  hasWireTransfer: primaryUserHasWireTransfer 
-                });
-                
-                if (primaryUserHasWireTransfer && primaryUserWireTransferData.wireTransferData) {
-                  console.log("✅ AuthContext: Sub user has access through primary user's wire transfer subscription");
-                  setAuthState({
-                    isPrimaryUser: false,
-                    isSubUser: true,
-                    hasActiveSubscription: true, // Treat as having active subscription for access
-                    hasFormData: hasFormData,
-                    isCheckComplete: true,
-                    subscriptionData: {
-                      status: 'active',
-                      plan: 'Wire Transfer Subscription (via Primary User)',
-                      amount: 0,
-                      currency: 'USD',
-                      billingInterval: 'wire_transfer',
-                      startDate: primaryUserWireTransferData.wireTransferData.subscriptionStartDate,
-                      endDate: primaryUserWireTransferData.wireTransferData.subscriptionEndDate
-                    },
-                    primaryUserEmail: primaryUserEmail,
-                    isWireTransferUser: false // Sub-user themselves is not wire transfer user
-                  });
-                  return;
-                } else {
-                  console.log("❌ AuthContext: Primary user does not have wire transfer subscription either");
+                if (primaryUserResult?.details?.isWireTransferUser && primaryUserResult?.hasAccess) {
+                  primaryUserHasActiveSubscription = true;
+                  primaryUserSubscriptionData = {
+                    status: 'active',
+                    plan: 'Wire Transfer Subscription',
+                    amount: 0,
+                    currency: 'USD',
+                    billingInterval: 'wire_transfer'
+                  };
+                  console.log("✅ AuthContext: Primary user has active wire transfer subscription");
                 }
-              } else {
-                console.log("⚠️ AuthContext: Failed to check primary user's wire transfer subscription");
               }
-              // Will fall through to show appropriate message
+            } catch (wireTransferError) {
+              console.log("⚠️ AuthContext: Error checking wire transfer for primary user, continuing...");
             }
+          }
+          
+          if (primaryUserHasActiveSubscription) {
+            console.log("✅ AuthContext: Sub user has access through primary user's active subscription (Stripe or Wire Transfer)");
+            setAuthState({
+              isPrimaryUser: false,
+              isSubUser: true,
+              hasActiveSubscription: false, // Sub user doesn't have their own subscription
+              hasFormData: hasFormData,
+              isCheckComplete: true,
+              subscriptionData: primaryUserSubscriptionData,
+              primaryUserEmail: primaryUserEmail
+            });
+            return;
+          } else {
+            console.log("❌ AuthContext: Primary user does not have active subscription (neither Stripe nor wire transfer)");
+            // Will fall through to show appropriate message
           }
         }
       }
 
-      // FOURTH: If not a regular sub user, check if user is a wire transfer subscription user
+      // FIFTH: If not a regular sub user, check if user is a wire transfer subscription user
       console.log("❌ AuthContext: Not a regular sub user, checking if user is a wire transfer subscription user...");
       
       const wireTransferResponse = await fetch("/api/wire-transfer-subscriptions");
@@ -329,19 +376,57 @@ export function useProtectedPage() {
   const auth = useAuth();
   const router = useRouter();
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!auth.isAuthenticated || !auth.userEmail) {
+        setIsCheckingAdmin(false);
+        return;
+      }
+
+      try {
+        const adminResponse = await fetch("/api/admin-users");
+        if (adminResponse.ok) {
+          const adminData = await adminResponse.json();
+          setIsAdmin(adminData.isAdmin && adminData.adminUser?.is_active !== false);
+        }
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+        setIsAdmin(false);
+      } finally {
+        setIsCheckingAdmin(false);
+      }
+    };
+
+    if (auth.isAuthenticated && auth.userEmail) {
+      checkAdmin();
+    } else {
+      setIsCheckingAdmin(false);
+    }
+  }, [auth.isAuthenticated, auth.userEmail]);
 
   useEffect(() => {
-    if (!auth.isLoading && auth.isCheckComplete) {
+    if (!auth.isLoading && auth.isCheckComplete && !isCheckingAdmin) {
       console.log("🔍 ProtectedPage: Auth check complete:", {
         isAuthenticated: auth.isAuthenticated,
         hasActiveSubscription: auth.hasActiveSubscription,
         isSubUser: auth.isSubUser,
-        hasFormData: auth.hasFormData
+        hasFormData: auth.hasFormData,
+        isAdmin: isAdmin
       });
 
       if (!auth.isAuthenticated) {
         console.log("❌ ProtectedPage: Not authenticated, redirecting to login");
         router.push("/api/auth/login");
+        return;
+      }
+
+      // Admins have full access, bypass all subscription checks
+      if (isAdmin) {
+        console.log("✅ ProtectedPage: Admin user - GRANTING FULL ACCESS");
         return;
       }
 
@@ -363,11 +448,12 @@ export function useProtectedPage() {
           auth.hasActiveSubscription ? "Primary user with subscription" : "Sub user with access");
       }
     }
-  }, [auth, router]);
+  }, [auth, router, isAdmin, isCheckingAdmin]);
 
   return {
     ...auth,
     shouldRedirect,
-    isLoading: auth.isLoading || !auth.isCheckComplete,
+    isLoading: auth.isLoading || !auth.isCheckComplete || isCheckingAdmin,
+    isAdmin,
   };
 }

@@ -308,26 +308,7 @@ const CodeDefinitionsIcon = () => {
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search Modifier (service_code)..."
-                value={modifierSearch}
-                onChange={(e) => setModifierSearch(e.target.value)}
-                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              {modifierSearch && (
-                <button
-                  onClick={() => setModifierSearch('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                  aria-label="Clear modifier search"
-                >
-                  <FaTimes className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search Description (service_description)..."
+                placeholder="Search Description..."
                 value={descriptionSearch}
                 onChange={(e) => setDescriptionSearch(e.target.value)}
                 className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -338,6 +319,25 @@ const CodeDefinitionsIcon = () => {
                   onClick={() => setDescriptionSearch('')}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                   aria-label="Clear description search"
+                >
+                  <FaTimes className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search Modifier..."
+                value={modifierSearch}
+                onChange={(e) => setModifierSearch(e.target.value)}
+                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              {modifierSearch && (
+                <button
+                  onClick={() => setModifierSearch('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Clear modifier search"
                 >
                   <FaTimes className="h-4 w-4" />
                 </button>

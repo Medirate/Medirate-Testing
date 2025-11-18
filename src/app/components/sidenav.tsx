@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
 import { useAuth } from "@/context/AuthContext";
+import { useSideNav } from "@/context/SideNavContext";
 import {
   Menu,
   X,
@@ -36,23 +37,35 @@ const adminRateDevLinks: { href: string; label: string; icon: React.ReactNode }[
 ];
 
 
-interface SideNavProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  isSidebarCollapsed: boolean;
-  toggleSidebar: () => void;
-}
-
-const SideNav = ({
-  activeTab,
-  setActiveTab,
-  isSidebarCollapsed,
-  toggleSidebar,
-}: SideNavProps) => {
+const SideNav = memo(() => {
+  const { activeTab, setActiveTab, isSidebarCollapsed, toggleSidebar, isToggling } = useSideNav();
   const pathname = usePathname();
-  const [isClientSide, setIsClientSide] = useState(false);
   const { user } = useKindeBrowserClient();
   const auth = useAuth(); // Add auth context to check subscription status
+  
+  // Only show sidenav on authenticated pages (same logic as navbar)
+  const authenticatedPages = [
+    "/dashboard",
+    "/historical-rates",
+    "/rate-developments",
+    "/state-rate-comparison",
+    "/state-rate-comparison/all",
+    "/state-rate-comparison/individual",
+    "/email-preferences",
+    "/settings",
+    "/profile",
+    "/documents",
+    // "/data-export", // TEMPORARILY HIDDEN
+    "/admin-dashboard",
+    "/support",
+    "/state-profiles",
+    "/home",
+    "/recent-rate-changes",
+  ];
+  
+  const shouldShowSideNav = auth.isAuthenticated && authenticatedPages.some(page => 
+    pathname === page || pathname.startsWith(`${page}/`)
+  );
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminCheckComplete, setAdminCheckComplete] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
@@ -136,35 +149,7 @@ const SideNav = ({
     }
   }, [user]);
 
-  // Update the tab mapping
-  useEffect(() => {
-    const tabMapping: { [key: string]: string } = {
-      "/state-profiles": "home",
-      "/home": "home",
-      "/recent-rate-changes": "home",
-      "/dashboard": "dashboard",
-      "/rate-developments": "rateDevelopments",
-      "/email-preferences": "emailPreferences",
-      "/state-rate-comparison": "stateRateComparison",
-      "/settings": "settings",
-      "/historical-rates": "historicalRates",
-      "/admin-dashboard": "adminDashboard",
-    };
-
-    // Match the exact path or paths that start with the base path
-    const activeTab = Object.keys(tabMapping).find(key => 
-      pathname === key || pathname.startsWith(`${key}/`)
-    );
-
-    if (activeTab && tabMapping[activeTab]) {
-      setActiveTab(tabMapping[activeTab]);
-    }
-  }, [pathname, setActiveTab]);
-
-  // Set isClientSide to true after the component mounts
-  useEffect(() => {
-    setIsClientSide(true);
-  }, []);
+  // Tab mapping is now handled in SideNavContext
 
   // Auto-expand admin submenu if on an admin page
   useEffect(() => {
@@ -183,41 +168,43 @@ const SideNav = ({
     }
   }, [pathname]);
 
+  // Don't render on non-authenticated pages
+  if (!shouldShowSideNav) {
+    return null;
+  }
+
   return (
-    <>
-      {/* Only render sidebar on client to avoid hydration mismatch */}
-      {isClientSide ? (
-        <aside
-          className={`transition-all duration-500 ease-in-out shadow-lg ${
-            isSidebarCollapsed ? "w-16" : "w-80"
-          }`}
-          style={{
-            backgroundColor: "rgb(1, 44, 97)",
-            color: "white",
-            position: "fixed", // Keeps it fixed
-            top: "5.5rem", // Height of the Navbar
-            bottom: "0", // Extend to the bottom of the viewport
-            left: 0, // Aligns to the left of the viewport
-            height: "calc(100vh - 5.5rem)", // Full height minus navbar
-            zIndex: 50, // Ensures it stays above the content
-            overflowY: "auto", // Allow scrolling when content overflows
-            overflowX: "hidden", // Hide horizontal scroll
-          }}
+    <aside
+      className="shadow-lg"
+      style={{
+        width: isSidebarCollapsed ? "4rem" : "20rem",
+        transition: isToggling ? "width 0.5s ease-in-out" : "none",
+        backgroundColor: "rgb(1, 44, 97)",
+        color: "white",
+        position: "fixed", // Keeps it fixed
+        top: "5.5rem", // Height of the Navbar
+        bottom: "0", // Extend to the bottom of the viewport
+        left: 0, // Aligns to the left of the viewport
+        height: "calc(100vh - 5.5rem)", // Full height minus navbar
+        zIndex: 50, // Ensures it stays above the content
+        overflowY: "auto", // Allow scrolling when content overflows
+        overflowX: "hidden", // Hide horizontal scroll
+      }}
+    >
+      {/* Sidebar Toggle Button */}
+      <div className="flex justify-end p-4">
+        <button
+          onClick={toggleSidebar}
+          className="p-2 text-white hover:bg-gray-800 rounded-md"
         >
-          {/* Sidebar Toggle Button */}
-          <div className="flex justify-end p-4">
-            <button
-              onClick={toggleSidebar}
-              className="p-2 text-white hover:bg-gray-800 rounded-md"
-            >
-              {isClientSide ? (isSidebarCollapsed ? <Menu size={20} /> : <X size={20} />) : <Menu size={20} />}
-            </button>
-          </div>
+          {isSidebarCollapsed ? <Menu size={20} /> : <X size={20} />}
+        </button>
+      </div>
 
           {/* Navigation Links */}
           <nav className="mt-6 pb-20">
             <ul className="space-y-2">
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -235,7 +222,13 @@ const SideNav = ({
                 ) : (
                   <Link
                     href="/dashboard"
-                    onClick={() => setActiveTab("dashboard")}
+                    onClick={(e) => {
+                      setActiveTab("dashboard");
+                      // Prevent any expansion when clicking in collapsed state
+                      if (isSidebarCollapsed) {
+                        e.stopPropagation();
+                      }
+                    }}
                     className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
                       activeTab === "dashboard" ? "bg-gray-200/20" : ""
                     }`}
@@ -255,7 +248,7 @@ const SideNav = ({
                 )}
               </li>
               {/* State Rate Comparison with submenu */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center w-full p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -276,7 +269,12 @@ const SideNav = ({
                 ) : (
                   <Link
                     href="/state-rate-comparison"
-                    onClick={() => setRateComparisonMenuOpen(open => !open)}
+                    onClick={(e) => {
+                      // Only toggle submenu if sidebar is expanded, otherwise just navigate
+                      if (!isSidebarCollapsed) {
+                        setRateComparisonMenuOpen(open => !open);
+                      }
+                    }}
                     className={`flex items-center w-full p-4 hover:bg-gray-200/20 transition-colors cursor-pointer focus:outline-none ${
                       pathname.startsWith("/state-rate-comparison") ? "bg-gray-200/20" : ""
                     }`}
@@ -330,7 +328,7 @@ const SideNav = ({
                   </ul>
                 )}
               </li>
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -368,7 +366,7 @@ const SideNav = ({
                 )}
               </li>
               {/* Rate Developments */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -407,7 +405,7 @@ const SideNav = ({
               </li>
               
               {/* State Profiles */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -446,7 +444,7 @@ const SideNav = ({
               </li>
               
               {/* Email Preferences */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -485,7 +483,7 @@ const SideNav = ({
               </li>
               
               {/* Documents */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 {shouldRestrictSubscriptionManager ? (
                   <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
                     <div className="flex items-center justify-center w-6 h-6">
@@ -523,8 +521,47 @@ const SideNav = ({
                 )}
               </li>
               
+              {/* Data Export - TEMPORARILY HIDDEN */}
+              {/* <li className={isSidebarCollapsed ? "" : "group"}>
+                {shouldRestrictSubscriptionManager ? (
+                  <div className="flex items-center p-4 opacity-50 cursor-not-allowed">
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Database size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Data Export
+                    </span>
+                  </div>
+                ) : (
+                  <Link
+                    href="/data-export"
+                    onClick={() => setActiveTab("dataExport")}
+                    className={`flex items-center p-4 hover:bg-gray-200/20 transition-colors cursor-pointer ${
+                      activeTab === "dataExport" ? "bg-gray-200/20" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-center w-6 h-6">
+                      <Database size={20} />
+                    </div>
+                    <span
+                      className={`ml-4 font-semibold transition-opacity duration-300 ease-in-out flex-grow pr-2 ${
+                        isSidebarCollapsed ? "opacity-0 invisible" : "opacity-100 visible"
+                      }`}
+                      style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                    >
+                      Data Export
+                    </span>
+                  </Link>
+                )}
+              </li> */}
+              
               {/* Settings */}
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 <Link
                   href="/settings"
                   onClick={() => setActiveTab("settings")}
@@ -550,7 +587,7 @@ const SideNav = ({
               {(() => {
                 return adminCheckComplete && isAdmin;
               })() && (
-                <li className="group">
+                <li className={isSidebarCollapsed ? "" : "group"}>
                   <div className="flex items-center w-full p-4 hover:bg-gray-200/20 transition-colors cursor-pointer">
                     {/* Shield icon and label as a link */}
                     <Link
@@ -573,16 +610,18 @@ const SideNav = ({
                         Admin Dashboard
                       </span>
                     </Link>
-                    {/* Chevron toggles submenu */}
-                    <button
-                      type="button"
-                      onClick={() => setAdminMenuOpen((open) => !open)}
-                      className="ml-2 p-1 focus:outline-none bg-transparent text-white hover:text-blue-200"
-                      tabIndex={0}
-                      aria-label="Toggle Admin Dashboard submenu"
-                    >
-                      {adminMenuOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                    </button>
+                    {/* Chevron toggles submenu - only works when sidebar is expanded */}
+                    {!isSidebarCollapsed && (
+                      <button
+                        type="button"
+                        onClick={() => setAdminMenuOpen((open) => !open)}
+                        className="ml-2 p-1 focus:outline-none bg-transparent text-white hover:text-blue-200"
+                        tabIndex={0}
+                        aria-label="Toggle Admin Dashboard submenu"
+                      >
+                        {adminMenuOpen ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                      </button>
+                    )}
                   </div>
                   {/* Rate Developments Submenu */}
                   {adminMenuOpen && !isSidebarCollapsed && (
@@ -590,7 +629,12 @@ const SideNav = ({
                       <li>
                         <button
                           type="button"
-                          onClick={() => setRateDevMenuOpen((open) => !open)}
+                          onClick={() => {
+                            // Only toggle submenu if sidebar is expanded
+                            if (!isSidebarCollapsed) {
+                              setRateDevMenuOpen((open) => !open);
+                            }
+                          }}
                           className={`flex items-center w-full px-4 py-2 rounded-md transition-all duration-200 focus:outline-none mb-1 ${
                             pathname.startsWith("/admin-dashboard/rate-developments")
                               ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold shadow"
@@ -644,7 +688,7 @@ const SideNav = ({
                 </li>
               )}
 
-              <li className="group">
+              <li className={isSidebarCollapsed ? "" : "group"}>
                 <Link
                   href="/support"
                   onClick={() => setActiveTab("support")}
@@ -667,27 +711,10 @@ const SideNav = ({
               </li>
             </ul>
           </nav>
-        </aside>
-      ) : (
-        // Server-side placeholder to prevent layout shift
-        <aside
-          className="transition-all duration-500 ease-in-out shadow-lg w-80"
-          style={{
-            backgroundColor: "rgb(1, 44, 97)",
-            color: "white",
-            position: "fixed",
-            top: "5.5rem",
-            bottom: "0",
-            left: 0,
-            height: "calc(100vh - 5.5rem)",
-            zIndex: 50,
-            overflowY: "auto",
-            overflowX: "hidden",
-          }}
-        />
-      )}
-    </>
+    </aside>
   );
-};
+});
+
+SideNav.displayName = "SideNav";
 
 export default SideNav;

@@ -40,6 +40,20 @@ interface Bill {
   ai_summary: string;
 }
 
+interface StatePlanAmendment {
+  id: string;
+  "Transmittal Number"?: string | null;
+  link?: string | null;
+  state?: string | null;
+  subject?: string | null;
+  service_lines_impacted?: string | null;
+  service_lines_impacted_1?: string | null;
+  service_lines_impacted_2?: string | null;
+  service_lines_impacted_3?: string | null;
+  "Effective Date"?: string | null;
+  "Approval Date"?: string | null;
+}
+
 // Map state names to codes
 const stateMap: { [key: string]: string } = {
   ALABAMA: "AL",
@@ -491,9 +505,11 @@ export default function RateDevelopments() {
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
+  const [statePlanAmendments, setStatePlanAmendments] = useState<StatePlanAmendment[]>([]);
 
   const [providerSearch, setProviderSearch] = useState<string>("");
   const [legislativeSearch, setLegislativeSearch] = useState<string>("");
+  const [spaSearch, setSpaSearch] = useState<string>("");
 
   const [selectedState, setSelectedState] = useState<string>("");
   const [selectedServiceLine, setSelectedServiceLine] = useState<string>("");
@@ -501,11 +517,13 @@ export default function RateDevelopments() {
   const [selectedProviderServiceLines, setSelectedProviderServiceLines] = useState<string[]>([]);
   const [selectedLegislativeStates, setSelectedLegislativeStates] = useState<string[]>([]);
   const [selectedLegislativeServiceLines, setSelectedLegislativeServiceLines] = useState<string[]>([]);
+  const [selectedSpaStates, setSelectedSpaStates] = useState<string[]>([]);
+  const [selectedSpaServiceLines, setSelectedSpaServiceLines] = useState<string[]>([]);
 
   const [selectedBillProgress, setSelectedBillProgress] = useState<string>("");
 
   const [layout, setLayout] = useState<"vertical" | "horizontal">("horizontal");
-  const [activeTable, setActiveTable] = useState<"provider" | "legislative">("provider");
+  const [activeTable, setActiveTable] = useState<"provider" | "legislative" | "spa">("provider");
 
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null); // For the pop-up modal
   const [showPopup, setShowPopup] = useState(false);
@@ -522,6 +540,7 @@ export default function RateDevelopments() {
   // Add search indexes for better performance
   const [providerSearchIndex, setProviderSearchIndex] = useState<Map<string, Set<number>>>();
   const [legislativeSearchIndex, setLegislativeSearchIndex] = useState<Map<string, Set<number>>>();
+  const [spaSearchIndex, setSpaSearchIndex] = useState<Map<string, Set<number>>>();
   
   useEffect(() => {
     const fetchServiceCategories = async () => {
@@ -547,6 +566,13 @@ export default function RateDevelopments() {
       setLegislativeSearchIndex(index);
     }
   }, [bills]);
+
+  useEffect(() => {
+    if (statePlanAmendments.length > 0) {
+      const index = createSearchIndex(statePlanAmendments, ['subject', 'Transmittal Number']);
+      setSpaSearchIndex(index);
+    }
+  }, [statePlanAmendments]);
 
   const uniqueServiceLines = useMemo(() => Array.from(new Set(serviceLines)).sort(), [serviceLines]);
 
@@ -627,14 +653,42 @@ export default function RateDevelopments() {
     return Array.from(serviceLinesInSelectedStates).sort();
   }, [bills, selectedLegislativeStates, uniqueServiceLines]);
 
+  const availableSpaServiceLines = useMemo(() => {
+    if (selectedSpaStates.length === 0) {
+      return uniqueServiceLines;
+    }
+    
+    const serviceLinesInSelectedStates = new Set<string>();
+    
+    statePlanAmendments.forEach(spa => {
+      const spaStateCode = reverseStateMap[spa.state || ''] || spa.state || '';
+      const isInSelectedState = selectedSpaStates.includes(spaStateCode) || 
+                               selectedSpaStates.includes(spa.state || '') ||
+                               (spa.state && selectedSpaStates.some(selectedState => 
+                                 selectedState && reverseStateMap[selectedState] === spa.state
+                               ));
+      
+      if (isInSelectedState) {
+        [spa.service_lines_impacted, spa.service_lines_impacted_1, spa.service_lines_impacted_2, spa.service_lines_impacted_3]
+          .filter((line): line is string => line !== null && line !== undefined && line.toUpperCase() !== 'NULL')
+          .forEach(line => serviceLinesInSelectedStates.add(line));
+      }
+    });
+    
+    return Array.from(serviceLinesInSelectedStates).sort();
+  }, [statePlanAmendments, selectedSpaStates, uniqueServiceLines]);
+
   // Reset all filters function
   const resetAllFilters = () => {
     setProviderSearch("");
     setLegislativeSearch("");
+    setSpaSearch("");
     setSelectedProviderStates([]);
     setSelectedProviderServiceLines([]);
     setSelectedLegislativeStates([]);
     setSelectedLegislativeServiceLines([]);
+    setSelectedSpaStates([]);
+    setSelectedSpaServiceLines([]);
     setSelectedBillProgress("");
   };
 
@@ -668,6 +722,17 @@ export default function RateDevelopments() {
       setBills([]);
     } else {
       setBills(billsData || []);
+    }
+
+    // Fetch State Plan Amendments from Supabase
+    const { data: spaData, error: spaError } = await supabase
+      .from("state_plan_amendments")
+      .select("*");
+    if (spaError) {
+      console.error("Error fetching state plan amendments:", spaError);
+      setStatePlanAmendments([]);
+    } else {
+      setStatePlanAmendments(spaData || []);
     }
     setLoading(false);
   };
@@ -712,6 +777,26 @@ export default function RateDevelopments() {
       return 0;
     });
   }, [bills, sortDirection]);
+
+  // Sorting logic for state plan amendments
+  const sortedStatePlanAmendments = useMemo(() => {
+    return [...statePlanAmendments].sort((a, b) => {
+      if (sortDirection.field === 'state') {
+        const stateA = a.state || "";
+        const stateB = b.state || "";
+        return sortDirection.direction === 'asc' ? stateA.localeCompare(stateB) : stateB.localeCompare(stateA);
+      } else if (sortDirection.field === 'Effective Date') {
+        const dateA = a["Effective Date"] ? new Date(a["Effective Date"]).getTime() : 0;
+        const dateB = b["Effective Date"] ? new Date(b["Effective Date"]).getTime() : 0;
+        return sortDirection.direction === 'asc' ? dateA - dateB : dateB - dateA;
+      } else if (sortDirection.field === 'Approval Date') {
+        const dateA = a["Approval Date"] ? new Date(a["Approval Date"]).getTime() : 0;
+        const dateB = b["Approval Date"] ? new Date(b["Approval Date"]).getTime() : 0;
+        return sortDirection.direction === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+      return 0;
+    });
+  }, [statePlanAmendments, sortDirection]);
 
   // Update the filtered data logic to use sorted arrays with improved search
   const filteredProviderAlerts = useMemo(() => {
@@ -801,12 +886,51 @@ export default function RateDevelopments() {
     });
   }, [sortedLegislativeUpdates, legislativeSearch, selectedLegislativeStates, selectedLegislativeServiceLines, selectedBillProgress, legislativeSearchIndex]);
 
+  // Filtered State Plan Amendments
+  const filteredStatePlanAmendments = useMemo(() => {
+    let searchFiltered = sortedStatePlanAmendments;
+    if (spaSearch) {
+      searchFiltered = searchWithIndex(spaSearch, sortedStatePlanAmendments, ['subject', 'Transmittal Number'], spaSearchIndex);
+    }
+    
+    return searchFiltered.filter((spa) => {
+      const matchesState = selectedSpaStates.length === 0 || 
+        (spa.state && (
+          selectedSpaStates.includes(spa.state || '') ||
+          selectedSpaStates.some(selectedState => 
+            selectedState && reverseStateMap[selectedState] === spa.state
+          )
+        ));
+
+      const matchesServiceLine = selectedSpaServiceLines.length === 0 || 
+        [
+          spa.service_lines_impacted,
+          spa.service_lines_impacted_1,
+          spa.service_lines_impacted_2,
+          spa.service_lines_impacted_3,
+        ].some(line => line && selectedSpaServiceLines.some(selectedLine => line.includes(selectedLine)));
+
+      return matchesState && matchesServiceLine;
+    });
+  }, [sortedStatePlanAmendments, spaSearch, selectedSpaStates, selectedSpaServiceLines, spaSearchIndex]);
+
   const getServiceLines = (bill: Bill) => {
     return [
       bill.service_lines_impacted,
       bill.service_lines_impacted_1,
       bill.service_lines_impacted_2,
       bill.service_lines_impacted_3
+    ]
+      .filter(line => line && line.toUpperCase() !== 'NULL')
+      .join(", ");
+  };
+
+  const getSpaServiceLines = (spa: StatePlanAmendment) => {
+    return [
+      spa.service_lines_impacted,
+      spa.service_lines_impacted_1,
+      spa.service_lines_impacted_2,
+      spa.service_lines_impacted_3
     ]
       .filter(line => line && line.toUpperCase() !== 'NULL')
       .join(", ");
@@ -928,7 +1052,7 @@ export default function RateDevelopments() {
             {/* Divider for md+ screens */}
             <div className="hidden md:block w-px bg-blue-100 mx-4 my-2 rounded-full" />
 
-            {/* Right Column: Legislative Updates Filters */}
+            {/* Middle Column: Legislative Updates Filters */}
             <div className="flex-1 flex flex-col gap-5">
               <span className="text-xs uppercase tracking-wider text-[#012C61] font-lemonMilkRegular mb-1 ml-1">Legislative Updates Filters</span>
               <div className="relative">
@@ -1020,6 +1144,45 @@ export default function RateDevelopments() {
                 />
               </div>
             </div>
+
+            {/* Divider for md+ screens */}
+            <div className="hidden md:block w-px bg-blue-100 mx-4 my-2 rounded-full" />
+
+            {/* Right Column: SPA/Waiver Amendments Filters */}
+              <div className="flex-1 flex flex-col gap-5">
+                <span className="text-xs uppercase tracking-wider text-[#012C61] font-lemonMilkRegular mb-1 ml-1">SPA/Waiver Amendments Filters</span>
+              <div className="relative">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
+                <input
+                  type="text"
+                  value={spaSearch}
+                  onChange={e => setSpaSearch(e.target.value)}
+                  placeholder="Search SPA/Waiver Amendments by subject or transmittal number"
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-blue-300 rounded-xl text-gray-800 focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all placeholder-gray-500 text-base shadow-sm"
+                />
+              </div>
+              <div className="relative pl-10">
+                <FaFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
+                <ReactSelectMultiDropdown
+                  values={selectedSpaStates}
+                  onChange={setSelectedSpaStates}
+                  options={Object.entries(stateMap).map(([name, code]) => ({
+                    value: code,
+                    label: `${name} [${code}]`
+                  }))}
+                  placeholder="All States"
+                />
+              </div>
+              <div className="relative pl-10">
+                <FaChartLine className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
+                <ReactSelectMultiDropdown
+                  values={selectedSpaServiceLines}
+                  onChange={setSelectedSpaServiceLines}
+                  options={availableSpaServiceLines.map(line => ({ value: line, label: line }))}
+                  placeholder="All Service Lines"
+                />
+              </div>
+            </div>
           </div>
         ) : (
           // Horizontal Layout: Show only active table filters
@@ -1060,7 +1223,7 @@ export default function RateDevelopments() {
               />
             </div>
               </>
-            ) : (
+            ) : activeTable === "legislative" ? (
               // Legislative Updates Filters
               <>
                 <span className="text-xs uppercase tracking-wider text-[#012C61] font-lemonMilkRegular mb-1 ml-1">Legislative Updates Filters</span>
@@ -1153,6 +1316,42 @@ export default function RateDevelopments() {
                 />
               </div>
               </>
+            ) : (
+              // SPA/Waiver Amendments Filters
+              <>
+                <span className="text-xs uppercase tracking-wider text-[#012C61] font-lemonMilkRegular mb-1 ml-1">SPA/Waiver Amendments Filters</span>
+                <div className="relative">
+                  <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
+                  <input
+                    type="text"
+                    value={spaSearch}
+                    onChange={e => setSpaSearch(e.target.value)}
+                    placeholder="Search SPA/Waiver Amendments by subject or transmittal number"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-blue-300 rounded-xl text-gray-800 focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all placeholder-gray-500 text-base shadow-sm"
+                  />
+                </div>
+                <div className="relative pl-10">
+                  <FaFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
+                  <ReactSelectMultiDropdown
+                    values={selectedSpaStates}
+                    onChange={setSelectedSpaStates}
+                    options={Object.entries(stateMap).map(([name, code]) => ({
+                      value: code,
+                      label: `${name} [${code}]`
+                    }))}
+                    placeholder="All States"
+                  />
+                </div>
+                <div className="relative pl-10">
+                  <FaChartLine className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
+                  <ReactSelectMultiDropdown
+                    values={selectedSpaServiceLines}
+                    onChange={setSelectedSpaServiceLines}
+                    options={availableSpaServiceLines.map(line => ({ value: line, label: line }))}
+                    placeholder="All Service Lines"
+                  />
+                </div>
+              </>
             )}
           </div>
         )}
@@ -1216,6 +1415,16 @@ export default function RateDevelopments() {
               >
                 Legislative Updates
           </button>
+              <button
+                onClick={() => setActiveTable("spa")}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  activeTable === "spa"
+                    ? "bg-white text-blue-600 shadow-sm"
+                    : "text-gray-600 hover:text-gray-800"
+              }`}
+              >
+                SPA/Waiver Amendments
+          </button>
         </div>
           </div>
         )}
@@ -1232,7 +1441,7 @@ export default function RateDevelopments() {
 
       {/* Tables */}
       {layout === "vertical" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Provider Alerts Table */}
           <div>
             <h2 className="text-xl font-semibold text-[#012C61] mb-2">
@@ -1390,17 +1599,92 @@ export default function RateDevelopments() {
               </table>
             </div>
           </div>
+
+          {/* SPA/Waiver Amendments Table */}
+          <div>
+            <h2 className="text-xl font-semibold text-[#012C61] mb-2">
+              SPA/Waiver Amendments
+            </h2>
+            <div className="border rounded-md max-h-[600px] overflow-y-auto bg-gray-50 shadow-lg">
+              <table className="min-w-full bg-white border-collapse">
+                <thead className="sticky top-0 bg-white shadow">
+                  <tr className="border-b">
+                    <th className="text-left p-4 font-semibold text-sm text-[#012C61] border-b cursor-pointer"
+                        onClick={() => toggleSort('state')}>
+                      State
+                      {sortDirection.field === 'state' && (sortDirection.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
+                    </th>
+                    <th className="text-left p-4 font-semibold text-sm text-[#012C61] border-b">
+                      Transmittal Number
+                    </th>
+                    <th className="text-left p-4 font-semibold text-sm text-[#012C61] border-b">
+                      Subject
+                    </th>
+                    <th className="text-left p-4 font-semibold text-sm text-[#012C61] border-b cursor-pointer"
+                        onClick={() => toggleSort('Effective Date')}>
+                      Effective Date
+                      {sortDirection.field === 'Effective Date' && (sortDirection.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
+                    </th>
+                    <th className="text-left p-4 font-semibold text-sm text-[#012C61] border-b cursor-pointer"
+                        onClick={() => toggleSort('Approval Date')}>
+                      Approval Date
+                      {sortDirection.field === 'Approval Date' && (sortDirection.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
+                    </th>
+                    <th className="text-left p-4 font-semibold text-sm text-[#012C61] border-b">
+                      Service Lines
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStatePlanAmendments.map((spa, index) => (
+                    <tr key={spa.id || index} className="border-b hover:bg-gray-100">
+                      <td className="p-4 text-sm text-gray-700 border-b">
+                        {reverseStateMap[spa.state || ''] || spa.state || ""}
+                      </td>
+                      <td className="p-4 text-sm text-gray-700 border-b">
+                        {spa["Transmittal Number"] || ""}
+                      </td>
+                      <td className="p-4 text-sm text-gray-700 border-b">
+                        <div className="flex items-center">
+                          <span>{spa.subject || ""}</span>
+                          {spa.link && (
+                            <a
+                              href={spa.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="ml-2 text-blue-500 hover:underline"
+                            >
+                              [Read More]
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-sm text-gray-700 border-b">
+                        {formatExcelOrStringDate(spa["Effective Date"])}
+                      </td>
+                      <td className="p-4 text-sm text-gray-700 border-b">
+                        {formatExcelOrStringDate(spa["Approval Date"])}
+                      </td>
+                      <td className="p-4 text-sm text-gray-700 border-b">
+                        {getSpaServiceLines(spa)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="relative overflow-hidden">
           {/* Table Heading */}
           <h2 className="text-xl font-semibold text-[#012C61] mb-2">
-            {activeTable === "provider" ? "Provider Alerts" : "Legislative Updates"}
+            {activeTable === "provider" ? "Provider Alerts" : activeTable === "legislative" ? "Legislative Updates" : "SPA/Waiver Amendments"}
           </h2>
 
           {/* Tables Container with Animation */}
           <div className="flex transition-transform duration-300 ease-in-out" style={{
-            transform: `translateX(${activeTable === "provider" ? "0%" : "-100%"})`
+            transform: `translateX(${activeTable === "provider" ? "0%" : activeTable === "legislative" ? "-100%" : "-200%"})`
           }}>
             {/* Provider Alerts Table */}
             <div className="min-w-full border rounded-md max-h-[600px] overflow-y-auto bg-gray-50 shadow-lg relative">
@@ -1543,6 +1827,76 @@ export default function RateDevelopments() {
                       </td>
                       <td className="p-4 text-sm text-gray-700 border-b">
                         {getServiceLines(bill)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* SPA/Waiver Amendments Table */}
+            <div className="min-w-full border rounded-md max-h-[600px] overflow-y-auto bg-gray-50 shadow-lg relative">
+              <table className="min-w-full bg-white border-collapse">
+                <thead className="sticky top-0 bg-white shadow">
+                  <tr className="border-b">
+                    <th className="text-left p-4 font-semibold text-sm text-[#012C61] border-b cursor-pointer"
+                        onClick={() => toggleSort('state')}>
+                      State
+                      {sortDirection.field === 'state' && (sortDirection.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
+                    </th>
+                    <th className="text-left p-4 font-semibold text-sm text-[#012C61] border-b">
+                      Transmittal Number
+                    </th>
+                    <th className="text-left p-4 font-semibold text-sm text-[#012C61] border-b">
+                      Subject
+                    </th>
+                    <th className="text-left p-4 font-semibold text-sm text-[#012C61] border-b cursor-pointer"
+                        onClick={() => toggleSort('Effective Date')}>
+                      Effective Date
+                      {sortDirection.field === 'Effective Date' && (sortDirection.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
+                    </th>
+                    <th className="text-left p-4 font-semibold text-sm text-[#012C61] border-b cursor-pointer"
+                        onClick={() => toggleSort('Approval Date')}>
+                      Approval Date
+                      {sortDirection.field === 'Approval Date' && (sortDirection.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
+                    </th>
+                    <th className="text-left p-4 font-semibold text-sm text-[#012C61] border-b">
+                      Service Lines
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStatePlanAmendments.map((spa, index) => (
+                    <tr key={spa.id || index} className="border-b hover:bg-gray-100">
+                      <td className="p-4 text-sm text-gray-700 border-b">
+                        {reverseStateMap[spa.state || ''] || spa.state || ""}
+                      </td>
+                      <td className="p-4 text-sm text-gray-700 border-b">
+                        {spa["Transmittal Number"] || ""}
+                      </td>
+                      <td className="p-4 text-sm text-gray-700 border-b">
+                        <div className="flex items-center">
+                          <span>{spa.subject || ""}</span>
+                          {spa.link && (
+                            <a
+                              href={spa.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="ml-2 text-blue-500 hover:underline"
+                            >
+                              [Read More]
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-sm text-gray-700 border-b">
+                        {formatExcelOrStringDate(spa["Effective Date"])}
+                      </td>
+                      <td className="p-4 text-sm text-gray-700 border-b">
+                        {formatExcelOrStringDate(spa["Approval Date"])}
+                      </td>
+                      <td className="p-4 text-sm text-gray-700 border-b">
+                        {getSpaServiceLines(spa)}
                       </td>
                     </tr>
                   ))}

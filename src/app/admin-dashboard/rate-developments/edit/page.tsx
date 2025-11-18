@@ -42,6 +42,24 @@ interface Bill {
   is_new: string;
 }
 
+interface StatePlanAmendment {
+  id: string;
+  "Transmittal Number"?: string | null;
+  transmittal_number?: string | null;
+  link?: string | null;
+  state?: string | null;
+  subject?: string | null;
+  service_lines_impacted?: string | null;
+  service_lines_impacted_1?: string | null;
+  service_lines_impacted_2?: string | null;
+  service_lines_impacted_3?: string | null;
+  "Effective Date"?: string | null;
+  effective_date?: string | null;
+  "Approval Date"?: string | null;
+  approval_date?: string | null;
+  is_new?: string;
+}
+
 // Map state names to codes
 const stateMap: { [key: string]: string } = {
   ALABAMA: "AL",
@@ -612,13 +630,14 @@ const isNew = (val: any) => {
 };
 
 // Helper function to check if service lines are blank
-const hasBlankServiceLines = (item: Alert | Bill) => {
+const hasBlankServiceLines = (item: Alert | Bill | StatePlanAmendment) => {
+  // All items now have 4 service line columns
   const serviceLines = [
     item.service_lines_impacted,
     item.service_lines_impacted_1,
     item.service_lines_impacted_2,
-    item.service_lines_impacted_3
-  ].filter(line => line && line.trim() !== '' && line.toUpperCase() !== 'NULL');
+    (item as Alert | Bill | StatePlanAmendment).service_lines_impacted_3
+  ].filter(line => line !== undefined && line && line.trim() !== '' && line.toUpperCase() !== 'NULL');
   
   return serviceLines.length === 0;
 };
@@ -692,9 +711,11 @@ export default function RateDevelopments() {
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
+  const [statePlanAmendments, setStatePlanAmendments] = useState<StatePlanAmendment[]>([]);
 
   const [providerSearch, setProviderSearch] = useState<string>("");
   const [legislativeSearch, setLegislativeSearch] = useState<string>("");
+  const [spaSearch, setSpaSearch] = useState<string>("");
 
   const [selectedState, setSelectedState] = useState<string>("");
   const [selectedServiceLine, setSelectedServiceLine] = useState<string>("");
@@ -704,11 +725,13 @@ export default function RateDevelopments() {
   const [selectedProviderServiceLines, setSelectedProviderServiceLines] = useState<string[]>([]);
   const [selectedLegislativeStates, setSelectedLegislativeStates] = useState<string[]>([]);
   const [selectedLegislativeServiceLines, setSelectedLegislativeServiceLines] = useState<string[]>([]);
+  const [selectedSpaStates, setSelectedSpaStates] = useState<string[]>([]);
+  const [selectedSpaServiceLines, setSelectedSpaServiceLines] = useState<string[]>([]);
 
   const [selectedBillProgress, setSelectedBillProgress] = useState<string>("");
 
   const [layout, setLayout] = useState<"vertical" | "horizontal">("horizontal");
-  const [activeTable, setActiveTable] = useState<"provider" | "legislative">("provider");
+  const [activeTable, setActiveTable] = useState<"provider" | "legislative" | "spa">("provider");
 
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null); // For the pop-up modal
   
@@ -892,10 +915,16 @@ export default function RateDevelopments() {
         setBills(data.bills);
       }
       
+      // Set state plan amendments
+      if (data.statePlanAmendments) {
+        setStatePlanAmendments(data.statePlanAmendments);
+      }
+      
     } catch (error) {
       console.error("Error fetching admin data:", error);
       setAlerts([]);
       setBills([]);
+      setStatePlanAmendments([]);
     } finally {
       setLoading(false);
     }
@@ -1027,6 +1056,26 @@ export default function RateDevelopments() {
     });
   }, [bills, sortDirection]);
 
+  // Sorting logic for state plan amendments
+  const sortedStatePlanAmendments = useMemo(() => {
+    return [...statePlanAmendments].sort((a, b) => {
+      if (sortDirection.field === 'state') {
+        const stateA = (a.state || "").trim();
+        const stateB = (b.state || "").trim();
+        return sortDirection.direction === 'asc' ? stateA.localeCompare(stateB) : stateB.localeCompare(stateA);
+      } else if (sortDirection.field === 'Effective Date') {
+        const dateA = (a['Effective Date'] || a.effective_date) ? new Date(a['Effective Date'] || a.effective_date || '').getTime() : 0;
+        const dateB = (b['Effective Date'] || b.effective_date) ? new Date(b['Effective Date'] || b.effective_date || '').getTime() : 0;
+        return sortDirection.direction === 'asc' ? dateA - dateB : dateB - dateA;
+      } else if (sortDirection.field === 'Approval Date') {
+        const dateA = (a['Approval Date'] || a.approval_date) ? new Date(a['Approval Date'] || a.approval_date || '').getTime() : 0;
+        const dateB = (b['Approval Date'] || b.approval_date) ? new Date(b['Approval Date'] || b.approval_date || '').getTime() : 0;
+        return sortDirection.direction === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+      return 0;
+    });
+  }, [statePlanAmendments, sortDirection]);
+
   // Update the filtered data logic to use sorted arrays and multi-select filters
   const filteredProviderAlerts = sortedProviderAlerts.filter((alert) => {
     const matchesSearch = !providerSearch || searchInFields(providerSearch, [
@@ -1087,12 +1136,68 @@ export default function RateDevelopments() {
     return matchesSearch && matchesState && matchesServiceLine && matchesBillProgress && matchesNewFilter && matchesBlankServiceLines;
   });
 
+  // Filtering logic for state plan amendments
+  const filteredStatePlanAmendments = sortedStatePlanAmendments.filter((spa) => {
+    const matchesSearch = !spaSearch || searchInFields(spaSearch, [
+      spa.subject,
+      spa['Transmittal Number'] || spa.transmittal_number
+    ]);
+
+    // Multi-select state filtering
+    const spaStateCode = reverseStateMap[spa.state || ''] || spa.state;
+    const matchesState = selectedSpaStates.length === 0 || 
+      (spaStateCode && selectedSpaStates.includes(spaStateCode)) || 
+      selectedSpaStates.includes(spa.state || '');
+
+    // Multi-select service line filtering
+    const matchesServiceLine = selectedSpaServiceLines.length === 0 || 
+      [
+        spa.service_lines_impacted,
+        spa.service_lines_impacted_1,
+        spa.service_lines_impacted_2,
+        spa.service_lines_impacted_3,
+      ].some(line => line && selectedSpaServiceLines.includes(line));
+
+    const matchesNewFilter = !showOnlyNew || isNew(spa.is_new);
+    const matchesBlankServiceLines = !showOnlyBlankServiceLines || hasBlankServiceLines(spa);
+
+    return matchesSearch && matchesState && matchesServiceLine && matchesNewFilter && matchesBlankServiceLines;
+  });
+
   const getServiceLines = (bill: Bill) => {
     const lines = [
       bill.service_lines_impacted,
       bill.service_lines_impacted_1,
       bill.service_lines_impacted_2,
       bill.service_lines_impacted_3
+    ]
+      .filter((line): line is string => !!line && line.toUpperCase() !== 'NULL');
+    
+    if (lines.length === 0) {
+      return <span className="text-gray-400 italic">No service lines</span>;
+    }
+    
+    return (
+      <div className="flex flex-wrap gap-1">
+        {lines.map((line, index) => (
+          <span
+            key={index}
+            className="inline-block px-2 py-1 text-xs bg-green-50 text-green-700 rounded-md border border-green-200"
+            title={line}
+          >
+            {line.length > 20 ? `${line.substring(0, 20)}...` : line}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
+  const getSpaServiceLines = (spa: StatePlanAmendment) => {
+    const lines = [
+      spa.service_lines_impacted,
+      spa.service_lines_impacted_1,
+      spa.service_lines_impacted_2,
+      spa.service_lines_impacted_3,
     ]
       .filter((line): line is string => !!line && line.toUpperCase() !== 'NULL');
     
@@ -1130,10 +1235,14 @@ export default function RateDevelopments() {
   const [editingBillUrl, setEditingBillUrl] = useState<string | null>(null);
   const [editingBillValues, setEditingBillValues] = useState<Partial<Bill>>({});
   const [sponsorListEdit, setSponsorListEdit] = useState<string>("");
+  const [editingSpaId, setEditingSpaId] = useState<string | null>(null);
+  const [editingSpaValues, setEditingSpaValues] = useState<Partial<StatePlanAmendment>>({});
+  const [editingSpaServiceLines, setEditingSpaServiceLines] = useState<string[]>([]);
   
   // Add delete confirmation states
   const [deleteProviderId, setDeleteProviderId] = useState<string | null>(null);
   const [deleteBillUrl, setDeleteBillUrl] = useState<string | null>(null);
+  const [deleteSpaId, setDeleteSpaId] = useState<string | null>(null);
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
 
   // Update the save functions to handle multiple service lines with protection
@@ -1430,13 +1539,126 @@ export default function RateDevelopments() {
     }
   };
 
-  const confirmDelete = (type: 'provider' | 'bill', id: string) => {
+  const confirmDelete = (type: 'provider' | 'bill' | 'spa', id: string) => {
     if (type === 'provider') {
       setDeleteProviderId(id);
-    } else {
+    } else if (type === 'bill') {
       setDeleteBillUrl(id);
+    } else {
+      setDeleteSpaId(id);
     }
     setShowDeleteConfirmation(true);
+  };
+
+  // Save function for state plan amendments
+  const handleSaveSpaEdit = async () => {
+    const prevSpa = statePlanAmendments.find(s => s.id === editingSpaId);
+    
+    // Only update service lines if they were actually changed by the user
+    let serviceLinesData = {};
+    if (prevSpa) {
+      const currentServiceLines = [
+        prevSpa.service_lines_impacted,
+        prevSpa.service_lines_impacted_1,
+        prevSpa.service_lines_impacted_2,
+        prevSpa.service_lines_impacted_3,
+      ].filter(line => line && line.toUpperCase() !== 'NULL');
+      
+      const newServiceLines = editingSpaServiceLines.filter(line => line && line.trim() !== '');
+      
+      // Check if service lines actually changed
+      const serviceLinesChanged = 
+        currentServiceLines.length !== newServiceLines.length ||
+        currentServiceLines.some((line, index) => line !== newServiceLines[index]);
+      
+      if (serviceLinesChanged) {
+        serviceLinesData = {
+          service_lines_impacted: editingSpaServiceLines[0] || null,
+          service_lines_impacted_1: editingSpaServiceLines[1] || null,
+          service_lines_impacted_2: editingSpaServiceLines[2] || null,
+          service_lines_impacted_3: editingSpaServiceLines[3] || null,
+        };
+        console.log('Service lines changed, updating:', serviceLinesData);
+      } else {
+        console.log('Service lines unchanged, preserving existing values');
+      }
+    }
+    
+    setStatePlanAmendments(statePlanAmendments =>
+      statePlanAmendments.map(spa =>
+        spa.id === editingSpaId
+          ? { ...spa, ...editingSpaValues, ...serviceLinesData }
+          : spa
+      )
+    );
+    
+    if (editingSpaId) {
+      const updateData = { ...editingSpaValues, ...serviceLinesData };
+      console.log('Updating state plan amendment with:', updateData);
+      
+      try {
+        const response = await fetch('/api/admin/update-state-plan-amendment', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingSpaId, ...updateData })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Failed to update state plan amendment:', errorData);
+          alert(`❌ Failed to update SPA/Waiver Amendment: ${errorData.error || 'Unknown error'}`);
+        } else {
+          console.log('✅ State plan amendment updated successfully');
+        }
+      } catch (error) {
+        console.error('Error updating state plan amendment:', error);
+        alert('❌ Error updating SPA/Waiver Amendment');
+      }
+    }
+    
+    // Highlight changed cells
+    if (prevSpa) {
+      const changed: string[] = [];
+      Object.keys({ ...editingSpaValues, ...serviceLinesData }).forEach(key => {
+        if ((prevSpa as any)[key] !== (editingSpaValues as any)[key]) {
+          changed.push(key);
+        }
+      });
+      if (changed.length > 0) {
+        setHighlightedCells(cells => ({ ...cells, [editingSpaId!]: changed }));
+      }
+    }
+    setEditingSpaId(null);
+    setEditingSpaValues({});
+    setEditingSpaServiceLines([]);
+  };
+
+  // Delete function for state plan amendments
+  const handleDeleteSpa = async () => {
+    if (!deleteSpaId) return;
+    
+    try {
+      const response = await fetch('/api/admin/delete-state-plan-amendment', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deleteSpaId })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Failed to delete state plan amendment:', errorData);
+        alert(`❌ Failed to delete SPA/Waiver Amendment: ${errorData.error || 'Unknown error'}`);
+      } else {
+        console.log('✅ State plan amendment deleted successfully');
+        setStatePlanAmendments(statePlanAmendments => statePlanAmendments.filter(spa => spa.id !== deleteSpaId));
+      }
+    } catch (error) {
+      console.error('Error deleting state plan amendment:', error);
+      alert('❌ Error deleting SPA/Waiver Amendment');
+    } finally {
+      setDeleteSpaId(null);
+      setShowDeleteConfirmation(false);
+    }
   };
 
   // Function to handle click on alert subject
@@ -1516,7 +1738,7 @@ export default function RateDevelopments() {
               {/* Divider for md+ screens */}
               <div className="hidden md:block w-px bg-blue-100 mx-4 my-2 rounded-full" />
 
-              {/* Right Column: Legislative Updates Filters */}
+              {/* Middle Column: Legislative Updates Filters */}
               <div className="flex-1 flex flex-col gap-5">
                 <span className="text-xs uppercase tracking-wider text-[#012C61] font-lemonMilkRegular mb-1 ml-1">Legislative Updates Filters</span>
                 <div className="relative">
@@ -1597,6 +1819,45 @@ export default function RateDevelopments() {
                         }
                       })
                     }}
+                  />
+                </div>
+              </div>
+
+              {/* Divider for md+ screens */}
+              <div className="hidden md:block w-px bg-blue-100 mx-4 my-2 rounded-full" />
+
+              {/* Right Column: SPA/Waiver Amendments Filters */}
+              <div className="flex-1 flex flex-col gap-5">
+                <span className="text-xs uppercase tracking-wider text-[#012C61] font-lemonMilkRegular mb-1 ml-1">SPA/Waiver Amendments Filters</span>
+                <div className="relative">
+                  <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
+                  <input
+                    type="text"
+                    value={spaSearch}
+                    onChange={e => setSpaSearch(e.target.value)}
+                    placeholder="Search SPA/Waiver Amendments by subject or transmittal number"
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-blue-300 rounded-xl text-gray-800 focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all placeholder-gray-500 text-base shadow-sm"
+                  />
+                </div>
+                <div className="relative pl-10">
+                  <FaFilter className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
+                  <ReactSelectMultiDropdown
+                    values={selectedSpaStates}
+                    onChange={setSelectedSpaStates}
+                    options={Object.entries(stateMap).map(([name, code]) => ({
+                      value: code,
+                      label: `${name} [${code}]`
+                    }))}
+                    placeholder="All States"
+                  />
+                </div>
+                <div className="relative pl-10">
+                  <FaChartLine className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
+                  <ReactSelectMultiDropdown
+                    values={selectedSpaServiceLines}
+                    onChange={setSelectedSpaServiceLines}
+                    options={uniqueServiceLines.map(line => ({ value: line, label: line }))}
+                    placeholder="All Service Lines"
                   />
                 </div>
               </div>
@@ -1725,6 +1986,16 @@ export default function RateDevelopments() {
                 >
                   Legislative Updates ({filteredLegislativeUpdates.length})
                 </button>
+                <button
+                  onClick={() => setActiveTable("spa")}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                    activeTable === "spa"
+                      ? "bg-white text-[#012C61] shadow-sm"
+                      : "text-gray-600 hover:text-gray-800"
+                  }`}
+                >
+                  SPA/Waiver Amendments ({filteredStatePlanAmendments.length})
+                </button>
               </div>
             </div>
           </div>
@@ -1749,7 +2020,7 @@ export default function RateDevelopments() {
 
       {/* Tables */}
       {layout === "vertical" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Provider Alerts Table */}
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100">
@@ -1782,7 +2053,7 @@ export default function RateDevelopments() {
                             values={editingProviderServiceLines}
                             onChange={setEditingProviderServiceLines}
                             options={normalizedServiceLineOptions}
-                            placeholder="Select service lines (max 3)"
+                            placeholder="Select service lines (max 4)"
                             />
                           </td>
                         <td className="p-3 align-middle text-center">
@@ -1931,7 +2202,7 @@ export default function RateDevelopments() {
                             values={editingBillServiceLines}
                             onChange={setEditingBillServiceLines}
                             options={normalizedServiceLineOptions}
-                            placeholder="Select service lines (max 3)"
+                            placeholder="Select service lines (max 4)"
                           />
                         </td>
                         <td className="p-3 align-middle text-center">
@@ -1996,6 +2267,118 @@ export default function RateDevelopments() {
               </table>
             </div>
           </div>
+
+          {/* SPA/Waiver Amendments Table */}
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-purple-100">
+              <h2 className="text-xl font-semibold text-[#012C61] flex items-center">
+                <FaChartLine className="mr-2" />
+                SPA/Waiver Amendments ({filteredStatePlanAmendments.length})
+              </h2>
+            </div>
+            <div className="max-h-[600px] overflow-y-auto">
+              <table className="min-w-full bg-white border-collapse">
+                <thead className="sticky top-0 bg-white shadow">
+                  <tr className="border-b">
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b cursor-pointer" onClick={() => toggleSort('state')}>State {sortDirection.field === 'state' && (sortDirection.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b">Transmittal Number</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b">Subject</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b cursor-pointer" onClick={() => toggleSort('Effective Date')}>Effective Date {sortDirection.field === 'Effective Date' && (sortDirection.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b cursor-pointer" onClick={() => toggleSort('Approval Date')}>Approval Date {sortDirection.field === 'Approval Date' && (sortDirection.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b min-w-[200px]">Service Lines</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b">Is New</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStatePlanAmendments.map((spa: any, idx: number) =>
+                    editingSpaId === spa.id ? (
+                      <tr key={spa.id} className={`${isNew(editingSpaValues.is_new ?? spa.is_new) ? 'bg-green-100' : 'bg-yellow-100'} border-b`}>
+                        <td className="p-3 align-middle"><input type="text" value={editingSpaValues.state ?? spa.state ?? ""} onChange={e => setEditingSpaValues({ ...editingSpaValues, state: e.target.value })} className="border rounded px-2 py-1 w-full" /></td>
+                        <td className="p-3 align-middle"><input type="text" value={editingSpaValues['Transmittal Number'] ?? editingSpaValues.transmittal_number ?? spa['Transmittal Number'] ?? spa.transmittal_number ?? ""} onChange={e => setEditingSpaValues({ ...editingSpaValues, 'Transmittal Number': e.target.value })} className="border rounded px-2 py-1 w-full" /></td>
+                        <td className="p-3 align-middle"><input type="text" value={editingSpaValues.subject ?? spa.subject ?? ""} onChange={e => setEditingSpaValues({ ...editingSpaValues, subject: e.target.value })} className="border rounded px-2 py-1 w-full" /></td>
+                        <td className="p-3 align-middle"><input type="text" value={editingSpaValues['Effective Date'] ?? editingSpaValues.effective_date ?? spa['Effective Date'] ?? spa.effective_date ?? ""} onChange={e => setEditingSpaValues({ ...editingSpaValues, 'Effective Date': e.target.value })} className="border rounded px-2 py-1 w-full" /></td>
+                        <td className="p-3 align-middle"><input type="text" value={editingSpaValues['Approval Date'] ?? editingSpaValues.approval_date ?? spa['Approval Date'] ?? spa.approval_date ?? ""} onChange={e => setEditingSpaValues({ ...editingSpaValues, 'Approval Date': e.target.value })} className="border rounded px-2 py-1 w-full" /></td>
+                        <td className="p-3 align-middle">
+                          <MultiServiceLinesDropdown
+                            values={editingSpaServiceLines}
+                            onChange={setEditingSpaServiceLines}
+                            options={normalizedServiceLineOptions}
+                            placeholder="Select service lines (max 4)"
+                          />
+                        </td>
+                        <td className="p-3 align-middle text-center">
+                          <input
+                            type="text"
+                            value={editingSpaValues.is_new ?? spa.is_new ?? ''}
+                            onChange={e => setEditingSpaValues({ ...editingSpaValues, is_new: e.target.value })}
+                            className="border rounded px-2 py-1 w-full text-center"
+                          />
+                        </td>
+                        <td className="p-3 align-middle flex gap-2">
+                          <button onClick={handleSaveSpaEdit} className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded flex items-center gap-1"><svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M5 13l4 4L19 7' /></svg>Save</button>
+                          <button onClick={() => { setEditingSpaId(null); setEditingSpaServiceLines([]); }} className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-1 rounded flex items-center gap-1"><svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' /></svg>Cancel</button>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={spa.id} className={`${isNew(spa.is_new) ? 'bg-green-100' : (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50')} border-b hover:bg-blue-50 transition-colors`}>
+                        <td className="p-3 align-middle">{spa.state}</td>
+                        <td className="p-3 align-middle">{spa['Transmittal Number'] || spa.transmittal_number || ''}</td>
+                        <td className="p-3 align-middle">
+                          <div className="flex items-center">
+                            <span>{spa.subject || ''}</span>
+                            {spa.link && (
+                              <a
+                                href={spa.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-2 text-blue-500 hover:underline"
+                              >
+                                [Read More]
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3 align-middle">{formatExcelOrStringDate(spa['Effective Date'] || spa.effective_date)}</td>
+                        <td className="p-3 align-middle">{formatExcelOrStringDate(spa['Approval Date'] || spa.approval_date)}</td>
+                        <td className="p-3 align-middle">{getSpaServiceLines(spa)}</td>
+                        <td className="p-3 align-middle text-center">{String(spa.is_new || '').trim()}</td>
+                        <td className="p-3 align-middle">
+                          <div className="flex gap-2">
+                            <button onClick={() => { 
+                              setEditingSpaId(spa.id); 
+                              setEditingSpaValues({ ...spa }); 
+                              const lines = [
+                                spa.service_lines_impacted,
+                                spa.service_lines_impacted_1,
+                                spa.service_lines_impacted_2,
+                                spa.service_lines_impacted_3,
+                              ].filter(line => line && line.toUpperCase().trim() !== 'NULL');
+                              const seen = new Set();
+                              const uniqueLines = [];
+                              for (const line of lines) {
+                                const norm = line.trim().toLowerCase();
+                                if (!seen.has(norm)) {
+                                  seen.add(norm);
+                                  uniqueLines.push(line.trim());
+                                }
+                              }
+                              setEditingSpaServiceLines(uniqueLines);
+                            }} className="text-blue-600 hover:bg-blue-100 p-2 rounded transition" title="Edit">
+                              <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a4 4 0 01-1.414.828l-4.243 1.414 1.414-4.243a4 4 0 01.828-1.414z' /></svg>
+                            </button>
+                            <button onClick={() => confirmDelete('spa', spa.id)} className="text-red-600 hover:bg-red-100 p-2 rounded transition" title="Delete">
+                              <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M10 3h4a1 1 0 011 1v2H9V4a1 1 0 011-1z' /></svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
@@ -2007,10 +2390,15 @@ export default function RateDevelopments() {
                   <FaExclamationCircle className="mr-2" />
                   Provider Alerts ({filteredProviderAlerts.length})
                 </>
-              ) : (
+              ) : activeTable === "legislative" ? (
                 <>
                   <FaChartLine className="mr-2" />
                   Legislative Updates ({filteredLegislativeUpdates.length})
+                </>
+              ) : (
+                <>
+                  <FaChartLine className="mr-2" />
+                  SPA/Waiver Amendments ({filteredStatePlanAmendments.length})
                 </>
               )}
             </h2>
@@ -2018,7 +2406,7 @@ export default function RateDevelopments() {
 
           {/* Tables Container with Animation */}
           <div className="flex transition-transform duration-300 ease-in-out" style={{
-            transform: `translateX(${activeTable === "provider" ? "0%" : "-100%"})`
+            transform: `translateX(${activeTable === "provider" ? "0%" : activeTable === "legislative" ? "-100%" : "-200%"})`
           }}>
             {/* Provider Alerts Table */}
             <div className="min-w-full max-h-[600px] overflow-y-auto relative">
@@ -2045,7 +2433,7 @@ export default function RateDevelopments() {
                             values={editingProviderServiceLines}
                             onChange={setEditingProviderServiceLines}
                             options={normalizedServiceLineOptions}
-                            placeholder="Select service lines (max 3)"
+                            placeholder="Select service lines (max 4)"
                           />
                         </td>
                         <td className="p-3 align-middle text-center">
@@ -2161,7 +2549,7 @@ export default function RateDevelopments() {
                             values={editingBillServiceLines}
                             onChange={setEditingBillServiceLines}
                             options={normalizedServiceLineOptions}
-                            placeholder="Select service lines (max 3)"
+                            placeholder="Select service lines (max 4)"
                           />
                         </td>
                         <td className="p-3 align-middle text-center">
@@ -2249,6 +2637,110 @@ export default function RateDevelopments() {
                 </tbody>
               </table>
             </div>
+
+            {/* SPA/Waiver Amendments Table */}
+            <div className="min-w-full max-h-[600px] overflow-y-auto relative">
+              <table className="min-w-full bg-white border-collapse">
+                <thead className="sticky top-0 bg-white shadow">
+                  <tr className="border-b">
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b cursor-pointer" onClick={() => toggleSort('state')}>State {sortDirection.field === 'state' && (sortDirection.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b">Transmittal Number</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b">Subject</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b cursor-pointer" onClick={() => toggleSort('Effective Date')}>Effective Date {sortDirection.field === 'Effective Date' && (sortDirection.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b cursor-pointer" onClick={() => toggleSort('Approval Date')}>Approval Date {sortDirection.field === 'Approval Date' && (sortDirection.direction === 'asc' ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b min-w-[200px]">Service Lines</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b">Is New</th>
+                    <th className="p-3 text-left font-semibold text-[#012C61] bg-gray-100 border-b">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStatePlanAmendments.map((spa: any, idx: number) =>
+                    editingSpaId === spa.id ? (
+                      <tr key={spa.id} className={`${isNew(editingSpaValues.is_new ?? spa.is_new) ? 'bg-green-100' : 'bg-yellow-100'} border-b`}>
+                        <td className="p-3 align-middle"><input type="text" value={editingSpaValues.state ?? spa.state ?? ""} onChange={e => setEditingSpaValues({ ...editingSpaValues, state: e.target.value })} className="border rounded px-2 py-1 w-full" /></td>
+                        <td className="p-3 align-middle"><input type="text" value={editingSpaValues['Transmittal Number'] ?? editingSpaValues.transmittal_number ?? spa['Transmittal Number'] ?? spa.transmittal_number ?? ""} onChange={e => setEditingSpaValues({ ...editingSpaValues, 'Transmittal Number': e.target.value })} className="border rounded px-2 py-1 w-full" /></td>
+                        <td className="p-3 align-middle"><input type="text" value={editingSpaValues.subject ?? spa.subject ?? ""} onChange={e => setEditingSpaValues({ ...editingSpaValues, subject: e.target.value })} className="border rounded px-2 py-1 w-full" /></td>
+                        <td className="p-3 align-middle"><input type="text" value={editingSpaValues['Effective Date'] ?? editingSpaValues.effective_date ?? spa['Effective Date'] ?? spa.effective_date ?? ""} onChange={e => setEditingSpaValues({ ...editingSpaValues, 'Effective Date': e.target.value })} className="border rounded px-2 py-1 w-full" /></td>
+                        <td className="p-3 align-middle"><input type="text" value={editingSpaValues['Approval Date'] ?? editingSpaValues.approval_date ?? spa['Approval Date'] ?? spa.approval_date ?? ""} onChange={e => setEditingSpaValues({ ...editingSpaValues, 'Approval Date': e.target.value })} className="border rounded px-2 py-1 w-full" /></td>
+                        <td className="p-3 align-middle">
+                          <MultiServiceLinesDropdown
+                            values={editingSpaServiceLines}
+                            onChange={setEditingSpaServiceLines}
+                            options={normalizedServiceLineOptions}
+                            placeholder="Select service lines (max 4)"
+                          />
+                        </td>
+                        <td className="p-3 align-middle text-center">
+                          <input
+                            type="text"
+                            value={editingSpaValues.is_new ?? spa.is_new ?? ''}
+                            onChange={e => setEditingSpaValues({ ...editingSpaValues, is_new: e.target.value })}
+                            className="border rounded px-2 py-1 w-full text-center"
+                          />
+                        </td>
+                        <td className="p-3 align-middle flex gap-2">
+                          <button onClick={handleSaveSpaEdit} className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded flex items-center gap-1"><svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M5 13l4 4L19 7' /></svg>Save</button>
+                          <button onClick={() => { setEditingSpaId(null); setEditingSpaServiceLines([]); }} className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-1 rounded flex items-center gap-1"><svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' /></svg>Cancel</button>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={spa.id} className={`${isNew(spa.is_new) ? 'bg-green-100' : (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50')} border-b hover:bg-blue-50 transition-colors`}>
+                        <td className="p-3 align-middle">{spa.state}</td>
+                        <td className="p-3 align-middle">{spa['Transmittal Number'] || spa.transmittal_number || ''}</td>
+                        <td className="p-3 align-middle">
+                          <div className="flex items-center">
+                            <span>{spa.subject || ''}</span>
+                            {spa.link && (
+                              <a
+                                href={spa.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-2 text-blue-500 hover:underline"
+                              >
+                                [Read More]
+                              </a>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3 align-middle">{formatExcelOrStringDate(spa['Effective Date'] || spa.effective_date)}</td>
+                        <td className="p-3 align-middle">{formatExcelOrStringDate(spa['Approval Date'] || spa.approval_date)}</td>
+                        <td className="p-3 align-middle">{getSpaServiceLines(spa)}</td>
+                        <td className="p-3 align-middle text-center">{String(spa.is_new || '').trim()}</td>
+                        <td className="p-3 align-middle">
+                          <div className="flex gap-2">
+                            <button onClick={() => { 
+                              setEditingSpaId(spa.id); 
+                              setEditingSpaValues({ ...spa }); 
+                              const lines = [
+                                spa.service_lines_impacted,
+                                spa.service_lines_impacted_1,
+                                spa.service_lines_impacted_2,
+                                spa.service_lines_impacted_3,
+                              ].filter(line => line && line.toUpperCase().trim() !== 'NULL');
+                              const seen = new Set();
+                              const uniqueLines = [];
+                              for (const line of lines) {
+                                const norm = line.trim().toLowerCase();
+                                if (!seen.has(norm)) {
+                                  seen.add(norm);
+                                  uniqueLines.push(line.trim());
+                                }
+                              }
+                              setEditingSpaServiceLines(uniqueLines);
+                            }} className="text-blue-600 hover:bg-blue-100 p-2 rounded transition" title="Edit">
+                              <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a4 4 0 01-1.414.828l-4.243 1.414 1.414-4.243a4 4 0 01.828-1.414z' /></svg>
+                            </button>
+                            <button onClick={() => confirmDelete('spa', spa.id)} className="text-red-600 hover:bg-red-100 p-2 rounded transition" title="Delete">
+                              <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M10 3h4a1 1 0 011 1v2H9V4a1 1 0 011-1z' /></svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -2282,7 +2774,7 @@ export default function RateDevelopments() {
               <h3 className="text-lg font-bold text-gray-900">Confirm Delete</h3>
             </div>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to delete this {deleteProviderId ? 'provider alert' : 'legislative bill'}? This action cannot be undone.
+              Are you sure you want to delete this {deleteProviderId ? 'provider alert' : deleteBillUrl ? 'legislative bill' : 'SPA/Waiver Amendment'}? This action cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
               <button
@@ -2290,13 +2782,14 @@ export default function RateDevelopments() {
                   setShowDeleteConfirmation(false);
                   setDeleteProviderId(null);
                   setDeleteBillUrl(null);
+                  setDeleteSpaId(null);
                 }}
                 className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={deleteProviderId ? handleDeleteProvider : handleDeleteBill}
+                onClick={deleteProviderId ? handleDeleteProvider : deleteBillUrl ? handleDeleteBill : handleDeleteSpa}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
               >
                 Delete

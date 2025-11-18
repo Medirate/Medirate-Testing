@@ -13,6 +13,11 @@ import clsx from 'clsx';
 import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
 import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRedirect";
+import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { fixEncoding } from "@/lib/encoding-fix";
+// import TemplatesIcon from "@/app/components/TemplatesIcon"; // TEMPORARILY HIDDEN
+import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 // --- NEW: Types for client-side filtering ---
 interface FilterOptionsData {
@@ -417,6 +422,20 @@ export default function Dashboard() {
   const [pendingFilters, setPendingFilters] = useState<Set<keyof Selections>>(new Set());
   const [displayedItems, setDisplayedItems] = useState(50); // Adjust this number based on your needs
   const [isTableExpanded, setIsTableExpanded] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportUsage, setExportUsage] = useState<{
+    rowsUsed: number;
+    rowsLimit: number;
+    rowsRemaining: number;
+    currentPeriodStart: string;
+    currentPeriodEnd: string;
+    canExport: boolean;
+  } | null>(null);
+  const [showUsageModal, setShowUsageModal] = useState(false);
+  const [pendingExportRowCount, setPendingExportRowCount] = useState(0);
+  const [showCsvWarningModal, setShowCsvWarningModal] = useState(false);
+  const [pendingCsvExport, setPendingCsvExport] = useState<{ rowCount: number; proceed: () => void; primaryUserEmail?: string; userRole?: 'subscription_manager' | 'primary_user' | 'sub_user' } | null>(null);
+  const [isPreparingExport, setIsPreparingExport] = useState(false);
   
   const itemsPerPage = 50; // Adjust this number based on your needs
 
@@ -654,6 +673,13 @@ export default function Dashboard() {
 
   // All useEffect hooks
   // Authentication is now handled by useProtectedPage hook
+  
+  // Load export usage on mount and when auth changes
+  useEffect(() => {
+    if (auth.isAuthenticated && auth.isCheckComplete) {
+      checkExportUsage();
+    }
+  }, [auth.isAuthenticated, auth.isCheckComplete]);
 
   useEffect(() => {
     if (!auth.isAuthenticated) return;
@@ -1104,6 +1130,594 @@ export default function Dashboard() {
   // Update hasMoreItems logic for Load More mode
   const hasMoreItems = data.length < totalCount;
 
+  // Check Excel export usage
+  const checkExportUsage = async () => {
+    try {
+      const response = await fetch('/api/excel-export/check-usage');
+      if (response.ok) {
+        const usage = await response.json();
+        setExportUsage(usage);
+        return usage;
+      }
+    } catch (error) {
+      console.error('Error checking export usage:', error);
+    }
+    return null;
+  };
+
+  // Get primary user email and user role
+  const getPrimaryUserInfo = async (): Promise<{ primaryUserEmail: string | null; userRole: 'subscription_manager' | 'primary_user' | 'sub_user' }> => {
+    try {
+      const response = await fetch('/api/excel-export/check-usage');
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          primaryUserEmail: data.primaryUserEmail || null,
+          userRole: data.userRole || 'primary_user'
+        };
+      }
+    } catch (error) {
+      console.error('Error getting primary user info:', error);
+    }
+    return { primaryUserEmail: null, userRole: 'primary_user' };
+  };
+
+  // Export function to fetch ALL data and convert to Excel with protection
+  const handleExportExcel = async () => {
+    if (!hasSearched || data.length === 0) {
+      alert('Please search for data first before exporting.');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      // Build filters to get total count first
+      const filters: Record<string, string> = {};
+      for (const [key, value] of Object.entries(selections)) {
+        if (value) filters[key] = value;
+      }
+      if (startDate) filters.start_date = startDate.toISOString().split('T')[0];
+      if (endDate) filters.end_date = endDate.toISOString().split('T')[0];
+
+      // Apply sorting if present
+      if (sortConfig.length > 0) {
+        const sortParts = sortConfig.map(config => `${config.key}:${config.direction}`).join(',');
+        filters.sort = sortParts;
+      }
+
+      // Get total count first
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value && typeof value === 'string') params.append(key, value);
+      });
+      params.append('page', '1');
+      params.append('itemsPerPage', '1');
+      
+      const countResponse = await fetch(`/api/state-payment-comparison?${params.toString()}`);
+      if (!countResponse.ok) {
+        throw new Error('Failed to get total count');
+      }
+      const countResult = await countResponse.json();
+      const totalRowCount = countResult.totalCount || 0;
+
+      // Check usage and validate
+      const usage = await checkExportUsage();
+      if (!usage) {
+        alert('Failed to check export limits. Please try again.');
+        setIsExporting(false);
+        return;
+      }
+
+      // Check if export is allowed
+      if (totalRowCount > usage.rowsRemaining) {
+        setPendingExportRowCount(totalRowCount);
+        setShowUsageModal(true);
+        setIsExporting(false);
+        return;
+      }
+
+      // Reserve the rows
+      const reserveResponse = await fetch('/api/excel-export/check-usage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rowCount: totalRowCount }),
+      });
+
+      if (!reserveResponse.ok) {
+        const errorData = await reserveResponse.json();
+        alert(errorData.message || 'Failed to reserve rows for export. Please try again.');
+        setIsExporting(false);
+        return;
+      }
+
+      const reserveData = await reserveResponse.json();
+      if (!reserveData.canExport) {
+        alert(reserveData.message || 'Export limit exceeded. Please try again later.');
+        setIsExporting(false);
+        return;
+      }
+
+      // Update usage display
+      setExportUsage({
+        rowsUsed: reserveData.rowsUsed,
+        rowsLimit: reserveData.rowsLimit,
+        rowsRemaining: reserveData.rowsRemaining,
+        currentPeriodStart: usage.currentPeriodStart,
+        currentPeriodEnd: usage.currentPeriodEnd,
+        canExport: true,
+      });
+
+      // Now fetch all pages of data
+      const allData: ServiceData[] = [];
+      let currentPageNum = 1;
+      let hasMore = true;
+      const exportPageSize = 1000;
+
+      console.log('📥 Starting Excel export - fetching all pages...');
+      
+      while (hasMore) {
+        const fetchParams = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value && typeof value === 'string') fetchParams.append(key, value);
+        });
+        fetchParams.append('page', String(currentPageNum));
+        fetchParams.append('itemsPerPage', String(exportPageSize));
+        
+        const url = `/api/state-payment-comparison?${fetchParams.toString()}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch page ${currentPageNum}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        
+        if (result && Array.isArray(result.data) && result.data.length > 0) {
+          allData.push(...result.data);
+          console.log(`📥 Fetched page ${currentPageNum}: ${result.data.length} records (Total: ${allData.length})`);
+          
+          if (allData.length >= (result.totalCount || 0) || result.data.length < exportPageSize) {
+            hasMore = false;
+          } else {
+            currentPageNum++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      console.log(`✅ Excel export complete: ${allData.length} total records`);
+
+      // Create Excel workbook with ExcelJS (supports password protection)
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'MediRate';
+      workbook.created = new Date();
+
+      // Create watermark/notice sheet
+      const noticeSheet = workbook.addWorksheet('Notice');
+      noticeSheet.getColumn(1).width = 60;
+      noticeSheet.getRow(1).getCell(1).value = 'MEDIRATE - PROPRIETARY DATA';
+      noticeSheet.getRow(1).getCell(1).font = { bold: true, size: 14 };
+      noticeSheet.getRow(2).getCell(1).value = `Copyright © ${new Date().getFullYear()} MediRate. All Rights Reserved.`;
+      noticeSheet.getRow(3).getCell(1).value = 'This file contains proprietary and confidential information.';
+      noticeSheet.getRow(4).getCell(1).value = 'Unauthorized copying, distribution, or modification is prohibited.';
+      noticeSheet.getRow(6).getCell(1).value = `Export Date: ${new Date().toLocaleString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      })}`;
+      noticeSheet.getRow(7).getCell(1).value = `Total Records: ${allData.length}`;
+
+      // Create main data sheet
+      const dataSheet = workbook.addWorksheet('Data');
+      
+      // Define columns
+      dataSheet.columns = [
+        { header: 'State', key: 'state', width: 10 },
+        { header: 'Service Category', key: 'serviceCategory', width: 20 },
+        { header: 'Service Code', key: 'serviceCode', width: 15 },
+        { header: 'Service Description', key: 'serviceDescription', width: 40 },
+        { header: 'Rate per Base Unit', key: 'rate', width: 18 },
+        { header: 'Duration Unit', key: 'durationUnit', width: 15 },
+        { header: 'Effective Date', key: 'effectiveDate', width: 15 },
+        { header: 'Provider Type', key: 'providerType', width: 20 },
+        { header: 'Modifier 1', key: 'modifier1', width: 20 },
+        { header: 'Modifier 2', key: 'modifier2', width: 20 },
+        { header: 'Modifier 3', key: 'modifier3', width: 20 },
+        { header: 'Modifier 4', key: 'modifier4', width: 20 },
+        { header: 'Program', key: 'program', width: 30 },
+        { header: 'Location/Region', key: 'locationRegion', width: 25 },
+      ];
+
+      // Style header row
+      dataSheet.getRow(1).font = { bold: true };
+      dataSheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+
+      // Add data rows
+      allData.forEach(item => {
+        const row = dataSheet.addRow({
+          state: fixEncoding(item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || ''),
+          serviceCategory: fixEncoding(SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || ''),
+          serviceCode: fixEncoding(item.service_code || ''),
+          serviceDescription: fixEncoding(item.service_description || ''),
+          rate: formatRate(item.rate) === '-' ? '' : formatRate(item.rate),
+          durationUnit: fixEncoding(item.duration_unit || ''),
+          effectiveDate: formatDate(item.rate_effective_date) === '-' ? '' : formatDate(item.rate_effective_date),
+          providerType: fixEncoding(item.provider_type || ''),
+          modifier1: item.modifier_1 ? fixEncoding(item.modifier_1_details ? `${item.modifier_1} - ${item.modifier_1_details}` : item.modifier_1) : '',
+          modifier2: item.modifier_2 ? fixEncoding(item.modifier_2_details ? `${item.modifier_2} - ${item.modifier_2_details}` : item.modifier_2) : '',
+          modifier3: item.modifier_3 ? fixEncoding(item.modifier_3_details ? `${item.modifier_3} - ${item.modifier_3_details}` : item.modifier_3) : '',
+          modifier4: item.modifier_4 ? fixEncoding(item.modifier_4_details ? `${item.modifier_4} - ${item.modifier_4_details}` : item.modifier_4) : '',
+          program: fixEncoding(item.program || ''),
+          locationRegion: fixEncoding(item.location_region || '')
+        });
+
+        // Lock all cells in this row
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          cell.protection = { locked: true };
+        });
+      });
+
+      // Protect the data sheet with password
+      // Password: "MEDIRATE2025" (users will need this to unprotect)
+      dataSheet.protect('MEDIRATE2025', {
+        selectLockedCells: true,
+        selectUnlockedCells: false,
+        formatCells: false,
+        formatColumns: false,
+        formatRows: false,
+        insertColumns: false,
+        insertRows: false,
+        insertHyperlinks: false,
+        deleteColumns: false,
+        deleteRows: false,
+        sort: false,
+        autoFilter: false,
+        pivotTables: false,
+      });
+
+      // Generate Excel file
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `MediRate-export-${timestamp}.xlsx`;
+      
+      // Write to buffer and download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      console.log(`✅ Excel export downloaded: ${filename} (${allData.length} records)`);
+      console.log(`🔒 Password-protected - Password: MEDIRATE2025`);
+      
+      // Show success message with usage info
+      if (exportUsage) {
+        alert(`✅ Export successful!\n\n${allData.length.toLocaleString()} rows exported.\n${exportUsage.rowsRemaining.toLocaleString()} rows remaining in your subscription.`);
+      }
+      
+      setIsExporting(false);
+    } catch (err) {
+      console.error('❌ Excel export error:', err);
+      alert(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setIsExporting(false);
+    }
+  };
+
+  // Export function to fetch ALL data and convert to CSV
+  const handleExport = async () => {
+    if (!hasSearched || data.length === 0) {
+      alert('Please search for data first before exporting.');
+      return;
+    }
+
+    setIsPreparingExport(true);
+
+    // First, get the total row count to show in warning
+    try {
+      // Build filters from current selections
+      const filters: Record<string, string> = {};
+      for (const [key, value] of Object.entries(selections)) {
+        if (value) filters[key] = value;
+      }
+      if (startDate) filters.start_date = startDate.toISOString().split('T')[0];
+      if (endDate) filters.end_date = endDate.toISOString().split('T')[0];
+
+      // Apply sorting if present
+      if (sortConfig.length > 0) {
+        const sortParts = sortConfig.map(config => `${config.key}:${config.direction}`).join(',');
+        filters.sort = sortParts;
+      }
+
+      // Get total count first
+      const countParams = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value && typeof value === 'string') countParams.append(key, value);
+      });
+      countParams.append('page', '1');
+      countParams.append('itemsPerPage', '1');
+      
+      const countUrl = `/api/state-payment-comparison?${countParams.toString()}`;
+      const countResponse = await fetch(countUrl);
+      
+      if (!countResponse.ok) {
+        throw new Error('Failed to get total count');
+      }
+
+      const countResult = await countResponse.json();
+      const totalRowCount = countResult.totalCount || 0;
+
+      if (totalRowCount === 0) {
+        alert('No data available to export.');
+        setIsPreparingExport(false);
+        return;
+      }
+
+      // Check usage and get primary user info in parallel
+      const [usage, primaryUserInfo] = await Promise.all([
+        checkExportUsage(),
+        getPrimaryUserInfo()
+      ]);
+
+      if (!usage) {
+        alert('Failed to check export limits. Please try again.');
+        setIsPreparingExport(false);
+        return;
+      }
+
+      // Check if export exceeds limit
+      if (totalRowCount > usage.rowsRemaining) {
+        setPendingExportRowCount(totalRowCount);
+        setShowUsageModal(true);
+        setIsPreparingExport(false);
+        return;
+      }
+
+      // Show warning modal with usage info
+      setPendingCsvExport({
+        rowCount: totalRowCount,
+        proceed: () => performCsvExport(filters, totalRowCount),
+        primaryUserEmail: primaryUserInfo.primaryUserEmail || undefined,
+        userRole: primaryUserInfo.userRole
+      });
+      setShowCsvWarningModal(true);
+      setIsPreparingExport(false);
+    } catch (err) {
+      console.error('❌ Error preparing export:', err);
+      alert(`Failed to prepare export: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setIsPreparingExport(false);
+    }
+  };
+
+  const performCsvExport = async (filters: Record<string, string>, expectedRowCount: number) => {
+    setIsExporting(true);
+    setShowCsvWarningModal(false);
+    
+    try {
+      // Reserve the rows first
+      const reserveResponse = await fetch('/api/excel-export/check-usage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rowCount: expectedRowCount }),
+      });
+
+      if (!reserveResponse.ok) {
+        const errorData = await reserveResponse.json();
+        alert(errorData.message || 'Failed to reserve rows for export. Please try again.');
+        setIsExporting(false);
+        return;
+      }
+
+      const reserveData = await reserveResponse.json();
+      if (!reserveData.canExport) {
+        alert(reserveData.message || 'Export limit exceeded. Please try again later.');
+        setIsExporting(false);
+        return;
+      }
+
+      // Update usage display
+      setExportUsage({
+        rowsUsed: reserveData.rowsUsed,
+        rowsLimit: reserveData.rowsLimit,
+        rowsRemaining: reserveData.rowsRemaining,
+        currentPeriodStart: reserveData.currentPeriodStart || '',
+        currentPeriodEnd: reserveData.currentPeriodEnd || '',
+        canExport: true,
+      });
+
+      // Fetch all pages of data
+      const allData: ServiceData[] = [];
+      let currentPageNum = 1;
+      let hasMore = true;
+      const exportPageSize = 1000; // Larger page size for exports to reduce API calls
+
+      console.log('📥 Starting CSV export - fetching all pages...');
+      
+      while (hasMore) {
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value && typeof value === 'string') params.append(key, value);
+        });
+        params.append('page', String(currentPageNum));
+        params.append('itemsPerPage', String(exportPageSize));
+        
+        const url = `/api/state-payment-comparison?${params.toString()}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch page ${currentPageNum}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        
+        if (result && Array.isArray(result.data) && result.data.length > 0) {
+          allData.push(...result.data);
+          console.log(`📥 Fetched page ${currentPageNum}: ${result.data.length} records (Total: ${allData.length})`);
+          
+          // Check if we've fetched all data
+          if (allData.length >= (result.totalCount || 0) || result.data.length < exportPageSize) {
+            hasMore = false;
+          } else {
+            currentPageNum++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      console.log(`✅ Export complete: ${allData.length} total records`);
+
+      // Convert to CSV
+      const headers = [
+        'State',
+        'Service Category',
+        'Service Code',
+        'Service Description',
+        'Rate per Base Unit',
+        'Duration Unit',
+        'Effective Date',
+        'Provider Type',
+        'Modifier 1',
+        'Modifier 2',
+        'Modifier 3',
+        'Modifier 4',
+        'Program',
+        'Location/Region'
+      ];
+
+      // Helper function to escape CSV fields
+      const escapeCSV = (value: string | null | undefined): string => {
+        if (value === null || value === undefined) return '';
+        const str = String(value);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      // Helper function to format rate (returns formatted string, remove $ for CSV if needed, or keep it)
+      const formatRateForExport = (rate: string | undefined): string => {
+        if (!rate) return '';
+        const formatted = formatRate(rate);
+        return formatted === '-' ? '' : formatted;
+      };
+
+      // Helper function to format date
+      const formatDateForExport = (date: string | undefined): string => {
+        if (!date) return '';
+        const formatted = formatDate(date);
+        return formatted === '-' ? '' : formatted;
+      };
+
+      // Helper function to format modifier
+      const formatModifierForExport = (modifier: string | undefined, details: string | undefined): string => {
+        if (!modifier) return '';
+        return details ? `${modifier} - ${details}` : modifier;
+      };
+
+      // Build CSV rows with MEDIRATE watermark header
+      const watermarkHeader = [
+        'MEDIRATE - PROPRIETARY DATA',
+        'Copyright © ' + new Date().getFullYear() + ' MediRate. All Rights Reserved.',
+        'This file contains proprietary and confidential information.',
+        'Unauthorized copying, distribution, or modification is prohibited.',
+        '', // Empty row separator
+        `Export Date: ${new Date().toLocaleString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric', 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })}`,
+        `Total Records: ${allData.length}`,
+        '', // Empty row separator
+      ];
+      
+      const csvRows = [
+        ...watermarkHeader.map(row => escapeCSV(row)),
+        headers.join(',')
+      ];
+
+      for (const item of allData) {
+        const row = [
+          escapeCSV(fixEncoding(item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || '')),
+          escapeCSV(fixEncoding(SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || '')),
+          escapeCSV(fixEncoding(item.service_code || '')),
+          escapeCSV(fixEncoding(item.service_description || '')),
+          escapeCSV(formatRateForExport(item.rate)),
+          escapeCSV(fixEncoding(item.duration_unit || '')),
+          escapeCSV(formatDateForExport(item.rate_effective_date)),
+          escapeCSV(fixEncoding(item.provider_type || '')),
+          escapeCSV(fixEncoding(formatModifierForExport(item.modifier_1, item.modifier_1_details))),
+          escapeCSV(fixEncoding(formatModifierForExport(item.modifier_2, item.modifier_2_details))),
+          escapeCSV(fixEncoding(formatModifierForExport(item.modifier_3, item.modifier_3_details))),
+          escapeCSV(fixEncoding(formatModifierForExport(item.modifier_4, item.modifier_4_details))),
+          escapeCSV(fixEncoding(item.program || '')),
+          escapeCSV(fixEncoding(item.location_region || ''))
+        ];
+        csvRows.push(row.join(','));
+      }
+
+      // Add footer watermark
+      const watermarkFooter = [
+        '', // Empty row separator
+        'MEDIRATE - PROPRIETARY DATA',
+        'Copyright © ' + new Date().getFullYear() + ' MediRate. All Rights Reserved.',
+        'Generated by MediRate Dashboard'
+      ];
+      
+      const csvRowsWithFooter = [
+        ...csvRows,
+        ...watermarkFooter.map(row => escapeCSV(row))
+      ];
+      
+      const csvContent = csvRowsWithFooter.join('\n');
+      
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `MediRate-export-${timestamp}.csv`;
+      
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log(`✅ CSV export downloaded: ${filename} (${allData.length} records)`);
+      
+      // Show success message with usage info
+      if (exportUsage) {
+        const updatedRemaining = reserveData.rowsRemaining;
+        alert(`✅ Export successful!\n\n${allData.length.toLocaleString()} rows exported.\n${updatedRemaining.toLocaleString()} rows remaining in your subscription.`);
+      }
+      
+      setIsExporting(false);
+    } catch (err) {
+      console.error('❌ Export error:', err);
+      alert(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setIsExporting(false);
+    }
+  };
+
 
 
   // Update handlePageChange for Pagination mode
@@ -1520,15 +2134,7 @@ export default function Dashboard() {
 
   // Only after all hooks, do any early returns:
   if (auth.isLoading || auth.shouldRedirect) {
-    return (
-      <div className="loader-overlay">
-        <div className="cssloader">
-          <div className="sh1"></div>
-          <div className="sh2"></div>
-          <h4 className="lt">loading</h4>
-        </div>
-      </div>
-    );
+    return <LoaderOverlay />;
   }
 
   // Debug mode removed - everything is working correctly!
@@ -1607,6 +2213,45 @@ export default function Dashboard() {
     setCurrentPage(1);
   };
 
+  // Handler for loading templates
+  const handleLoadTemplate = (templateData: {
+    selections: Record<string, string | null>;
+    startDate?: string | null;
+    endDate?: string | null;
+    sortConfig?: Array<{ key: string; direction: 'asc' | 'desc' }>;
+    displayedItems?: number;
+  }) => {
+    // Load selections
+    if (templateData.selections) {
+      setSelections(templateData.selections);
+    }
+
+    // Load dates
+    if (templateData.startDate) {
+      setStartDate(new Date(templateData.startDate));
+    } else {
+      setStartDate(null);
+    }
+    if (templateData.endDate) {
+      setEndDate(new Date(templateData.endDate));
+    } else {
+      setEndDate(null);
+    }
+
+    // Load sort config
+    if (templateData.sortConfig) {
+      setSortConfig(templateData.sortConfig);
+    }
+
+    // Load displayed items
+    if (templateData.displayedItems) {
+      setDisplayedItems(templateData.displayedItems);
+    }
+
+    // Reset to first page
+    setCurrentPage(1);
+  };
+
   // 1. Remove Load More logic and button
   // ... existing code ...
   // Remove handleLoadMore, hasMoreItems, and LoadMoreButton
@@ -1639,8 +2284,18 @@ export default function Dashboard() {
   }
 
   return (
-    <AppLayout activeTab="dashboard">
-      <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
+    <>
+      {/* TemplatesIcon - TEMPORARILY HIDDEN */}
+      {/* <TemplatesIcon
+        onLoadTemplate={handleLoadTemplate}
+        currentSelections={selections}
+        currentStartDate={startDate}
+        currentEndDate={endDate}
+        currentSortConfig={sortConfig}
+        currentDisplayedItems={displayedItems}
+      /> */}
+      <AppLayout activeTab="dashboard">
+        <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         {/* Error Messages */}
         <ErrorMessage error={localError} />
         {authError && (
@@ -1989,12 +2644,12 @@ export default function Dashboard() {
                     )}
                     {startDate && (
                       <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
-                        Start Date: {startDate.toLocaleDateString()}
+                        Start Date: {startDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
                       </span>
                     )}
                     {endDate && (
                       <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
-                        End Date: {endDate.toLocaleDateString()}
+                        End Date: {endDate.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
                       </span>
                     )}
                   </div>
@@ -2063,7 +2718,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsTableExpanded(prev => !prev)}
-                className="px-3 py-2 text-sm rounded-md border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 transition-colors"
+                className="px-3 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                 title={isTableExpanded ? 'Shrink table' : 'Expand table to full screen'}
               >
                 {isTableExpanded ? 'Shrink Table' : 'Expand Table'}
@@ -2187,20 +2842,20 @@ export default function Dashboard() {
                   {sortedData.map((item: any, idx: number) => (
                     <tr key={`id-${item.id}-${item.service_code ?? ''}-${item.rate_effective_date ?? ''}-${idx}`}
                         className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.service_code || '-'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-[220px] truncate" title={item.service_description || '-'}>{item.service_description || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || '-')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || '-')}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(item.service_code || '-')}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900 max-w-[220px] truncate" title={fixEncoding(item.service_description || '-')}>{fixEncoding(item.service_description || '-')}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatRate(item.rate)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.duration_unit || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(item.duration_unit || '-')}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(item.rate_effective_date)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.provider_type || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_1 ? (item.modifier_1_details ? `${item.modifier_1} - ${item.modifier_1_details}` : item.modifier_1) : '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_2 ? (item.modifier_2_details ? `${item.modifier_2} - ${item.modifier_2_details}` : item.modifier_2) : '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_3 ? (item.modifier_3_details ? `${item.modifier_3} - ${item.modifier_3_details}` : item.modifier_3) : '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_4 ? (item.modifier_4_details ? `${item.modifier_4} - ${item.modifier_4_details}` : item.modifier_4) : '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.program || '-'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.location_region || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(item.provider_type || '-')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_1 ? fixEncoding(item.modifier_1_details ? `${item.modifier_1} - ${item.modifier_1_details}` : item.modifier_1) : '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_2 ? fixEncoding(item.modifier_2_details ? `${item.modifier_2} - ${item.modifier_2_details}` : item.modifier_2) : '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_3 ? fixEncoding(item.modifier_3_details ? `${item.modifier_3} - ${item.modifier_3_details}` : item.modifier_3) : '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.modifier_4 ? fixEncoding(item.modifier_4_details ? `${item.modifier_4} - ${item.modifier_4_details}` : item.modifier_4) : '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(item.program || '-')}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{fixEncoding(item.location_region || '-')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -2432,6 +3087,7 @@ export default function Dashboard() {
           z-index: 999999999 !important;
         }
       `}</style>
-    </AppLayout>
+      </AppLayout>
+    </>
   );
 }

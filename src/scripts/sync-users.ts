@@ -41,10 +41,10 @@ async function fetchAndSyncUsers(nextToken?: string) {
             FirstName: first_name,
             LastName: last_name,
             UpdatedAt: new Date(),
-            IsSuspended: is_suspended,
+            IsSuspended: is_suspended ?? false,
             LastSignedIn: last_signed_in ? new Date(last_signed_in) : null,
-            TotalSignIns: total_sign_ins,
-            FailedSignIns: failed_sign_ins,
+            TotalSignIns: total_sign_ins ?? 0,
+            FailedSignIns: failed_sign_ins ?? 0,
           },
         });
       } else {
@@ -55,12 +55,12 @@ async function fetchAndSyncUsers(nextToken?: string) {
             Email: email,
             FirstName: first_name,
             LastName: last_name,
-            CreatedAt: created_on ? new Date(created_on) : new Date(),
+            CreatedOn: created_on ? new Date(created_on) : null,
             UpdatedAt: new Date(),
-            IsSuspended: is_suspended,
+            IsSuspended: is_suspended ?? false,
             LastSignedIn: last_signed_in ? new Date(last_signed_in) : null,
-            TotalSignIns: total_sign_ins,
-            FailedSignIns: failed_sign_ins,
+            TotalSignIns: total_sign_ins ?? 0,
+            FailedSignIns: failed_sign_ins ?? 0,
           },
         });
       }

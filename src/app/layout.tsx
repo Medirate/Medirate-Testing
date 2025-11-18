@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Navbar from "./components/Navbar";
+import SideNav from "./components/sidenav";
 import RightClickProtection from "./components/RightClickProtection";
 import DebugMode from "./components/DebugMode";
 import { AuthProvider } from "@/context/AuthContext";
+import { SideNavProvider } from "@/context/SideNavContext";
 import "./globals.css";
 import { cn } from "./lib/utils";
 
@@ -53,10 +55,14 @@ export default function RootLayout({
         )}
       >
         <AuthProvider>
-          {/* <RightClickProtection /> - Disabled to allow all clicks */}
-          <DebugMode />
-          <Navbar />
-          {children}
+          <SideNavProvider>
+            {/* <RightClickProtection /> - Disabled to allow all clicks */}
+            <DebugMode />
+            <Navbar />
+            {/* Persistent SideNav - only shows on authenticated pages via conditional rendering in SideNav */}
+            <SideNav />
+            {children}
+          </SideNavProvider>
         </AuthProvider>
       </body>
     </html>
