@@ -3880,7 +3880,8 @@ export default function StatePaymentComparison() {
 
   return (
     <>
-      <StateRateTemplatesIcon
+      {/* Temporarily disabled */}
+      {/* <StateRateTemplatesIcon
         onLoadTemplate={handleLoadTemplate}
         currentSelections={selections}
         currentFilterSets={filterSets}
@@ -3888,7 +3889,7 @@ export default function StatePaymentComparison() {
         currentIsAllStatesSelected={isAllStatesSelected}
         currentSelectedEntries={selectedEntries}
         currentStateSelectedForAverage={stateSelectedForAverage}
-      />
+      /> */}
       <AppLayout activeTab="stateRateComparison">
       <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         {/* Error Messages */}

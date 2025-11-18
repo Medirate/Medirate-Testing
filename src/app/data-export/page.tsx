@@ -707,13 +707,14 @@ export default function DataExport() {
 
   return (
     <AppLayout activeTab="dataExport">
-      <DataExportTemplatesIcon
+      {/* Temporarily disabled */}
+      {/* <DataExportTemplatesIcon
         onLoadTemplate={handleLoadTemplate}
         currentSelections={selections as unknown as Record<string, string | null>}
         currentStartDate={startDate}
         currentEndDate={endDate}
         currentSelectedColumns={selectedColumns}
-      />
+      /> */}
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-8">
         <div className="flex items-center justify-between">
           <div>
@@ -964,7 +965,8 @@ export default function DataExport() {
           </div>
         </div>
 
-        <div className="mt-8 flex flex-wrap items-center gap-3">
+        {/* Temporarily disabled */}
+        {/* <div className="mt-8 flex flex-wrap items-center gap-3">
           <button
             onClick={prepareExport}
             disabled={isPreparingExport || isExporting}
@@ -980,7 +982,7 @@ export default function DataExport() {
           <p className="text-xs text-slate-500">
             Excel files include watermark and usage tracking. You can regenerate the same export as many times as you like.
           </p>
-        </div>
+        </div> */}
 
         {showLimitModal && (
           <ModalShell onClose={() => setShowLimitModal(false)}>
