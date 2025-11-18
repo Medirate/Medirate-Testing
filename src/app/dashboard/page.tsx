@@ -2563,7 +2563,7 @@ export default function Dashboard() {
                   </label>
                   <Select
                     instanceId="program_select"
-                    options={getDropdownOptions(availablePrograms, false)}
+                    options={getDropdownOptions(availablePrograms, false, 'program')}
                     value={selections.program ? { value: selections.program, label: selections.program } : null}
                     onChange={(option) => handleSelectionChange('program', option ? option.value : null)}
                     placeholder="Select Program"
@@ -2600,7 +2600,7 @@ export default function Dashboard() {
                   </label>
                   <Select
                     instanceId="location_region_select"
-                    options={getDropdownOptions(availableLocationRegions, false)}
+                    options={getDropdownOptions(availableLocationRegions, false, 'location_region')}
                     value={selections.location_region ? selections.location_region.split(',').map(l => ({ value: l.trim(), label: l.trim() })) : null}
                     onChange={(options) => handleSelectionChange('location_region', options ? options.map(opt => opt.value).join(',') : null)}
                     placeholder="Select Location/Region"
@@ -2638,7 +2638,7 @@ export default function Dashboard() {
                   </label>
                   <Select
                     instanceId="provider_type_select"
-                    options={getDropdownOptions(availableProviderTypes, false)}
+                    options={getDropdownOptions(availableProviderTypes, false, 'provider_type')}
                     value={selections.provider_type ? selections.provider_type.split(',').map(p => ({ value: p.trim(), label: p.trim() })) : null}
                     onChange={(options) => handleSelectionChange('provider_type', options ? options.map(opt => opt.value).join(',') : null)}
                     placeholder="Select Provider Type"
@@ -2722,7 +2722,7 @@ export default function Dashboard() {
                   </label>
                     <Select
                     instanceId="modifier_1_select"
-                    options={getDropdownOptions(modifierOptions, false)}
+                    options={getDropdownOptions(modifierOptions, false, 'modifier_1')}
                     value={selections.modifier_1 ? selections.modifier_1.split(',').map(m => {
                       const mod = modifierOptions.find(opt => opt.value === m.trim());
                       return mod || { value: m.trim(), label: m.trim() };
