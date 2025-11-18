@@ -376,29 +376,39 @@ export async function GET(request: Request) {
       query = query.ilike('service_category', `%${trimmedCategory}%`);
     }
     if (state) {
-      // Use ILIKE to handle trailing spaces on both sides
-      const trimmedState = state.trim();
-      console.log(`🔍 API Debug - State filtering: "${state}" → "${trimmedState}"`);
-      
-      // Test different state name approaches
-      const exactStateTest = supabase.from('master_data_sept_2')
-        .select('state_name')
-        .eq('state_name', trimmedState)
-        .limit(5);
-      const { data: exactStateData } = await exactStateTest;
-      console.log(`🔍 API Debug - Exact state match for "${trimmedState}":`, exactStateData?.length || 0);
-      
-      const spaceStateTest = supabase.from('master_data_sept_2')
-        .select('state_name')
-        .eq('state_name', trimmedState + ' ')
-        .limit(5);
-      const { data: spaceStateData } = await spaceStateTest;
-      console.log(`🔍 API Debug - State with trailing space "${trimmedState} ":`, spaceStateData?.length || 0);
-      
-      // Avoid substring matches like "KANSAS" matching "ARKANSAS".
-      // Prefer prefix match (handles potential trailing spaces in source data) OR exact match.
-      console.log(`🔍 API Debug - Using ILIKE pattern for state (prefix): "${trimmedState}%" with OR exact`);
-      query = query.or(`state_name.eq.${trimmedState},state_name.ilike.${trimmedState}%`);
+      if (state.includes(',')) {
+        // Handle multi-select states
+        const states = state.split(',').map(s => s.trim()).filter(s => s);
+        if (states.length > 0) {
+          const orConditions = states.map(s => `state_name.eq.${s},state_name.ilike.${s}%`).join(',');
+          query = query.or(orConditions);
+          console.log(`🔍 API Debug - Multi-select states: "${state}" → [${states.join(', ')}]`);
+        }
+      } else {
+        // Use ILIKE to handle trailing spaces on both sides
+        const trimmedState = state.trim();
+        console.log(`🔍 API Debug - State filtering: "${state}" → "${trimmedState}"`);
+        
+        // Test different state name approaches
+        const exactStateTest = supabase.from('master_data_sept_2')
+          .select('state_name')
+          .eq('state_name', trimmedState)
+          .limit(5);
+        const { data: exactStateData } = await exactStateTest;
+        console.log(`🔍 API Debug - Exact state match for "${trimmedState}":`, exactStateData?.length || 0);
+        
+        const spaceStateTest = supabase.from('master_data_sept_2')
+          .select('state_name')
+          .eq('state_name', trimmedState + ' ')
+          .limit(5);
+        const { data: spaceStateData } = await spaceStateTest;
+        console.log(`🔍 API Debug - State with trailing space "${trimmedState} ":`, spaceStateData?.length || 0);
+        
+        // Avoid substring matches like "KANSAS" matching "ARKANSAS".
+        // Prefer prefix match (handles potential trailing spaces in source data) OR exact match.
+        console.log(`🔍 API Debug - Using ILIKE pattern for state (prefix): "${trimmedState}%" with OR exact`);
+        query = query.or(`state_name.eq.${trimmedState},state_name.ilike.${trimmedState}%`);
+      }
     }
     if (serviceCode) {
       if (serviceCode.includes(',')) {
@@ -447,9 +457,19 @@ export async function GET(request: Request) {
       }
     }
     if (serviceDescription) {
-      const trimmedDescription = serviceDescription.trim();
-      // Use ILIKE to handle potential trailing spaces
-      query = query.ilike('service_description', trimmedDescription);
+      if (serviceDescription.includes(',')) {
+        // Handle multi-select service descriptions
+        const descriptions = serviceDescription.split(',').map(d => d.trim()).filter(d => d);
+        if (descriptions.length > 0) {
+          const orConditions = descriptions.map(d => `service_description.ilike.${d}`).join(',');
+          query = query.or(orConditions);
+          console.log(`🔍 API Debug - Multi-select service descriptions: "${serviceDescription}" → [${descriptions.join(', ')}]`);
+        }
+      } else {
+        const trimmedDescription = serviceDescription.trim();
+        // Use ILIKE to handle potential trailing spaces
+        query = query.ilike('service_description', trimmedDescription);
+      }
     }
     
     // Handle secondary filters with "-" option for empty values and multi-select support

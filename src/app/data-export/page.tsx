@@ -37,15 +37,15 @@ interface ColumnOption {
 }
 
 interface Selections {
-  state_name: string | null;
-  service_category: string | null;
-  service_code: string | null;
-  service_description: string | null;
-  program: string | null;
-  location_region: string | null;
-  provider_type: string | null;
-  duration_unit: string | null;
-  modifier_1: string | null;
+  state_name: string | string[] | null;
+  service_category: string | null; // Single select only
+  service_code: string | string[] | null;
+  service_description: string | string[] | null;
+  program: string | string[] | null;
+  location_region: string | string[] | null;
+  provider_type: string | string[] | null;
+  duration_unit: string | string[] | null;
+  modifier_1: string | string[] | null;
   fee_schedule_date: string | null;
 }
 
@@ -294,7 +294,14 @@ export default function DataExport() {
   const buildFilters = () => {
     const filters: Record<string, string> = {};
     Object.entries(selections).forEach(([key, value]) => {
-      if (value) filters[key] = value;
+      if (value) {
+        // Convert arrays to comma-separated strings for API
+        if (Array.isArray(value)) {
+          filters[key] = value.join(',');
+        } else {
+          filters[key] = value;
+        }
+      }
     });
     if (startDate) filters.start_date = startDate.toISOString().split("T")[0];
     if (endDate) filters.end_date = endDate.toISOString().split("T")[0];
@@ -394,7 +401,13 @@ export default function DataExport() {
             }
             return combo.rate_effective_date === value;
           }
-          return combo[key] === value;
+          // Handle multi-select values (arrays) vs single values (strings)
+          const comboValue = combo[key];
+          if (Array.isArray(value)) {
+            return value.includes(String(comboValue));
+          } else {
+            return comboValue === value;
+          }
         });
       }
     });
@@ -449,7 +462,11 @@ export default function DataExport() {
     }
     
     // All other filters require both service_category and state_name
-    if (!selections.service_category || !selections.state_name) {
+    // Check if state_name has any value (could be string or array)
+    const hasStateSelection = selections.state_name && 
+      (Array.isArray(selections.state_name) ? selections.state_name.length > 0 : true);
+    
+    if (!selections.service_category || !hasStateSelection) {
       return true;
     }
     
@@ -750,17 +767,33 @@ export default function DataExport() {
                       classNamePrefix="filter"
                       options={availableOptions}
                       isClearable
+                      isMulti={field.key !== 'service_category'}
                       placeholder={field.placeholder}
                       isLoading={isLoadingFilters}
                       isDisabled={isDisabled}
                       value={
-                        selections[field.key]
-                          ? { value: selections[field.key]!, label: selections[field.key]! }
-                          : null
+                        field.key === 'service_category'
+                          ? (selections[field.key]
+                              ? { value: selections[field.key]!, label: selections[field.key]! }
+                              : null)
+                          : (Array.isArray(selections[field.key])
+                              ? selections[field.key]!.map(val => ({ value: val, label: val }))
+                              : selections[field.key]
+                              ? [{ value: selections[field.key]!, label: selections[field.key]! }]
+                              : [])
                       }
-                      onChange={(option) =>
-                        setSelections((prev) => ({ ...prev, [field.key]: option?.value || null }))
-                      }
+                      onChange={(option) => {
+                        if (field.key === 'service_category') {
+                          setSelections((prev) => ({ ...prev, [field.key]: (option as { value: string; label: string } | null)?.value || null }));
+                        } else {
+                          const selectedValues = Array.isArray(option)
+                            ? option.map(opt => opt.value)
+                            : option
+                            ? [option.value]
+                            : [];
+                          setSelections((prev) => ({ ...prev, [field.key]: selectedValues.length > 0 ? selectedValues : null }));
+                        }
+                      }}
                       styles={{
                         control: (provided, state) => ({
                           ...provided,
