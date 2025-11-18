@@ -178,6 +178,10 @@ const DataExportTemplatesIcon = ({
             <p className="text-sm text-gray-600 mt-1">
               Save and load your filter and column selections
             </p>
+            <p className="text-xs text-gray-500 mt-2">
+              Take a snapshot of your current filters, date range, and chosen columns so you can return to the exact same setup later with one click.
+              Create a template after configuring a view you like, then load it any time to instantly apply those settings again.
+            </p>
           </div>
 
           {error && (
