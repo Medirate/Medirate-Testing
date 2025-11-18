@@ -1722,7 +1722,7 @@ export default function HistoricalRates() {
                       )}>Program</label>
                       <Select
                         instanceId="program_select"
-                        options={getDropdownOptions(availablePrograms, false)}
+                        options={getDropdownOptions(availablePrograms, false, 'program', selections, filterOptionsData)}
                         value={selections.program ? selections.program.split(',').map(p => ({ value: p.trim(), label: p.trim() })) : null}
                         onChange={(options) => handleSelectionChange('program', options ? options.map(opt => opt.value).join(',') : null)}
                         placeholder="Select Program"
@@ -1755,7 +1755,7 @@ export default function HistoricalRates() {
                       )}>Location/Region</label>
                       <Select
                         instanceId="location_region_select"
-                        options={getDropdownOptions(availableLocationRegions, false)}
+                        options={getDropdownOptions(availableLocationRegions, false, 'location_region', selections, filterOptionsData)}
                         value={selections.location_region ? selections.location_region.split(',').map(l => ({ value: l.trim(), label: l.trim() })) : null}
                         onChange={(options) => handleSelectionChange('location_region', options ? options.map(opt => opt.value).join(',') : null)}
                         placeholder="Select Location/Region"
@@ -1788,7 +1788,7 @@ export default function HistoricalRates() {
                       )}>Provider Type</label>
                       <Select
                         instanceId="provider_type_select"
-                        options={getDropdownOptions(availableProviderTypes, false)}
+                        options={getDropdownOptions(availableProviderTypes, false, 'provider_type', selections, filterOptionsData)}
                         value={selections.provider_type ? selections.provider_type.split(',').map(p => ({ value: p.trim(), label: p.trim() })) : null}
                         onChange={(options) => handleSelectionChange('provider_type', options ? options.map(opt => opt.value).join(',') : null)}
                         placeholder="Select Provider Type"
@@ -1851,14 +1851,15 @@ export default function HistoricalRates() {
                       )}>Modifier</label>
                       <Select
                         instanceId="modifier_1_select"
-                        options={[{ value: '-', label: '-' }, ...availableModifiers.map((o: string) => {
+                        options={getDropdownOptions(availableModifiers, false, 'modifier_1', selections, filterOptionsData).map((opt: { value: string; label: string }) => {
+                          // Add modifier details if available
                           const def =
-                            filterOptionsData?.combinations?.find((c: any) => c.modifier_1 === o)?.modifier_1_details ||
-                            filterOptionsData?.combinations?.find((c: any) => c.modifier_2 === o)?.modifier_2_details ||
-                            filterOptionsData?.combinations?.find((c: any) => c.modifier_3 === o)?.modifier_3_details ||
-                            filterOptionsData?.combinations?.find((c: any) => c.modifier_4 === o)?.modifier_4_details;
-                          return { value: o, label: def ? `${o} - ${def}` : o };
-                        })]}
+                            filterOptionsData?.combinations?.find((c: any) => c.modifier_1 === opt.value)?.modifier_1_details ||
+                            filterOptionsData?.combinations?.find((c: any) => c.modifier_2 === opt.value)?.modifier_2_details ||
+                            filterOptionsData?.combinations?.find((c: any) => c.modifier_3 === opt.value)?.modifier_3_details ||
+                            filterOptionsData?.combinations?.find((c: any) => c.modifier_4 === opt.value)?.modifier_4_details;
+                          return { value: opt.value, label: def ? `${opt.value} - ${def}` : opt.label };
+                        })}
                         value={selections.modifier_1 ? selections.modifier_1.split(',').map(m => {
                           const mod = availableModifiers.find(opt => opt === m.trim());
                           if (mod) {
