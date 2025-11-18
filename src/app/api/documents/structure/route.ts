@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     
     console.log(`📁 Total files found: ${blobs.length}`);
     
-    // Filter out metadata files and archive folders
+    // Filter out metadata files, archive folders, and BILLING_MANUALS
     const documentBlobs = blobs.filter(blob => {
       const p = (blob.pathname || '');
       // Exclude metadata folder
@@ -45,6 +45,11 @@ export async function GET(request: NextRequest) {
         part.toUpperCase().endsWith('_ARCHIVE')
       );
       if (hasArchiveFolder) return false;
+      // Exclude BILLING_MANUALS folder - should not be visible to users
+      const hasBillingManuals = pathParts.some(part => 
+        part.toUpperCase() === 'BILLING_MANUALS'
+      );
+      if (hasBillingManuals) return false;
       return true;
     });
     

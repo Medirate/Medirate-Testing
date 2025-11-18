@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     // Transform blob data to show actual storage structure
     const documents = blobs
-      // exclude metadata, json helper files, and archive folders from UI
+      // exclude metadata, json helper files, archive folders, and BILLING_MANUALS from UI
       .filter(blob => {
         const p = (blob.pathname || '');
         // Exclude metadata folder
@@ -47,6 +47,11 @@ export async function GET(request: NextRequest) {
           part.toUpperCase().endsWith('_ARCHIVE')
         );
         if (hasArchiveFolder) return false;
+        // Exclude BILLING_MANUALS folder - should not be visible to users
+        const hasBillingManuals = pathParts.some(part => 
+          part.toUpperCase() === 'BILLING_MANUALS'
+        );
+        if (hasBillingManuals) return false;
         return true;
       })
       .map(blob => {
