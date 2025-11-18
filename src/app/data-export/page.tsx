@@ -794,10 +794,10 @@ export default function DataExport() {
                             [field.key]: singleOption?.value || null,
                           }));
                         } else {
-                          const selectedValues = Array.isArray(option)
-                            ? option.map((opt) => opt.value)
-                            : option
-                            ? [option.value]
+                          // For multi-select, option is always an array or null
+                          const multiOption = option as Array<{ value: string; label: string }> | null;
+                          const selectedValues = multiOption
+                            ? multiOption.map((opt) => opt.value)
                             : [];
                           setSelections((prev) => ({
                             ...prev,
