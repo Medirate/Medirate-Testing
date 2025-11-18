@@ -340,6 +340,45 @@ export default function DataExport() {
     setSelectedColumns(allColumnsSelected ? [] : ALL_COLUMN_OPTIONS.map((option) => option.key));
   };
 
+  // Helper function to check if there are blank entries for a secondary filter
+  const hasBlankEntriesForFilter = (filterKey: keyof Selections): boolean => {
+    if (!filterOptionsData || !filterOptionsData.combinations) return false;
+    
+    // Build filter conditions based on current selections (same as getAvailableOptions)
+    const filteredCombinations = filterOptionsData.combinations.filter(combo => {
+      // If a fee_schedule_date is selected, only consider combos where the date matches
+      if (selections.fee_schedule_date) {
+        if (Array.isArray(combo.rate_effective_date)) {
+          if (!combo.rate_effective_date.includes(selections.fee_schedule_date)) return false;
+        } else {
+          if (combo.rate_effective_date !== selections.fee_schedule_date) return false;
+        }
+      }
+      
+      // Check all other selections except the current filterKey
+      return Object.entries(selections).every(([key, value]) => {
+        if (key === filterKey || key === 'fee_schedule_date') return true;
+        if (!value) return true;
+        
+        const comboValue = combo[key];
+        if (typeof comboValue !== 'string') return true; // Skip non-string fields
+        
+        // Handle multi-select values (arrays) vs single values (strings)
+        if (Array.isArray(value)) {
+          return value.includes(String(comboValue));
+        } else {
+          return comboValue === value;
+        }
+      });
+    });
+    
+    // Check if there are any entries where the specified field is blank/empty
+    return filteredCombinations.some(combo => {
+      const fieldValue = combo[filterKey];
+      return !fieldValue || (typeof fieldValue === 'string' && fieldValue.trim() === '');
+    });
+  };
+
   const getAvailableOptions = (filterKey: keyof Selections) => {
     if (!filterOptionsData || !filterOptionsData.combinations) return [];
     
@@ -378,9 +417,21 @@ export default function DataExport() {
       }
     });
     
-    return Array.from(values)
+    // Build options array
+    const options = Array.from(values)
       .sort()
       .map((value) => ({ value, label: value }));
+    
+    // For secondary filters, conditionally add "-" option if there are blank entries
+    const secondaryFilters = ['program', 'location_region', 'provider_type', 'modifier_1'];
+    if (secondaryFilters.includes(filterKey as string) && filterKey !== 'duration_unit') {
+      const hasBlankEntries = hasBlankEntriesForFilter(filterKey);
+      if (hasBlankEntries) {
+        return [{ value: '-', label: '-' }, ...options];
+      }
+    }
+    
+    return options;
   };
 
   const prepareExport = async () => {
