@@ -21,7 +21,7 @@ import { useProtectedPage } from "@/context/AuthContext";
 import type { Dispatch, SetStateAction } from 'react';
 import { gunzipSync, strFromU8 } from "fflate";
 import { supabase } from "@/lib/supabase";
-import HistoricalRatesTemplatesIcon from "@/app/components/HistoricalRatesTemplatesIcon";
+// import HistoricalRatesTemplatesIcon from "@/app/components/HistoricalRatesTemplatesIcon"; // TEMPORARILY HIDDEN
 import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 interface ServiceData {
@@ -1562,11 +1562,12 @@ export default function HistoricalRates() {
 
   return (
     <AppLayout activeTab="historicalRates">
-      <HistoricalRatesTemplatesIcon
+      {/* HistoricalRatesTemplatesIcon - TEMPORARILY HIDDEN */}
+      {/* <HistoricalRatesTemplatesIcon
         onLoadTemplate={handleLoadTemplate}
         currentSelections={selections}
         currentSelectedEntries={selectedEntries}
-      />
+      /> */}
       <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         <ErrorMessage error={error} />
 

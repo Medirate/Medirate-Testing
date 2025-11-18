@@ -16,7 +16,7 @@ import { useSubscriptionManagerRedirect } from "@/hooks/useSubscriptionManagerRe
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { fixEncoding } from "@/lib/encoding-fix";
-import TemplatesIcon from "@/app/components/TemplatesIcon";
+// import TemplatesIcon from "@/app/components/TemplatesIcon"; // TEMPORARILY HIDDEN
 import LoaderOverlay from "@/app/components/LoaderOverlay";
 
 // --- NEW: Types for client-side filtering ---
@@ -2285,14 +2285,15 @@ export default function Dashboard() {
 
   return (
     <>
-      <TemplatesIcon
+      {/* TemplatesIcon - TEMPORARILY HIDDEN */}
+      {/* <TemplatesIcon
         onLoadTemplate={handleLoadTemplate}
         currentSelections={selections}
         currentStartDate={startDate}
         currentEndDate={endDate}
         currentSortConfig={sortConfig}
         currentDisplayedItems={displayedItems}
-      />
+      /> */}
       <AppLayout activeTab="dashboard">
         <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
         {/* Error Messages */}
