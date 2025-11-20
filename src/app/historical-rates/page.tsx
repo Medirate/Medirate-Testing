@@ -2070,10 +2070,14 @@ export default function HistoricalRates() {
                           data: getGraphData.xAxis,
                           name: 'Effective Date',
                           nameLocation: 'middle',
-                          nameGap: 30,
+                          nameGap: 50,
+                          nameTextStyle: {
+                            padding: [10, 0, 0, 0]
+                          },
                           axisLabel: {
                             formatter: (value: string) => formatDate(value),
-                            rotate: 45
+                            rotate: 45,
+                            margin: 12
                           }
                         },
                         yAxis: {
@@ -2089,15 +2093,29 @@ export default function HistoricalRates() {
                         series: getGraphData.series.map((series: any) => ({
                           ...series,
                           label: {
-                            show: false // Hide labels for cleaner multi-line chart
+                            show: true,
+                            position: 'top',
+                            formatter: (params: any) => {
+                              if (params.value === null || params.value === undefined) return '';
+                              return `$${params.value.toFixed(2)}`;
+                            },
+                            fontSize: 11,
+                            fontWeight: 'bold',
+                            color: '#374151',
+                            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                            borderColor: '#e5e7eb',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            padding: [4, 6],
+                            distance: 8
                           }
                         })),
                         grid: {
                           containLabel: true,
                           left: '10%',
                           right: '3%',
-                          bottom: '10%',
-                          top: '10%'
+                          bottom: '15%',
+                          top: '15%'
                         }
                       }}
                       style={{ height: '100%', width: '100%' }}
