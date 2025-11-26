@@ -41,6 +41,7 @@ import {
   ProviderAlert,
   LegislativeUpdate
 } from "@/lib/enhanced-metrics";
+import USMap from "@/app/components/us-map";
 
 // State mapping for consistent state name handling
 const stateMap: { [key: string]: string } = {
@@ -664,6 +665,22 @@ const StateProfilesPage = () => {
             </div>
           </div>
         </div>
+
+        {/* US Map */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Select a State</CardTitle>
+            <CardDescription>Click on a state on the map to view its profile</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="w-full h-[500px]">
+              <USMap 
+                onStateSelect={handleStateSelect} 
+                selectedState={selectedState}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Key Statistics Cards - State Specific */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
