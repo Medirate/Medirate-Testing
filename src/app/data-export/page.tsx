@@ -166,7 +166,34 @@ export default function DataExport() {
   const [endDateInput, setEndDateInput] = useState<string>(formatDateInput(new Date()));
   const [showStartCalendar, setShowStartCalendar] = useState(false);
   const [showEndCalendar, setShowEndCalendar] = useState(false);
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(ALL_COLUMN_OPTIONS.map((option) => option.key));
+  // Default to only the specified columns
+  const defaultColumns = [
+    'service_category',
+    'state_name',
+    'state_code',
+    'service_code',
+    'service_description',
+    'rate',
+    'rate_effective_date',
+    'duration_unit',
+    'program',
+    'modifier_1',
+    'modifier_1_details',
+    'modifier_2',
+    'modifier_2_details',
+    'modifier_3',
+    'modifier_3_details',
+    'modifier_4',
+    'modifier_4_details',
+    'fee',
+    'max_fee',
+    'prior_auth_required',
+    'location_region',
+    'requires_pa',
+    'provider_type',
+    'age',
+  ];
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(defaultColumns);
   const [exportUsage, setExportUsage] = useState<UsageResponse | null>(null);
   const [isPreparingExport, setIsPreparingExport] = useState(false);
   const [isExporting, setIsExporting] = useState(false);

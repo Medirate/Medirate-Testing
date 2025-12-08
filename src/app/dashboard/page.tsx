@@ -1322,22 +1322,32 @@ export default function Dashboard() {
       // Create main data sheet
       const dataSheet = workbook.addWorksheet('Data');
       
-      // Define columns
+      // Define columns - only specified columns
       dataSheet.columns = [
-        { header: 'State', key: 'state', width: 10 },
         { header: 'Service Category', key: 'serviceCategory', width: 20 },
+        { header: 'State Name', key: 'stateName', width: 15 },
+        { header: 'State Code', key: 'stateCode', width: 10 },
         { header: 'Service Code', key: 'serviceCode', width: 15 },
         { header: 'Service Description', key: 'serviceDescription', width: 40 },
-        { header: 'Rate per Base Unit', key: 'rate', width: 18 },
+        { header: 'Rate', key: 'rate', width: 18 },
+        { header: 'Rate Effective Date', key: 'rateEffectiveDate', width: 15 },
         { header: 'Duration Unit', key: 'durationUnit', width: 15 },
-        { header: 'Effective Date', key: 'effectiveDate', width: 15 },
-        { header: 'Provider Type', key: 'providerType', width: 20 },
-        { header: 'Modifier 1', key: 'modifier1', width: 20 },
-        { header: 'Modifier 2', key: 'modifier2', width: 20 },
-        { header: 'Modifier 3', key: 'modifier3', width: 20 },
-        { header: 'Modifier 4', key: 'modifier4', width: 20 },
         { header: 'Program', key: 'program', width: 30 },
+        { header: 'Modifier 1', key: 'modifier1', width: 15 },
+        { header: 'Modifier 1 Details', key: 'modifier1Details', width: 25 },
+        { header: 'Modifier 2', key: 'modifier2', width: 15 },
+        { header: 'Modifier 2 Details', key: 'modifier2Details', width: 25 },
+        { header: 'Modifier 3', key: 'modifier3', width: 15 },
+        { header: 'Modifier 3 Details', key: 'modifier3Details', width: 25 },
+        { header: 'Modifier 4', key: 'modifier4', width: 15 },
+        { header: 'Modifier 4 Details', key: 'modifier4Details', width: 25 },
+        { header: 'Fee', key: 'fee', width: 15 },
+        { header: 'Max Fee', key: 'maxFee', width: 15 },
+        { header: 'Prior Auth Required', key: 'priorAuthRequired', width: 20 },
         { header: 'Location/Region', key: 'locationRegion', width: 25 },
+        { header: 'Requires PA', key: 'requiresPa', width: 15 },
+        { header: 'Provider Type', key: 'providerType', width: 20 },
+        { header: 'Age', key: 'age', width: 10 },
       ];
 
       // Style header row
@@ -1348,23 +1358,33 @@ export default function Dashboard() {
         fgColor: { argb: 'FFE0E0E0' }
       };
 
-      // Add data rows
+      // Add data rows - only specified columns
       allData.forEach(item => {
         const row = dataSheet.addRow({
-          state: fixEncoding(item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || ''),
           serviceCategory: fixEncoding(SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || ''),
+          stateName: fixEncoding(item.state_name || ''),
+          stateCode: fixEncoding(item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || ''),
           serviceCode: fixEncoding(item.service_code || ''),
           serviceDescription: fixEncoding(item.service_description || ''),
           rate: formatRate(item.rate) === '-' ? '' : formatRate(item.rate),
+          rateEffectiveDate: formatDate(item.rate_effective_date) === '-' ? '' : formatDate(item.rate_effective_date),
           durationUnit: fixEncoding(item.duration_unit || ''),
-          effectiveDate: formatDate(item.rate_effective_date) === '-' ? '' : formatDate(item.rate_effective_date),
-          providerType: fixEncoding(item.provider_type || ''),
-          modifier1: item.modifier_1 ? fixEncoding(item.modifier_1_details ? `${item.modifier_1} - ${item.modifier_1_details}` : item.modifier_1) : '',
-          modifier2: item.modifier_2 ? fixEncoding(item.modifier_2_details ? `${item.modifier_2} - ${item.modifier_2_details}` : item.modifier_2) : '',
-          modifier3: item.modifier_3 ? fixEncoding(item.modifier_3_details ? `${item.modifier_3} - ${item.modifier_3_details}` : item.modifier_3) : '',
-          modifier4: item.modifier_4 ? fixEncoding(item.modifier_4_details ? `${item.modifier_4} - ${item.modifier_4_details}` : item.modifier_4) : '',
           program: fixEncoding(item.program || ''),
-          locationRegion: fixEncoding(item.location_region || '')
+          modifier1: fixEncoding(item.modifier_1 || ''),
+          modifier1Details: fixEncoding(item.modifier_1_details || ''),
+          modifier2: fixEncoding(item.modifier_2 || ''),
+          modifier2Details: fixEncoding(item.modifier_2_details || ''),
+          modifier3: fixEncoding(item.modifier_3 || ''),
+          modifier3Details: fixEncoding(item.modifier_3_details || ''),
+          modifier4: fixEncoding(item.modifier_4 || ''),
+          modifier4Details: fixEncoding(item.modifier_4_details || ''),
+          fee: fixEncoding(item.fee || ''),
+          maxFee: fixEncoding(item.max_fee || ''),
+          priorAuthRequired: fixEncoding(item.prior_auth_required || ''),
+          locationRegion: fixEncoding(item.location_region || ''),
+          requiresPa: fixEncoding(item.requires_pa || ''),
+          providerType: fixEncoding(item.provider_type || ''),
+          age: fixEncoding(item.age || ''),
         });
 
         // Lock all cells in this row
@@ -1591,20 +1611,30 @@ export default function Dashboard() {
 
       // Convert to CSV
       const headers = [
-        'State',
         'Service Category',
+        'State Name',
+        'State Code',
         'Service Code',
         'Service Description',
-        'Rate per Base Unit',
+        'Rate',
+        'Rate Effective Date',
         'Duration Unit',
-        'Effective Date',
-        'Provider Type',
-        'Modifier 1',
-        'Modifier 2',
-        'Modifier 3',
-        'Modifier 4',
         'Program',
-        'Location/Region'
+        'Modifier 1',
+        'Modifier 1 Details',
+        'Modifier 2',
+        'Modifier 2 Details',
+        'Modifier 3',
+        'Modifier 3 Details',
+        'Modifier 4',
+        'Modifier 4 Details',
+        'Fee',
+        'Max Fee',
+        'Prior Auth Required',
+        'Location/Region',
+        'Requires PA',
+        'Provider Type',
+        'Age',
       ];
 
       // Helper function to escape CSV fields
@@ -1662,20 +1692,30 @@ export default function Dashboard() {
 
       for (const item of allData) {
         const row = [
-          escapeCSV(fixEncoding(item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || item.state_name || '')),
           escapeCSV(fixEncoding(SERVICE_CATEGORY_ABBREVIATIONS[item.service_category?.toUpperCase() || ""] || item.service_category || '')),
+          escapeCSV(fixEncoding(item.state_name || '')),
+          escapeCSV(fixEncoding(item.state_code || STATE_ABBREVIATIONS[item.state_name?.toUpperCase() || ""] || '')),
           escapeCSV(fixEncoding(item.service_code || '')),
           escapeCSV(fixEncoding(item.service_description || '')),
           escapeCSV(formatRateForExport(item.rate)),
-          escapeCSV(fixEncoding(item.duration_unit || '')),
           escapeCSV(formatDateForExport(item.rate_effective_date)),
-          escapeCSV(fixEncoding(item.provider_type || '')),
-          escapeCSV(fixEncoding(formatModifierForExport(item.modifier_1, item.modifier_1_details))),
-          escapeCSV(fixEncoding(formatModifierForExport(item.modifier_2, item.modifier_2_details))),
-          escapeCSV(fixEncoding(formatModifierForExport(item.modifier_3, item.modifier_3_details))),
-          escapeCSV(fixEncoding(formatModifierForExport(item.modifier_4, item.modifier_4_details))),
+          escapeCSV(fixEncoding(item.duration_unit || '')),
           escapeCSV(fixEncoding(item.program || '')),
-          escapeCSV(fixEncoding(item.location_region || ''))
+          escapeCSV(fixEncoding(item.modifier_1 || '')),
+          escapeCSV(fixEncoding(item.modifier_1_details || '')),
+          escapeCSV(fixEncoding(item.modifier_2 || '')),
+          escapeCSV(fixEncoding(item.modifier_2_details || '')),
+          escapeCSV(fixEncoding(item.modifier_3 || '')),
+          escapeCSV(fixEncoding(item.modifier_3_details || '')),
+          escapeCSV(fixEncoding(item.modifier_4 || '')),
+          escapeCSV(fixEncoding(item.modifier_4_details || '')),
+          escapeCSV(fixEncoding(item.fee || '')),
+          escapeCSV(fixEncoding(item.max_fee || '')),
+          escapeCSV(fixEncoding(item.prior_auth_required || '')),
+          escapeCSV(fixEncoding(item.location_region || '')),
+          escapeCSV(fixEncoding(item.requires_pa || '')),
+          escapeCSV(fixEncoding(item.provider_type || '')),
+          escapeCSV(fixEncoding(item.age || '')),
         ];
         csvRows.push(row.join(','));
       }
