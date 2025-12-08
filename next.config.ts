@@ -10,9 +10,7 @@ const nextConfig: NextConfig = {
       "qpadwftthiuotvnchbvt.supabase.co" // Add your Supabase domain here
     ], // Add the allowed domains here
   },
-  eslint: {
-    ignoreDuringBuilds: true, // Ignore ESLint errors during builds
-  },
+  // Note: eslint config removed in Next.js 16 - ESLint is now handled separately
   // Force remove console logs in production
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
