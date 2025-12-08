@@ -1177,6 +1177,8 @@ export default function Dashboard() {
     alert('Export functionality is currently disabled.');
     return;
     
+    // Disabled code below - kept for reference
+    /*
     if (!hasSearched || data.length === 0) {
       alert('Please search for data first before exporting.');
       return;
@@ -1187,7 +1189,7 @@ export default function Dashboard() {
       // Build filters to get total count first
       const filters: Record<string, string> = {};
       for (const [key, value] of Object.entries(selections)) {
-        if (value) filters[key] = value;
+        if (value) filters[key] = value as string;
       }
       if (startDate) filters.start_date = startDate.toISOString().split('T')[0];
       if (endDate) filters.end_date = endDate.toISOString().split('T')[0];
@@ -1448,6 +1450,7 @@ export default function Dashboard() {
       alert(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setIsExporting(false);
     }
+    */
   };
 
   // Export function to fetch ALL data and convert to CSV
@@ -1456,6 +1459,8 @@ export default function Dashboard() {
     alert('Export functionality is currently disabled.');
     return;
     
+    // Disabled code below - kept for reference
+    /*
     if (!hasSearched || data.length === 0) {
       alert('Please search for data first before exporting.');
       return;
@@ -1540,6 +1545,12 @@ export default function Dashboard() {
   };
 
   const performCsvExport = async (filters: Record<string, string>, expectedRowCount: number) => {
+    // Export functionality disabled
+    alert('Export functionality is currently disabled.');
+    return;
+    
+    // Disabled code below - kept for reference
+    /*
     setIsExporting(true);
     setShowCsvWarningModal(false);
     
@@ -1773,6 +1784,7 @@ export default function Dashboard() {
       alert(`Export failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setIsExporting(false);
     }
+    */
   };
 
 

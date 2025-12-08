@@ -485,6 +485,8 @@ export default function DataExport() {
     alert("Export functionality is currently disabled.");
     return;
     
+    // Disabled code below - kept for reference
+    /*
     if (selectedColumns.length === 0) {
       alert("Please select at least one column before exporting.");
       return;
@@ -523,6 +525,7 @@ export default function DataExport() {
     } finally {
       setIsPreparingExport(false);
     }
+    */
   };
 
   const confirmExport = async () => {
@@ -530,6 +533,8 @@ export default function DataExport() {
     alert("Export functionality is currently disabled.");
     return;
     
+    // Disabled code below - kept for reference
+    /*
     if (!selectionReview) return;
     setSelectionReview(null);
     setIsExporting(true);
@@ -565,6 +570,7 @@ export default function DataExport() {
     } finally {
       setIsExporting(false);
     }
+    */
   };
 
   const fetchAllData = async (filters: Record<string, string>) => {
