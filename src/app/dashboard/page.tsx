@@ -1173,6 +1173,10 @@ export default function Dashboard() {
 
   // Export function to fetch ALL data and convert to Excel with protection
   const handleExportExcel = async () => {
+    // Export functionality disabled
+    alert('Export functionality is currently disabled.');
+    return;
+    
     if (!hasSearched || data.length === 0) {
       alert('Please search for data first before exporting.');
       return;
@@ -1448,6 +1452,10 @@ export default function Dashboard() {
 
   // Export function to fetch ALL data and convert to CSV
   const handleExport = async () => {
+    // Export functionality disabled
+    alert('Export functionality is currently disabled.');
+    return;
+    
     if (!hasSearched || data.length === 0) {
       alert('Please search for data first before exporting.');
       return;

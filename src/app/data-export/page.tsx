@@ -481,6 +481,10 @@ export default function DataExport() {
   };
 
   const prepareExport = async () => {
+    // Export functionality disabled
+    alert("Export functionality is currently disabled.");
+    return;
+    
     if (selectedColumns.length === 0) {
       alert("Please select at least one column before exporting.");
       return;
@@ -522,6 +526,10 @@ export default function DataExport() {
   };
 
   const confirmExport = async () => {
+    // Export functionality disabled
+    alert("Export functionality is currently disabled.");
+    return;
+    
     if (!selectionReview) return;
     setSelectionReview(null);
     setIsExporting(true);
@@ -1017,15 +1025,16 @@ export default function DataExport() {
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <button
             onClick={prepareExport}
-            disabled={isPreparingExport || isExporting}
+            disabled={true}
             className={clsx(buttonClasses, {
-              "opacity-60": isPreparingExport || isExporting,
+              "opacity-60 cursor-not-allowed": true,
             })}
+            title="Export functionality is currently disabled"
           >
             {(isPreparingExport || isExporting) && (
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
             )}
-            Download Excel
+            Download Excel (Disabled)
           </button>
           <p className="text-xs text-slate-500">
             Excel files include watermark and usage tracking. You can regenerate the same export as many times as you like.
