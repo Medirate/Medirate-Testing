@@ -5,7 +5,7 @@ import AppLayout from "@/app/components/applayout";
 import { Search, LayoutGrid, LayoutList, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FaSpinner, FaExclamationCircle, FaSearch, FaSort, FaSortUp, FaSortDown, FaFilter, FaChartLine } from 'react-icons/fa';
-import { useRequireSubscription } from "@/hooks/useRequireAuth";
+import { useProtectedPage } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { createPortal } from "react-dom";
 import Select from 'react-select';
@@ -498,10 +498,10 @@ function formatExcelOrStringDate(val: any): string {
 }
 
 export default function RateDevelopments() {
-  const auth = useRequireSubscription();
+  const auth = useProtectedPage();
   const router = useRouter();
 
-  // Authentication is now handled by useRequireSubscription hook
+  // Authentication is now handled by useProtectedPage hook (same as dashboard)
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
@@ -692,14 +692,19 @@ export default function RateDevelopments() {
     setSelectedBillProgress("");
   };
 
-  // Authentication and subscription checks are now handled by useRequireSubscription hook
+  // Authentication and subscription checks are now handled by useProtectedPage hook (same as dashboard)
 
   // Fetch data once authentication is complete
+  // Use same access logic as dashboard: hasActiveSubscription || isSubUser || isWireTransferUser
   useEffect(() => {
-    if (auth.isAuthenticated && auth.hasActiveSubscription && !auth.isLoading) {
-      fetchData();
+    if (auth.isAuthenticated && !auth.isLoading && auth.isCheckComplete) {
+      // Check access same way as dashboard: subscription OR sub-user OR wire transfer
+      const hasAccess = auth.hasActiveSubscription || auth.isSubUser || auth.isWireTransferUser;
+      if (hasAccess) {
+        fetchData();
+      }
     }
-  }, [auth.isAuthenticated, auth.hasActiveSubscription, auth.isLoading]);
+  }, [auth.isAuthenticated, auth.hasActiveSubscription, auth.isSubUser, auth.isWireTransferUser, auth.isLoading, auth.isCheckComplete]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -979,7 +984,8 @@ export default function RateDevelopments() {
     }
   }, [alerts, bills, loading]);
 
-  if (auth.isLoading || auth.shouldRedirect) {
+  // Show loading state while checking authentication (same as dashboard)
+  if (auth.isLoading || !auth.isCheckComplete) {
     return (
       <div className="loader-overlay">
         <div className="cssloader">
@@ -989,6 +995,11 @@ export default function RateDevelopments() {
         </div>
       </div>
     );
+  }
+
+  // Check if user should be redirected (no access)
+  if (auth.shouldRedirect) {
+    return null; // useProtectedPage handles the redirect
   }
 
   return (
