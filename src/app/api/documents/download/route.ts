@@ -27,7 +27,8 @@ export async function GET(request: NextRequest) {
     const fileBuffer = await downloadFileAsBuffer(fileId);
 
     // Return the file with proper headers
-    return new NextResponse(fileBuffer, {
+    // Convert Buffer to Uint8Array for NextResponse
+    return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         'Content-Type': mimeType,
         'Content-Disposition': `attachment; filename="${fileName}"`,

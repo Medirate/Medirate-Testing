@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useRouter } from "next/navigation";
 import AppLayout from "@/app/components/applayout";
@@ -310,7 +310,7 @@ export default function AdminDocumentLibrary() {
   };
 
   // Render tree node
-  const renderTreeNode = (node: FileNode, level: number = 0): JSX.Element => {
+  const renderTreeNode = (node: FileNode, level: number = 0): React.ReactElement => {
     const isFolder = node.type === 'folder';
     const isExpanded = node.expanded || false;
     const hasChildren = node.children && node.children.length > 0;

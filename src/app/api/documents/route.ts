@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
       
       // Extract folder structure from path
-      const pathParts = filePath.split('/').filter(part => part && part !== '');
+      const pathParts = filePath.split('/').filter((part: string) => part && part !== '');
       const folderPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : 'Root';
       
       // Extract subfolder (like ABA, BH, IDD)
