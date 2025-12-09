@@ -433,10 +433,55 @@ export default function AdminDocumentLibrary() {
   return (
     <AppLayout activeTab="adminDashboard">
       <div className="p-4 sm:p-8 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
           <h1 className="text-3xl font-bold text-[#012C61]">Document Library Management</h1>
-          <div className="flex items-center gap-2">
-            {clipboard && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Selection Mode Toggle */}
+            {!selectionMode ? (
+              <button
+                onClick={() => setSelectionMode(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              >
+                <Copy className="w-4 h-4" />
+                Select
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={selectAll}
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm"
+                >
+                  Select All
+                </button>
+                <button
+                  onClick={clearSelection}
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
+                >
+                  Cancel
+                </button>
+                {selectedItems.size > 0 && (
+                  <>
+                    <button
+                      onClick={() => handleCut(getSelectedItems())}
+                      className="flex items-center gap-2 px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm"
+                    >
+                      <Scissors className="w-4 h-4" />
+                      Cut ({selectedItems.size})
+                    </button>
+                    <button
+                      onClick={() => handleCopy(getSelectedItems())}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy ({selectedItems.size})
+                    </button>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Clipboard indicator */}
+            {clipboard && !selectionMode && (
               <div className="flex items-center gap-2 px-3 py-1 bg-blue-100 rounded-lg">
                 {clipboard.type === 'cut' ? (
                   <Scissors className="w-4 h-4" />
@@ -454,25 +499,41 @@ export default function AdminDocumentLibrary() {
                 </button>
               </div>
             )}
-            <button
-              onClick={() => {
-                setCreatingFolder({ parentPath: currentPath, name: '' });
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4" />
-              New Folder
-            </button>
-            <button
-              onClick={() => {
-                fileInputRef.current?.click();
-                setUploadingTo(currentPath);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-            >
-              <Upload className="w-4 h-4" />
-              Upload File
-            </button>
+
+            {/* Paste Here button - shows when clipboard has items */}
+            {clipboard && !selectionMode && (
+              <button
+                onClick={() => handlePaste(currentPath)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                <Clipboard className="w-4 h-4" />
+                Paste Here
+              </button>
+            )}
+
+            {!selectionMode && (
+              <>
+                <button
+                  onClick={() => {
+                    setCreatingFolder({ parentPath: currentPath, name: '' });
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  New Folder
+                </button>
+                <button
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                    setUploadingTo(currentPath);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload File
+                </button>
+              </>
+            )}
           </div>
         </div>
 
