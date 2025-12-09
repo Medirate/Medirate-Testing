@@ -213,9 +213,13 @@ export async function POST(req: NextRequest) {
     log('Supabase connection successful.', 'success', 'connection');
 
     if (type === 'billtrack') {
-      // 1. Reset all is_new flags to 'no' in both tables
-      log('Resetting is_new flags in bill_track_50...', 'info', 'reset');
-      await supabase.from('bill_track_50').update({ is_new: 'no' }).neq('is_new', 'no');
+      // Get current year for year-based processing
+      const currentYear = new Date().getFullYear();
+      log(`📅 Processing bills for year: ${currentYear}`, 'info', 'year');
+      
+      // 1. Reset is_new flags to 'no' ONLY for current year entries (don't touch previous years)
+      log(`Resetting is_new flags in bill_track_50 for year ${currentYear} only...`, 'info', 'reset');
+      await supabase.from('bill_track_50').update({ is_new: 'no' }).eq('bill_year', currentYear).neq('is_new', 'no');
       log('Resetting is_new flags in provider_alerts...', 'info', 'reset');
       const { error: resetError } = await supabase.from('provider_alerts').update({ is_new: 'no' }).neq('id', null);
       if (resetError) {
@@ -223,17 +227,20 @@ export async function POST(req: NextRequest) {
       } else {
         log(`Reset is_new flags in provider_alerts. Update attempted for all rows.`, 'success', 'reset');
       }
-      log('is_new flags reset in both tables.', 'success', 'reset');
+      log(`is_new flags reset for ${currentYear} entries only. Previous years are untouched.`, 'success', 'reset');
 
-      // 2. Fetch all rows from bill_track_50
-      log('Fetching all rows from bill_track_50...', 'info', 'fetch');
-      const { data: dbRows, error: dbError } = await supabase.from('bill_track_50').select('*');
+      // 2. Fetch ONLY rows from current year (don't touch previous years)
+      log(`Fetching rows from bill_track_50 for year ${currentYear} only...`, 'info', 'fetch');
+      const { data: dbRows, error: dbError } = await supabase
+        .from('bill_track_50')
+        .select('*')
+        .eq('bill_year', currentYear);
       if (dbError) {
         log(`Supabase fetch error: ${dbError.message}`, 'error', 'fetch');
         throw new Error(`Supabase fetch error: ${dbError.message}`);
       }
-      log(`Fetched ${dbRows?.length || 0} rows from bill_track_50.`, 'success', 'fetch');
-      log(`DEBUG: Database table "bill_track_50" contains ${dbRows?.length || 0} total entries`, 'info', 'fetch');
+      log(`Fetched ${dbRows?.length || 0} rows from bill_track_50 for year ${currentYear}.`, 'success', 'fetch');
+      log(`DEBUG: Database table "bill_track_50" contains ${dbRows?.length || 0} entries for year ${currentYear}`, 'info', 'fetch');
       const dbRowsClean = (dbRows || []).map((row: any) => {
         const newRow: any = {};
         Object.keys(row).forEach(key => {
@@ -241,26 +248,34 @@ export async function POST(req: NextRequest) {
         });
         return newRow;
       });
-      const dbByUrl = new Map<string, any>();
+      // Key by URL + YEAR combination (same URL in different year = different entry)
+      const dbByUrlAndYear = new Map<string, any>();
       dbRowsClean.forEach(r => {
-        if (r.url) dbByUrl.set(r.url, r);
+        if (r.url) {
+          const key = `${r.url}_${r.bill_year || currentYear}`;
+          dbByUrlAndYear.set(key, r);
+        }
       });
-      // 3. Insert new entries
+      // 3. Insert new entries (entries not found in current year)
       const today = new Date().toISOString().slice(0, 10);
-      const newEntries = filteredRows.filter(r => r.url && !dbByUrl.has(r.url));
+      const newEntries = filteredRows.filter(r => {
+        if (!r.url) return false;
+        const key = `${r.url}_${currentYear}`;
+        return !dbByUrlAndYear.has(key);
+      });
       let inserted = [];
       
       // Debug: Show detailed comparison
-      log(`DEBUG: ===== COMPARISON SUMMARY =====`, 'info', 'debug');
+      log(`DEBUG: ===== COMPARISON SUMMARY (Year ${currentYear}) =====`, 'info', 'debug');
       log(`DEBUG: Excel sheet "${latestSheet}" has ${filteredRows.length} entries with URLs`, 'info', 'debug');
-      log(`DEBUG: Database table "bill_track_50" has ${dbByUrl.size} entries with URLs`, 'info', 'debug');
-      log(`DEBUG: Found ${newEntries.length} potentially NEW entries to insert`, 'info', 'debug');
+      log(`DEBUG: Database table "bill_track_50" has ${dbByUrlAndYear.size} entries with URLs for year ${currentYear}`, 'info', 'debug');
+      log(`DEBUG: Found ${newEntries.length} potentially NEW entries to insert for year ${currentYear}`, 'info', 'debug');
       
       // Show sample URLs from Excel vs Database for comparison
       const excelUrls = filteredRows.slice(0, 5).map(r => r.url).filter(Boolean);
-      const dbUrls = Array.from(dbByUrl.keys()).slice(0, 5);
+      const dbUrls = Array.from(dbByUrlAndYear.keys()).slice(0, 5);
       log(`DEBUG: Sample Excel URLs: ${excelUrls.join(', ')}`, 'info', 'debug');
-      log(`DEBUG: Sample DB URLs: ${dbUrls.join(', ')}`, 'info', 'debug');
+      log(`DEBUG: Sample DB URLs (with year): ${dbUrls.join(', ')}`, 'info', 'debug');
       
       if (newEntries.length > 0) {
         log(`DEBUG: First 3 new entry URLs: ${newEntries.slice(0, 3).map(r => r.url).join(', ')}`, 'info', 'debug');
@@ -270,7 +285,7 @@ export async function POST(req: NextRequest) {
         'id', 'state', 'bill_number', 'name', 'last_action', 'action_date', 
         'sponsor_list', 'bill_progress', 'url', 'ai_summary', 'is_new', 
         'date_extracted', 'service_lines_impacted', 'service_lines_impacted_1', 
-        'service_lines_impacted_2', 'service_lines_impacted_3'
+        'service_lines_impacted_2', 'service_lines_impacted_3', 'bill_year'
       ];
       
       // Debug: Show what columns we're actually working with
@@ -281,7 +296,7 @@ export async function POST(req: NextRequest) {
       const insertedWithSource: any[] = [];
 
       for (const entry of newEntries) {
-        const insertObj = { ...entry, is_new: 'yes', date_extracted: today };
+        const insertObj = { ...entry, is_new: 'yes', date_extracted: today, bill_year: currentYear };
         delete insertObj.source_sheet;
         
         // Debug: Show the raw entry data
@@ -318,12 +333,14 @@ export async function POST(req: NextRequest) {
         }
       }
       log(`Inserted ${inserted.length} new entries.`, 'success', 'insert');
-      // 4. Update changed entries
+      // 4. Update changed entries (only for current year)
       const updated: any[] = [];
       const updatedWithSource: any[] = [];
       for (const entry of filteredRows) {
-        if (!entry.url || !dbByUrl.has(entry.url)) continue;
-        const dbRow = dbByUrl.get(entry.url);
+        if (!entry.url) continue;
+        const key = `${entry.url}_${currentYear}`;
+        if (!dbByUrlAndYear.has(key)) continue;
+        const dbRow = dbByUrlAndYear.get(key);
         let changed = false;
         const updateObj: any = {};
         // Service line fields that should NOT be overwritten for existing entries
@@ -363,11 +380,16 @@ export async function POST(req: NextRequest) {
           updateObj.is_new = 'yes';
           updateObj.date_extracted = today;
           
-          log(`DEBUG: Updating entry ${entry.url} with changes: ${JSON.stringify(updateObj)}`, 'info', 'debug');
+          log(`DEBUG: Updating entry ${entry.url} (year ${currentYear}) with changes: ${JSON.stringify(updateObj)}`, 'info', 'debug');
           // Explicit source logging for each update attempt
-          log(`SOURCE: file='${fileName}', sheet='${latestSheet}', url='${entry.url || ''}', state='${entry.state || ''}', bill='${entry.bill_number || ''}'`, 'info', 'update');
+          log(`SOURCE: file='${fileName}', sheet='${latestSheet}', url='${entry.url || ''}', state='${entry.state || ''}', bill='${entry.bill_number || ''}', year='${currentYear}'`, 'info', 'update');
           
-          const { data, error } = await supabase.from('bill_track_50').update(updateObj).eq('url', entry.url);
+          // Update by URL AND year to ensure we only update current year entries
+          const { data, error } = await supabase
+            .from('bill_track_50')
+            .update(updateObj)
+            .eq('url', entry.url)
+            .eq('bill_year', currentYear);
           if (!error) {
             updated.push({ url: entry.url, ...updateObj });
             log(`Updated entry: ${entry.url}`, 'success', 'update');
