@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     
     console.log(`📁 Total files found: ${blobs.length}`);
     
-    // Filter out metadata files, archive folders, and BILLING_MANUALS
+    // Filter out metadata files, archive folders, BILLING_MANUALS, and hidden files/folders (starting with .)
     const documentBlobs = blobs.filter(blob => {
       const p = (blob.pathname || '');
       // Exclude metadata folder
@@ -59,6 +59,9 @@ export async function GET(request: NextRequest) {
                (part.toUpperCase().includes('BILLING') && part.toUpperCase().includes('MANUAL'));
       });
       if (hasBillingManuals) return false;
+      // Exclude files/folders that start with a dot (hidden files like .gitkeep)
+      const hasHiddenFileOrFolder = pathParts.some(part => part.startsWith('.'));
+      if (hasHiddenFileOrFolder) return false;
       return true;
     });
     
