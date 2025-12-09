@@ -72,10 +72,6 @@ export async function POST(request: NextRequest) {
       await del(oldFilePath);
     }
 
-    // If we moved files but left .gitkeep behind, ensure source folder still exists
-    // (Actually, if we didn't move .gitkeep and there are no other files, the folder is already empty
-    // and the .gitkeep is still there, so the folder is preserved. No action needed.)
-
     return NextResponse.json({ success: true, moved: filesToActuallyMove.length });
   } catch (error: any) {
     console.error('Move error:', error);
