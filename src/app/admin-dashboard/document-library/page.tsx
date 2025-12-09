@@ -56,6 +56,8 @@ export default function AdminDocumentLibrary() {
   const [creatingFolder, setCreatingFolder] = useState<{ parentPath: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingTo, setUploadingTo] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
   // Load all files and navigate to current path
   const loadFiles = async () => {
@@ -193,16 +195,63 @@ export default function AdminDocumentLibrary() {
     return ''; // Root level
   };
 
-  // Cut item
-  const handleCut = (item: FileNode) => {
-    setClipboard({ type: 'cut', item });
-    setContextMenu(null);
+  // Cut item(s)
+  const handleCut = (items: FileNode[]) => {
+    if (items.length === 1) {
+      setClipboard({ type: 'cut', item: items[0] });
+      setContextMenu(null);
+      setSelectedItems(new Set());
+      setSelectionMode(false);
+    } else {
+      // For multiple items, we'll handle the first one for now
+      // Could be enhanced to handle multiple items
+      setClipboard({ type: 'cut', item: items[0] });
+      setSelectedItems(new Set());
+      setSelectionMode(false);
+    }
   };
 
-  // Copy item
-  const handleCopy = (item: FileNode) => {
-    setClipboard({ type: 'copy', item });
-    setContextMenu(null);
+  // Copy item(s)
+  const handleCopy = (items: FileNode[]) => {
+    if (items.length === 1) {
+      setClipboard({ type: 'copy', item: items[0] });
+      setContextMenu(null);
+      setSelectedItems(new Set());
+      setSelectionMode(false);
+    } else {
+      // For multiple items, we'll handle the first one for now
+      setClipboard({ type: 'copy', item: items[0] });
+      setSelectedItems(new Set());
+      setSelectionMode(false);
+    }
+  };
+
+  // Toggle item selection
+  const toggleSelection = (itemPath: string) => {
+    const newSelection = new Set(selectedItems);
+    if (newSelection.has(itemPath)) {
+      newSelection.delete(itemPath);
+    } else {
+      newSelection.add(itemPath);
+    }
+    setSelectedItems(newSelection);
+  };
+
+  // Select all in current folder
+  const selectAll = () => {
+    const allPaths = new Set(currentFolderContents.map(item => item.path));
+    setSelectedItems(allPaths);
+  };
+
+  // Clear selection
+  const clearSelection = () => {
+    setSelectedItems(new Set());
+    setSelectionMode(false);
+  };
+
+  // Get selected items as FileNode array
+  const getSelectedItems = (): FileNode[] => {
+    return currentFolderContents.filter(item => selectedItems.has(item.path));
   };
 
   // Paste item
@@ -484,17 +533,34 @@ export default function AdminDocumentLibrary() {
               <div className="grid grid-cols-1 gap-1">
                 {currentFolderContents.map((item) => {
                   const isFolder = item.type === 'folder';
+                  const isSelected = selectedItems.has(item.path);
                   return (
                     <div
                       key={item.path}
                       className={`flex items-center py-2 px-3 hover:bg-gray-100 cursor-pointer group rounded ${
-                        selectedItem?.path === item.path ? 'bg-blue-50' : ''
+                        selectedItem?.path === item.path && !selectionMode ? 'bg-blue-50' : ''
+                      } ${
+                        isSelected ? 'bg-blue-100 border-2 border-blue-500' : ''
                       }`}
-                      onClick={() => setSelectedItem(item)}
-                      onDoubleClick={() => handleFolderClick(item)}
-                      onContextMenu={(e) => handleContextMenu(e, item)}
+                      onClick={() => {
+                        if (selectionMode) {
+                          toggleSelection(item.path);
+                        } else {
+                          setSelectedItem(item);
+                        }
+                      }}
+                      onDoubleClick={() => {
+                        if (!selectionMode) {
+                          handleFolderClick(item);
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        if (!selectionMode) {
+                          handleContextMenu(e, item);
+                        }
+                      }}
                       onDragOver={(e) => {
-                        if (isFolder && clipboard) {
+                        if (isFolder && clipboard && !selectionMode) {
                           e.preventDefault();
                           e.currentTarget.classList.add('bg-blue-100');
                         }
@@ -505,11 +571,21 @@ export default function AdminDocumentLibrary() {
                       onDrop={(e) => {
                         e.preventDefault();
                         e.currentTarget.classList.remove('bg-blue-100');
-                        if (isFolder && clipboard) {
+                        if (isFolder && clipboard && !selectionMode) {
                           handlePaste(item.path);
                         }
                       }}
                     >
+                      {/* Checkbox in selection mode */}
+                      {selectionMode && (
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelection(item.path)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mr-3 w-4 h-4 cursor-pointer"
+                        />
+                      )}
                       <div className="flex items-center flex-1 min-w-0">
                         {isFolder ? (
                           <Folder className="w-6 h-6 mr-3 text-blue-500" />
@@ -526,42 +602,44 @@ export default function AdminDocumentLibrary() {
                           </span>
                         )}
                       </div>
-                      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
-                        {isFolder && (
-                          <>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setCreatingFolder({ parentPath: item.path, name: '' });
-                              }}
-                              className="p-1 hover:bg-gray-200 rounded"
-                              title="Create folder"
-                            >
-                              <Plus className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                fileInputRef.current?.click();
-                                setUploadingTo(item.path);
-                              }}
-                              className="p-1 hover:bg-gray-200 rounded"
-                              title="Upload file"
-                            >
-                              <Upload className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleContextMenu(e, item);
-                          }}
-                          className="p-1 hover:bg-gray-200 rounded"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {!selectionMode && (
+                        <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
+                          {isFolder && (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCreatingFolder({ parentPath: item.path, name: '' });
+                                }}
+                                className="p-1 hover:bg-gray-200 rounded"
+                                title="Create folder"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  fileInputRef.current?.click();
+                                  setUploadingTo(item.path);
+                                }}
+                                className="p-1 hover:bg-gray-200 rounded"
+                                title="Upload file"
+                              >
+                                <Upload className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleContextMenu(e, item);
+                            }}
+                            className="p-1 hover:bg-gray-200 rounded"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -583,7 +661,7 @@ export default function AdminDocumentLibrary() {
             >
               <button
                 onClick={() => {
-                  handleCut(contextMenu.item);
+                  handleCut([contextMenu.item]);
                 }}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
               >
@@ -592,7 +670,7 @@ export default function AdminDocumentLibrary() {
               </button>
               <button
                 onClick={() => {
-                  handleCopy(contextMenu.item);
+                  handleCopy([contextMenu.item]);
                 }}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
               >
@@ -603,6 +681,7 @@ export default function AdminDocumentLibrary() {
                 <button
                   onClick={() => {
                     handlePaste(currentPath);
+                    setContextMenu(null);
                   }}
                   className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
                 >
