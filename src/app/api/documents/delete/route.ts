@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
-import { deleteFileOrFolder } from '@/lib/google-drive';
+import { list, del } from '@vercel/blob';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,15 +17,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const { fileId } = await request.json();
+    const { pathname } = await request.json();
 
-    if (!fileId) {
-      return NextResponse.json({ error: 'fileId is required' }, { status: 400 });
+    if (!pathname) {
+      return NextResponse.json({ error: 'pathname is required' }, { status: 400 });
     }
 
-    await deleteFileOrFolder(fileId);
+    // Check if it's a folder (need to delete all files in folder)
+    const { blobs } = await list();
+    const isFolder = !blobs.find(b => b.pathname === pathname);
+    const filesToDelete = isFolder 
+      ? blobs.filter(b => b.pathname.startsWith(pathname + '/'))
+      : [{ pathname }];
 
-    return NextResponse.json({ success: true });
+    // Delete all files
+    for (const file of filesToDelete) {
+      await del(file.pathname);
+    }
+
+    return NextResponse.json({ success: true, deleted: filesToDelete.length });
   } catch (error: any) {
     console.error('Delete error:', error);
     return NextResponse.json({ 

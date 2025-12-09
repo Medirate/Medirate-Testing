@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
-import { renameFileOrFolder } from '@/lib/google-drive';
+import { list, put, del } from '@vercel/blob';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,15 +17,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const { fileId, newName } = await request.json();
+    const { oldPath, newPath } = await request.json();
 
-    if (!fileId || !newName) {
-      return NextResponse.json({ error: 'fileId and newName are required' }, { status: 400 });
+    if (!oldPath || !newPath) {
+      return NextResponse.json({ error: 'oldPath and newPath are required' }, { status: 400 });
     }
 
-    await renameFileOrFolder(fileId, newName);
+    // Find the file(s) in Vercel Blob
+    const { blobs } = await list();
+    const isFolder = !blobs.find(b => b.pathname === oldPath);
+    const filesToRename = isFolder 
+      ? blobs.filter(b => b.pathname.startsWith(oldPath + '/'))
+      : [blobs.find(b => b.pathname === oldPath)].filter(Boolean);
 
-    return NextResponse.json({ success: true });
+    if (filesToRename.length === 0) {
+      return NextResponse.json({ error: 'File or folder not found' }, { status: 404 });
+    }
+
+    // Rename each file (download, upload with new path, delete old)
+    for (const fileBlob of filesToRename) {
+      const oldFilePath = fileBlob.pathname;
+      const newFilePath = isFolder 
+        ? oldFilePath.replace(oldPath, newPath)
+        : newPath;
+
+      // Download
+      const response = await fetch(fileBlob.url);
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.statusText}`);
+      }
+
+      const fileData = await response.arrayBuffer();
+      const blob = new Blob([fileData]);
+
+      // Upload to new path
+      await put(newFilePath, blob, {
+        access: 'public',
+      });
+
+      // Delete old file
+      await del(oldFilePath);
+    }
+
+    return NextResponse.json({ success: true, renamed: filesToRename.length });
   } catch (error: any) {
     console.error('Rename error:', error);
     return NextResponse.json({ 

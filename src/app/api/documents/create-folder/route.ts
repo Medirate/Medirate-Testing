@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
-import { createFolder } from '@/lib/google-drive';
+import { put } from '@vercel/blob';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,15 +17,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const { parentId, folderName } = await request.json();
+    const { parentPath, folderName } = await request.json();
 
-    if (!parentId || !folderName) {
-      return NextResponse.json({ error: 'parentId and folderName are required' }, { status: 400 });
+    if (!folderName) {
+      return NextResponse.json({ error: 'folderName is required' }, { status: 400 });
     }
 
-    const folder = await createFolder(parentId, folderName);
+    // Vercel Blob doesn't support empty folders, so we create a .gitkeep file
+    const folderPath = parentPath 
+      ? `${parentPath}/${folderName}/.gitkeep`
+      : `${folderName}/.gitkeep`;
 
-    return NextResponse.json({ success: true, folder });
+    // Create a placeholder file to represent the folder
+    const placeholder = new Blob([''], { type: 'text/plain' });
+    await put(folderPath, placeholder, {
+      access: 'public',
+    });
+
+    return NextResponse.json({ 
+      success: true, 
+      folder: {
+        id: folderPath.replace('/.gitkeep', ''),
+        name: folderName,
+        path: folderPath.replace('/.gitkeep', ''),
+      }
+    });
   } catch (error: any) {
     console.error('Create folder error:', error);
     return NextResponse.json({ 

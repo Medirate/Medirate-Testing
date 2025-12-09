@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
-import {
-  findRootFolder,
-  findOrCreateFolderPath,
-  uploadFileToDrive,
-} from '@/lib/google-drive';
+import { put } from '@vercel/blob';
 
 export async function POST(request: NextRequest) {
   try {
-    const { getUser } = getKindeServerSession();
+    const { getUser } = await getKindeServerSession();
     const user = await getUser();
     
     if (!user || !user.email) {
@@ -24,53 +20,37 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const folderPath = formData.get('folderPath') as string;
-    const folderId = formData.get('folderId') as string;
+    const parentPath = formData.get('parentPath') as string;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Determine target folder: use folderId if provided, otherwise use folderPath
-    let targetFolderId: string;
-    
-    if (folderId) {
-      // Direct folder ID provided
-      targetFolderId = folderId;
-    } else {
+    // Determine target path
+    let targetPath: string;
+    if (parentPath) {
+      // Upload to specific parent folder
+      targetPath = `${parentPath}/${file.name}`;
+    } else if (folderPath) {
       // Use folder path (legacy support)
-      const rootFolderName = process.env.GOOGLE_DRIVE_ROOT_FOLDER || 'MediRate Documents';
-      const rootFolderId = await findRootFolder(rootFolderName);
-      
-      if (!rootFolderId) {
-        return NextResponse.json({ 
-          error: `Root folder "${rootFolderName}" not found. Please create it in Google Drive.` 
-        }, { status: 404 });
-      }
-
-      targetFolderId = folderPath 
-        ? await findOrCreateFolderPath(rootFolderId, folderPath)
-        : rootFolderId;
+      targetPath = `${folderPath}/${file.name}`;
+    } else {
+      // Upload to root
+      targetPath = file.name;
     }
 
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const fileBuffer = Buffer.from(arrayBuffer);
-
-    // Upload to Google Drive
-    const uploadedFile = await uploadFileToDrive(
-      targetFolderId,
-      file.name,
-      fileBuffer,
-      file.type || 'application/octet-stream'
-    );
+    // Upload to Vercel Blob
+    const blob = await put(targetPath, file, {
+      access: 'public',
+    });
 
     return NextResponse.json({
       success: true,
       file: {
-        id: uploadedFile.id,
-        name: uploadedFile.name,
-        pathname: folderPath ? `${folderPath}/${file.name}` : file.name,
-        webViewLink: uploadedFile.webViewLink,
+        id: targetPath,
+        name: file.name,
+        pathname: targetPath,
+        url: blob.url,
       }
     });
 

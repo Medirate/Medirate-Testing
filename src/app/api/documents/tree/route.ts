@@ -1,6 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
-import { findRootFolder, getFolderTree } from '@/lib/google-drive';
+import { list } from '@vercel/blob';
+
+interface FileNode {
+  id: string;
+  name: string;
+  type: 'file' | 'folder';
+  path: string;
+  size?: number;
+  modifiedTime?: string;
+  parentId?: string;
+  children?: FileNode[];
+}
+
+// Build hierarchical tree from flat list of paths
+function buildTreeFromPaths(blobs: any[]): FileNode[] {
+  const nodeMap = new Map<string, FileNode>();
+  const roots: FileNode[] = [];
+
+  // First pass: create all nodes
+  blobs.forEach(blob => {
+    const pathname = blob.pathname || '';
+    const pathParts = pathname.split('/').filter(part => part && part !== '');
+    
+    if (pathParts.length === 0) return;
+
+    // Create folder nodes for each path segment
+    let currentPath = '';
+    pathParts.forEach((part, index) => {
+      const isLast = index === pathParts.length - 1;
+      const parentPath = currentPath;
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+
+      if (!nodeMap.has(currentPath)) {
+        const node: FileNode = {
+          id: currentPath,
+          name: part,
+          type: isLast ? 'file' : 'folder',
+          path: currentPath,
+          parentId: parentPath || undefined,
+          children: isLast ? undefined : [],
+          size: isLast ? blob.size : undefined,
+          modifiedTime: isLast ? blob.uploadedAt.toISOString() : undefined,
+        };
+        nodeMap.set(currentPath, node);
+
+        if (!parentPath) {
+          roots.push(node);
+        } else {
+          const parent = nodeMap.get(parentPath);
+          if (parent && parent.children) {
+            parent.children.push(node);
+          }
+        }
+      }
+    });
+  });
+
+  // Sort children
+  const sortNodes = (nodes: FileNode[]) => {
+    nodes.sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type === 'folder' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+    nodes.forEach(node => {
+      if (node.children) {
+        sortNodes(node.children);
+      }
+    });
+  };
+
+  sortNodes(roots);
+  return roots;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,21 +91,34 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const rootFolderName = process.env.GOOGLE_DRIVE_ROOT_FOLDER || 'Medirate Document Library';
-    const rootFolderId = await findRootFolder(rootFolderName);
+    // Get all files from Vercel Blob
+    const { blobs } = await list();
     
-    if (!rootFolderId) {
-      return NextResponse.json({ 
-        error: `Root folder "${rootFolderName}" not found` 
-      }, { status: 404 });
-    }
+    // Filter out metadata, archives, and billing manuals
+    const documentBlobs = blobs.filter(blob => {
+      const p = (blob.pathname || '');
+      if (p.startsWith('_metadata/')) return false;
+      if (p.toLowerCase().endsWith('.json')) return false;
+      const pathParts = p.split('/').filter(part => part && part !== '');
+      const hasArchiveFolder = pathParts.some(part => 
+        part.toUpperCase().includes('ARCHIVE') || 
+        part.toUpperCase().endsWith('_ARCHIVE')
+      );
+      if (hasArchiveFolder) return false;
+      const hasBillingManuals = pathParts.some(part => {
+        const normalized = part.toUpperCase().replace(/[_\s-]/g, '');
+        return normalized === 'BILLINGMANUALS' || 
+               (part.toUpperCase().includes('BILLING') && part.toUpperCase().includes('MANUAL'));
+      });
+      if (hasBillingManuals) return false;
+      return true;
+    });
 
-    const tree = await getFolderTree(rootFolderId);
+    // Build tree structure
+    const tree = buildTreeFromPaths(documentBlobs);
 
     return NextResponse.json({ 
       success: true, 
-      rootFolderId,
-      rootFolderName,
       tree 
     });
   } catch (error: any) {

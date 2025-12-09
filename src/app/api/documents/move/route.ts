@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
-import { moveFileOrFolder } from '@/lib/google-drive';
+import { list, put, del } from '@vercel/blob';
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,13 +17,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const { fileId, newParentId, removeFromOldParent = true } = await request.json();
+    const { oldPath, newPath } = await request.json();
 
-    if (!fileId || !newParentId) {
-      return NextResponse.json({ error: 'fileId and newParentId are required' }, { status: 400 });
+    if (!oldPath || !newPath) {
+      return NextResponse.json({ error: 'oldPath and newPath are required' }, { status: 400 });
     }
 
-    await moveFileOrFolder(fileId, newParentId, removeFromOldParent);
+    // Find the file in Vercel Blob
+    const { blobs } = await list();
+    const fileBlob = blobs.find(b => b.pathname === oldPath);
+
+    if (!fileBlob) {
+      return NextResponse.json({ error: 'File not found' }, { status: 404 });
+    }
+
+    // Download the file
+    const response = await fetch(fileBlob.url);
+    if (!response.ok) {
+      throw new Error(`Failed to download file: ${response.statusText}`);
+    }
+
+    const fileData = await response.arrayBuffer();
+    const blob = new Blob([fileData]);
+
+    // Upload to new location
+    await put(newPath, blob, {
+      access: 'public',
+    });
+
+    // Delete old file
+    await del(oldPath);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

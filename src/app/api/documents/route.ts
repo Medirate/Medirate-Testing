@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
-import {
-  findRootFolder,
-  getAllFilesFromFolder,
-  findMetadataFile,
-  extractStateFromPath,
-  extractSubfolderFromPath,
-  formatFileSize,
-} from '@/lib/google-drive';
+import { list } from '@vercel/blob';
+
+// Helper: Extract state from path
+function extractStateFromPath(path: string): string | undefined {
+  const parts = path.split('/').filter(Boolean);
+  return parts.length > 0 ? parts[0] : undefined;
+}
+
+// Helper: Extract subfolder from path
+function extractSubfolderFromPath(path: string): string | null {
+  const parts = path.split('/').filter(Boolean);
+  return parts.length > 1 ? parts[parts.length - 2] : null;
+}
+
+// Helper: Format file size
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,63 +31,80 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Find root folder (default: "MediRate Documents")
-    const rootFolderName = process.env.GOOGLE_DRIVE_ROOT_FOLDER || 'MediRate Documents';
-    const rootFolderId = await findRootFolder(rootFolderName);
+    console.log('🔍 Connecting to Vercel Blob Storage...');
     
-    if (!rootFolderId) {
-      console.error(`Root folder "${rootFolderName}" not found in Google Drive`);
-      return NextResponse.json({ 
-        error: `Root folder "${rootFolderName}" not found. Please create it in Google Drive and share it with the service account.` 
-      }, { status: 404 });
+    // List all files in the blob store
+    const { blobs } = await list();
+    
+    console.log(`📁 Total files found: ${blobs.length}`);
+    
+    // Filter out metadata files, archive folders, and BILLING_MANUALS
+    const documentBlobs = blobs.filter(blob => {
+      const p = (blob.pathname || '');
+      // Exclude metadata folder
+      if (p.startsWith('_metadata/')) return false;
+      // Exclude JSON files
+      if (p.toLowerCase().endsWith('.json')) return false;
+      // Exclude archive folders
+      const pathParts = p.split('/').filter(part => part && part !== '');
+      const hasArchiveFolder = pathParts.some(part => 
+        part.toUpperCase().includes('ARCHIVE') || 
+        part.toUpperCase().endsWith('_ARCHIVE')
+      );
+      if (hasArchiveFolder) return false;
+      // Exclude BILLING_MANUALS
+      const hasBillingManuals = pathParts.some(part => {
+        const normalized = part.toUpperCase().replace(/[_\s-]/g, '');
+        return normalized === 'BILLINGMANUALS' || 
+               (part.toUpperCase().includes('BILLING') && part.toUpperCase().includes('MANUAL'));
+      });
+      if (hasBillingManuals) return false;
+      return true;
+    });
+    
+    console.log(`📄 Document files (excluding metadata): ${documentBlobs.length}`);
+
+    // Load metadata (state links) - check for manual_billing_links.json
+    let stateLinks: Record<string, Array<string | { title: string; url: string }>> = {};
+    try {
+      const metadataBlob = blobs.find(b => b.pathname === '_metadata/manual_billing_links.json');
+      if (metadataBlob) {
+        const metadataResponse = await fetch(metadataBlob.url);
+        if (metadataResponse.ok) {
+          const metadata = await metadataResponse.json();
+          stateLinks = metadata.stateLinks || {};
+        }
+      }
+    } catch (error) {
+      console.warn('Could not load metadata file:', error);
     }
 
-    console.log(`📁 Found root folder: ${rootFolderName} (ID: ${rootFolderId})`);
-
-    // Get all files from Google Drive
-    const driveFiles = await getAllFilesFromFolder(rootFolderId);
-    console.log('📁 Found files in Google Drive:', driveFiles.length);
-
-    // Load metadata (state links)
-    const metadata = await findMetadataFile(rootFolderId);
-    const stateLinks: Record<string, string[]> = metadata?.stateLinks || {};
-
-    // Transform Google Drive files to Document format
-    const documents = driveFiles.map(file => {
-      const fileName = file.name || 'Document';
-      const filePath = file.path || fileName;
+    // Transform Vercel Blob files to Document format
+    const documents = documentBlobs.map(blob => {
+      const pathname = blob.pathname || '';
+      const pathParts = pathname.split('/').filter(part => part && part !== '');
+      const fileName = pathParts[pathParts.length - 1] || 'Document';
       const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
-      
-      // Extract folder structure from path
-      const pathParts = filePath.split('/').filter((part: string) => part && part !== '');
       const folderPath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : 'Root';
-      
-      // Extract subfolder (like ABA, BH, IDD)
-      const subfolder = extractSubfolderFromPath(filePath);
-      
-      // Get file size (convert from string to number if needed)
-      const fileSizeBytes = typeof file.size === 'string' ? parseInt(file.size) : (file.size || 0);
-      
-      // Get modified time
-      const modifiedTime = file.modifiedTime ? new Date(file.modifiedTime).toISOString() : new Date().toISOString();
+      const subfolder = extractSubfolderFromPath(pathname);
+      const state = extractStateFromPath(pathname);
 
       return {
-        id: file.id, // Google Drive file ID
+        id: pathname, // Use pathname as ID for Vercel Blob
         title: fileName,
         type: fileExtension,
         folder: folderPath,
         subfolder: subfolder,
-        state: extractStateFromPath(filePath),
+        state: state,
         category: subfolder || folderPath,
-        description: `File in ${folderPath}${subfolder ? ` → ${subfolder}` : ''} - Modified on ${new Date(modifiedTime).toLocaleDateString()}`,
-        uploadDate: modifiedTime,
-        lastModified: modifiedTime,
-        fileSize: formatFileSize(fileSizeBytes),
-        downloadUrl: file.id, // We'll use file ID for download endpoint
+        description: `File in ${folderPath}${subfolder ? ` → ${subfolder}` : ''}`,
+        uploadDate: blob.uploadedAt.toISOString(),
+        lastModified: blob.uploadedAt.toISOString(),
+        fileSize: formatFileSize(blob.size),
+        downloadUrl: blob.url,
         tags: [fileExtension, folderPath, ...(subfolder ? [subfolder] : [])],
         isPublic: true,
-        filePath: filePath,
-        googleDriveFileId: file.id, // Store for reference
+        filePath: pathname,
       };
     });
 
@@ -81,7 +112,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ documents, stateLinks });
   } catch (error) {
-    console.error('Error fetching documents from Google Drive:', error);
+    console.error('Error fetching documents from Vercel Blob:', error);
     return NextResponse.json({ 
       error: 'Failed to fetch documents',
       details: error instanceof Error ? error.message : 'Unknown error'

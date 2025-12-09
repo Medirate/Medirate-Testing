@@ -42,7 +42,6 @@ export default function AdminDocumentLibrary() {
   const auth = useRequireAuth();
   const router = useRouter();
   const [tree, setTree] = useState<FileNode[]>([]);
-  const [rootFolderId, setRootFolderId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<ClipboardItem | null>(null);
@@ -50,7 +49,7 @@ export default function AdminDocumentLibrary() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: FileNode } | null>(null);
   const [renamingItem, setRenamingItem] = useState<FileNode | null>(null);
   const [newName, setNewName] = useState('');
-  const [creatingFolder, setCreatingFolder] = useState<{ parentId: string; name: string } | null>(null);
+  const [creatingFolder, setCreatingFolder] = useState<{ parentPath: string; name: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingTo, setUploadingTo] = useState<string | null>(null);
 
@@ -61,56 +60,17 @@ export default function AdminDocumentLibrary() {
       setError(null);
       const response = await fetch('/api/documents/tree');
       if (!response.ok) {
-        throw new Error('Failed to load folder tree');
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'Failed to load folder tree');
       }
       const data = await response.json();
-      setRootFolderId(data.rootFolderId);
-      // Convert flat tree to hierarchical structure
-      const hierarchical = buildHierarchicalTree(data.tree, data.rootFolderId);
-      setTree(hierarchical);
+      // Tree is already hierarchical from the API
+      setTree(data.tree || []);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Convert flat tree to hierarchical structure
-  const buildHierarchicalTree = (flatTree: any[], rootId: string): FileNode[] => {
-    const map = new Map<string, FileNode>();
-    const roots: FileNode[] = [];
-
-    // First pass: create all nodes
-    flatTree.forEach(item => {
-      const node: FileNode = {
-        id: item.id,
-        name: item.name,
-        type: item.type === 'folder' ? 'folder' : 'file',
-        path: item.path,
-        size: item.size,
-        modifiedTime: item.modifiedTime,
-        parentId: item.parentId,
-        children: [],
-        expanded: false,
-      };
-      map.set(item.id, node);
-    });
-
-    // Second pass: build hierarchy
-    flatTree.forEach(item => {
-      const node = map.get(item.id)!;
-      if (item.parentId && item.parentId !== rootId) {
-        const parent = map.get(item.parentId);
-        if (parent) {
-          parent.children = parent.children || [];
-          parent.children.push(node);
-        }
-      } else {
-        roots.push(node);
-      }
-    });
-
-    return roots;
   };
 
   useEffect(() => {
@@ -147,22 +107,16 @@ export default function AdminDocumentLibrary() {
     return null;
   };
 
-  // Get parent folder ID for an item
-  const getParentId = (item: FileNode): string => {
+  // Get parent folder path for an item
+  const getParentPath = (item: FileNode): string => {
     if (item.parentId) return item.parentId;
-    // If no parentId, find it in the tree
-    const findParent = (nodes: FileNode[], targetId: string, parent: FileNode | null = null): FileNode | null => {
-      for (const node of nodes) {
-        if (node.id === targetId) return parent;
-        if (node.children) {
-          const found = findParent(node.children, targetId, node);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    const parent = findParent(tree, item.id);
-    return parent?.id || rootFolderId;
+    // Extract parent path from item path
+    const pathParts = item.path.split('/').filter(p => p);
+    if (pathParts.length > 1) {
+      pathParts.pop(); // Remove the item name
+      return pathParts.join('/');
+    }
+    return ''; // Root level
   };
 
   // Cut item
@@ -178,37 +132,41 @@ export default function AdminDocumentLibrary() {
   };
 
   // Paste item
-  const handlePaste = async (targetFolderId: string) => {
+  const handlePaste = async (targetFolderPath: string) => {
     if (!clipboard) return;
 
     try {
+      const oldPath = clipboard.item.path;
+      const fileName = clipboard.item.name;
+      const newPath = targetFolderPath ? `${targetFolderPath}/${fileName}` : fileName;
+
       if (clipboard.type === 'cut') {
         // Move file/folder
         const response = await fetch('/api/documents/move', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            fileId: clipboard.item.id,
-            newParentId: targetFolderId,
-            removeFromOldParent: true,
+            oldPath,
+            newPath,
           }),
         });
-        if (!response.ok) throw new Error('Failed to move');
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.details || 'Failed to move');
+        }
       } else {
-        // Copy file (folders can't be copied via API easily)
-        if (clipboard.item.type === 'file') {
-          const response = await fetch('/api/documents/copy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fileId: clipboard.item.id,
-              newParentId: targetFolderId,
-            }),
-          });
-          if (!response.ok) throw new Error('Failed to copy');
-        } else {
-          alert('Copying folders is not supported. Please move the folder instead.');
-          return;
+        // Copy file/folder
+        const response = await fetch('/api/documents/copy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            oldPath,
+            newPath,
+          }),
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.details || 'Failed to copy');
         }
       }
       setClipboard(null);
@@ -226,9 +184,12 @@ export default function AdminDocumentLibrary() {
       const response = await fetch('/api/documents/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileId: item.id }),
+        body: JSON.stringify({ pathname: item.path }),
       });
-      if (!response.ok) throw new Error('Failed to delete');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || 'Failed to delete');
+      }
       await loadTree();
       setContextMenu(null);
     } catch (err: any) {
@@ -241,15 +202,23 @@ export default function AdminDocumentLibrary() {
     if (!newName.trim()) return;
 
     try {
+      const oldPath = item.path;
+      const pathParts = oldPath.split('/').filter(p => p);
+      pathParts[pathParts.length - 1] = newName.trim();
+      const newPath = pathParts.join('/');
+
       const response = await fetch('/api/documents/rename', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fileId: item.id,
-          newName: newName.trim(),
+          oldPath,
+          newPath,
         }),
       });
-      if (!response.ok) throw new Error('Failed to rename');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || 'Failed to rename');
+      }
       await loadTree();
       setRenamingItem(null);
       setNewName('');
@@ -259,7 +228,7 @@ export default function AdminDocumentLibrary() {
   };
 
   // Create folder
-  const handleCreateFolder = async (parentId: string, folderName: string) => {
+  const handleCreateFolder = async (parentPath: string, folderName: string) => {
     if (!folderName.trim()) return;
 
     try {
@@ -267,11 +236,14 @@ export default function AdminDocumentLibrary() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          parentId,
+          parentPath: parentPath || '',
           folderName: folderName.trim(),
         }),
       });
-      if (!response.ok) throw new Error('Failed to create folder');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || 'Failed to create folder');
+      }
       await loadTree();
       setCreatingFolder(null);
     } catch (err: any) {
@@ -280,19 +252,22 @@ export default function AdminDocumentLibrary() {
   };
 
   // Upload file
-  const handleUpload = async (folderId: string, file: File) => {
+  const handleUpload = async (folderPath: string, file: File) => {
     try {
-      setUploadingTo(folderId);
+      setUploadingTo(folderPath);
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('folderId', folderId); // Use folderId directly
+      formData.append('parentPath', folderPath || '');
 
       const response = await fetch('/api/documents/upload', {
         method: 'POST',
         body: formData,
       });
 
-      if (!response.ok) throw new Error('Failed to upload');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || 'Failed to upload');
+      }
       await loadTree();
     } catch (err: any) {
       alert(`Error: ${err.message}`);
@@ -344,7 +319,7 @@ export default function AdminDocumentLibrary() {
             e.preventDefault();
             e.currentTarget.classList.remove('bg-blue-100');
             if (isFolder && clipboard) {
-              handlePaste(node.id);
+              handlePaste(node.path);
             }
           }}
         >
@@ -379,7 +354,7 @@ export default function AdminDocumentLibrary() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setCreatingFolder({ parentId: node.id, name: '' });
+                    setCreatingFolder({ parentPath: node.path, name: '' });
                   }}
                   className="p-1 hover:bg-gray-200 rounded"
                   title="Create folder"
@@ -390,7 +365,7 @@ export default function AdminDocumentLibrary() {
                   onClick={(e) => {
                     e.stopPropagation();
                     fileInputRef.current?.click();
-                    setUploadingTo(node.id);
+                    setUploadingTo(node.path);
                   }}
                   className="p-1 hover:bg-gray-200 rounded"
                   title="Upload file"
@@ -455,7 +430,7 @@ export default function AdminDocumentLibrary() {
             )}
             <button
               onClick={() => {
-                setCreatingFolder({ parentId: rootFolderId, name: '' });
+                setCreatingFolder({ parentPath: '', name: '' });
               }}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
@@ -515,8 +490,8 @@ export default function AdminDocumentLibrary() {
               {clipboard && (
                 <button
                   onClick={() => {
-                    const parentId = getParentId(contextMenu.item);
-                    handlePaste(parentId);
+                    const parentPath = getParentPath(contextMenu.item);
+                    handlePaste(parentPath);
                   }}
                   className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
                 >
@@ -600,7 +575,7 @@ export default function AdminDocumentLibrary() {
                 onChange={(e) => setCreatingFolder({ ...creatingFolder, name: e.target.value })}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    handleCreateFolder(creatingFolder.parentId, creatingFolder.name);
+                    handleCreateFolder(creatingFolder.parentPath, creatingFolder.name);
                   } else if (e.key === 'Escape') {
                     setCreatingFolder(null);
                   }
@@ -617,7 +592,7 @@ export default function AdminDocumentLibrary() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => handleCreateFolder(creatingFolder.parentId, creatingFolder.name)}
+                  onClick={() => handleCreateFolder(creatingFolder.parentPath, creatingFolder.name)}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
                   Create
@@ -634,10 +609,11 @@ export default function AdminDocumentLibrary() {
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file && uploadingTo) {
+            if (file && uploadingTo !== null) {
               handleUpload(uploadingTo, file);
             }
             e.target.value = '';
+            setUploadingTo(null);
           }}
         />
       </div>
