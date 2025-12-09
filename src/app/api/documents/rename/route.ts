@@ -25,10 +25,11 @@ export async function POST(request: NextRequest) {
 
     // Find the file(s) in Vercel Blob
     const { blobs } = await list();
-    const isFolder = !blobs.find(b => b.pathname === oldPath);
+    const exactMatch = blobs.find(b => b.pathname === oldPath);
+    const isFolder = !exactMatch;
     const filesToRename = isFolder 
       ? blobs.filter(b => b.pathname.startsWith(oldPath + '/'))
-      : [blobs.find(b => b.pathname === oldPath)].filter(Boolean);
+      : exactMatch ? [exactMatch] : [];
 
     if (filesToRename.length === 0) {
       return NextResponse.json({ error: 'File or folder not found' }, { status: 404 });

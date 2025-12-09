@@ -21,13 +21,13 @@ function buildTreeFromPaths(blobs: any[]): FileNode[] {
   // First pass: create all nodes
   blobs.forEach(blob => {
     const pathname = blob.pathname || '';
-    const pathParts = pathname.split('/').filter(part => part && part !== '');
+    const pathParts = pathname.split('/').filter((part: string) => part && part !== '');
     
     if (pathParts.length === 0) return;
 
     // Create folder nodes for each path segment
     let currentPath = '';
-    pathParts.forEach((part, index) => {
+    pathParts.forEach((part: string, index: number) => {
       const isLast = index === pathParts.length - 1;
       const parentPath = currentPath;
       currentPath = currentPath ? `${currentPath}/${part}` : part;
