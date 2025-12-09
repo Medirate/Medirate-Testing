@@ -150,9 +150,17 @@ export default function AdminDocumentLibrary() {
 
   // Navigate to breadcrumb path
   const navigateToBreadcrumb = (index: number) => {
-    const pathParts = currentPath.split('/').filter(p => p);
-    const newPath = pathParts.slice(0, index + 1).join('/');
-    navigateToPath(newPath, allFiles);
+    if (index === 0) {
+      // Root
+      navigateToPath('', allFiles);
+    } else {
+      // Get the path from breadcrumbs
+      const breadcrumbs = getBreadcrumbs();
+      const targetCrumb = breadcrumbs[index];
+      if (targetCrumb) {
+        navigateToPath(targetCrumb.path, allFiles);
+      }
+    }
   };
 
   useEffect(() => {
