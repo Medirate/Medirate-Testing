@@ -37,7 +37,7 @@ interface FileNode {
 
 interface ClipboardItem {
   type: 'cut' | 'copy';
-  item: FileNode;
+  items: FileNode[];
 }
 
 export default function AdminDocumentLibrary() {
@@ -197,33 +197,20 @@ export default function AdminDocumentLibrary() {
 
   // Cut item(s)
   const handleCut = (items: FileNode[]) => {
-    if (items.length === 1) {
-      setClipboard({ type: 'cut', item: items[0] });
-      setContextMenu(null);
-      setSelectedItems(new Set());
-      setSelectionMode(false);
-    } else {
-      // For multiple items, we'll handle the first one for now
-      // Could be enhanced to handle multiple items
-      setClipboard({ type: 'cut', item: items[0] });
-      setSelectedItems(new Set());
-      setSelectionMode(false);
-    }
+    if (items.length === 0) return;
+    setClipboard({ type: 'cut', items });
+    setContextMenu(null);
+    setSelectedItems(new Set());
+    setSelectionMode(false);
   };
 
   // Copy item(s)
   const handleCopy = (items: FileNode[]) => {
-    if (items.length === 1) {
-      setClipboard({ type: 'copy', item: items[0] });
-      setContextMenu(null);
-      setSelectedItems(new Set());
-      setSelectionMode(false);
-    } else {
-      // For multiple items, we'll handle the first one for now
-      setClipboard({ type: 'copy', item: items[0] });
-      setSelectedItems(new Set());
-      setSelectionMode(false);
-    }
+    if (items.length === 0) return;
+    setClipboard({ type: 'copy', items });
+    setContextMenu(null);
+    setSelectedItems(new Set());
+    setSelectionMode(false);
   };
 
   // Toggle item selection
@@ -254,45 +241,67 @@ export default function AdminDocumentLibrary() {
     return currentFolderContents.filter(item => selectedItems.has(item.path));
   };
 
-  // Paste item
+  // Paste item(s)
   const handlePaste = async (targetFolderPath: string) => {
-    if (!clipboard) return;
+    if (!clipboard || clipboard.items.length === 0) return;
 
     try {
-      const oldPath = clipboard.item.path;
-      const fileName = clipboard.item.name;
-      const newPath = targetFolderPath ? `${targetFolderPath}/${fileName}` : fileName;
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
 
-      if (clipboard.type === 'cut') {
-        // Move file/folder
-        const response = await fetch('/api/documents/move', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            oldPath,
-            newPath,
-          }),
-        });
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.details || 'Failed to move');
-        }
-      } else {
-        // Copy file/folder
-        const response = await fetch('/api/documents/copy', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            oldPath,
-            newPath,
-          }),
-        });
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.details || 'Failed to copy');
+      // Process each item
+      for (const item of clipboard.items) {
+        try {
+          const oldPath = item.path;
+          const fileName = item.name;
+          const newPath = targetFolderPath ? `${targetFolderPath}/${fileName}` : fileName;
+
+          if (clipboard.type === 'cut') {
+            // Move file/folder
+            const response = await fetch('/api/documents/move', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                oldPath,
+                newPath,
+              }),
+            });
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.details || 'Failed to move');
+            }
+            successCount++;
+          } else {
+            // Copy file/folder
+            const response = await fetch('/api/documents/copy', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                oldPath,
+                newPath,
+              }),
+            });
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.details || 'Failed to copy');
+            }
+            successCount++;
+          }
+        } catch (err: any) {
+          errorCount++;
+          errors.push(`${item.name}: ${err.message}`);
         }
       }
-      setClipboard(null);
+
+      // Show results
+      if (errorCount > 0) {
+        alert(`Completed: ${successCount} successful, ${errorCount} failed.\n\nErrors:\n${errors.join('\n')}`);
+      } else {
+        // Only clear clipboard if all succeeded
+        setClipboard(null);
+      }
+
       await reloadFiles(); // Reload files
     } catch (err: any) {
       alert(`Error: ${err.message}`);
@@ -489,7 +498,8 @@ export default function AdminDocumentLibrary() {
                   <Copy className="w-4 h-4" />
                 )}
                 <span className="text-sm">
-                  {clipboard.type === 'cut' ? 'Cut' : 'Copy'}: {clipboard.item.name}
+                  {clipboard.type === 'cut' ? 'Cut' : 'Copy'}: {clipboard.items.length} item{clipboard.items.length !== 1 ? 's' : ''}
+                  {clipboard.items.length === 1 && ` (${clipboard.items[0].name})`}
                 </span>
                 <button
                   onClick={() => setClipboard(null)}
