@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
       : `${folderName}/.gitkeep`;
 
     // Create a placeholder file to represent the folder
-    const placeholder = new Blob([''], { type: 'text/plain' });
+    // Use a small text string to ensure proper content-length header
+    const placeholder = new Blob(['Folder placeholder'], { type: 'text/plain' });
     await put(folderPath, placeholder, {
       access: 'public',
     });
