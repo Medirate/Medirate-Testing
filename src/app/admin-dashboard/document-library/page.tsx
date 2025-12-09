@@ -18,7 +18,9 @@ import {
   ChevronRight,
   ChevronDown,
   MoreVertical,
-  Loader2
+  Loader2,
+  ArrowLeft,
+  Home
 } from "lucide-react";
 
 interface FileNode {
@@ -41,7 +43,9 @@ interface ClipboardItem {
 export default function AdminDocumentLibrary() {
   const auth = useRequireAuth();
   const router = useRouter();
-  const [tree, setTree] = useState<FileNode[]>([]);
+  const [allFiles, setAllFiles] = useState<FileNode[]>([]);
+  const [currentPath, setCurrentPath] = useState<string>('');
+  const [currentFolderContents, setCurrentFolderContents] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<ClipboardItem | null>(null);
@@ -53,8 +57,8 @@ export default function AdminDocumentLibrary() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingTo, setUploadingTo] = useState<string | null>(null);
 
-  // Load folder tree
-  const loadTree = async () => {
+  // Load all files and navigate to current path
+  const loadFiles = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -64,8 +68,13 @@ export default function AdminDocumentLibrary() {
         throw new Error(errorData.details || 'Failed to load folder tree');
       }
       const data = await response.json();
-      // Tree is already hierarchical from the API
-      setTree(data.tree || []);
+      // Flatten the tree to get all files
+      const flattened = flattenTree(data.tree || []);
+      setAllFiles(flattened);
+      
+      // Navigate to current path (or restore from sessionStorage)
+      const savedPath = sessionStorage.getItem('documentLibraryPath') || '';
+      navigateToPath(savedPath, flattened);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -73,25 +82,89 @@ export default function AdminDocumentLibrary() {
     }
   };
 
+  // Flatten tree structure to get all files
+  const flattenTree = (nodes: FileNode[]): FileNode[] => {
+    const result: FileNode[] = [];
+    const traverse = (nodes: FileNode[], parentPath: string = '') => {
+      nodes.forEach(node => {
+        const fullPath = parentPath ? `${parentPath}/${node.name}` : node.name;
+        result.push({
+          ...node,
+          path: fullPath,
+          parentId: parentPath || undefined,
+        });
+        if (node.children) {
+          traverse(node.children, fullPath);
+        }
+      });
+    };
+    traverse(nodes);
+    return result;
+  };
+
+  // Navigate to a specific path
+  const navigateToPath = (path: string, files: FileNode[] = allFiles) => {
+    setCurrentPath(path);
+    sessionStorage.setItem('documentLibraryPath', path);
+    
+    // Get files/folders in current directory
+    const pathParts = path ? path.split('/').filter(p => p) : [];
+    const contents = files.filter(file => {
+      const filePathParts = file.path.split('/').filter(p => p);
+      // Check if file is directly in current path
+      if (pathParts.length === 0) {
+        // Root level - files with only one path part
+        return filePathParts.length === 1;
+      } else {
+        // Check if file is in this folder (same parent, one level deeper)
+        return filePathParts.length === pathParts.length + 1 &&
+               filePathParts.slice(0, -1).join('/') === path;
+      }
+    });
+    
+    // Separate folders and files, sort them
+    const folders = contents.filter(f => f.type === 'folder').sort((a, b) => a.name.localeCompare(b.name));
+    const filesList = contents.filter(f => f.type === 'file').sort((a, b) => a.name.localeCompare(b.name));
+    
+    setCurrentFolderContents([...folders, ...filesList]);
+  };
+
+  // Navigate into a folder
+  const navigateIntoFolder = (folderPath: string) => {
+    navigateToPath(folderPath, allFiles);
+  };
+
+  // Navigate up one level
+  const navigateUp = () => {
+    const pathParts = currentPath.split('/').filter(p => p);
+    if (pathParts.length > 0) {
+      pathParts.pop();
+      navigateToPath(pathParts.join('/'), allFiles);
+    } else {
+      navigateToPath('', allFiles);
+    }
+  };
+
+  // Navigate to breadcrumb path
+  const navigateToBreadcrumb = (index: number) => {
+    const pathParts = currentPath.split('/').filter(p => p);
+    const newPath = pathParts.slice(0, index + 1).join('/');
+    navigateToPath(newPath, allFiles);
+  };
+
   useEffect(() => {
-    loadTree();
+    loadFiles();
   }, []);
 
-  // Toggle folder expansion
-  const toggleFolder = (item: FileNode) => {
+  // Reload files after operations
+  const reloadFiles = async () => {
+    await loadFiles();
+  };
+
+  // Double-click or click to navigate into folder
+  const handleFolderClick = (item: FileNode) => {
     if (item.type === 'folder') {
-      const updateTree = (nodes: FileNode[]): FileNode[] => {
-        return nodes.map(node => {
-          if (node.id === item.id) {
-            return { ...node, expanded: !node.expanded };
-          }
-          if (node.children) {
-            return { ...node, children: updateTree(node.children) };
-          }
-          return node;
-        });
-      };
-      setTree(updateTree(tree));
+      navigateIntoFolder(item.path);
     }
   };
 
@@ -170,7 +243,7 @@ export default function AdminDocumentLibrary() {
         }
       }
       setClipboard(null);
-      await loadTree(); // Reload tree
+      await reloadFiles(); // Reload files
     } catch (err: any) {
       alert(`Error: ${err.message}`);
     }
@@ -190,7 +263,7 @@ export default function AdminDocumentLibrary() {
         const error = await response.json();
         throw new Error(error.details || 'Failed to delete');
       }
-      await loadTree();
+      await reloadFiles();
       setContextMenu(null);
     } catch (err: any) {
       alert(`Error: ${err.message}`);
@@ -219,7 +292,7 @@ export default function AdminDocumentLibrary() {
         const error = await response.json();
         throw new Error(error.details || 'Failed to rename');
       }
-      await loadTree();
+      await reloadFiles();
       setRenamingItem(null);
       setNewName('');
     } catch (err: any) {
@@ -244,7 +317,7 @@ export default function AdminDocumentLibrary() {
         const error = await response.json();
         throw new Error(error.details || 'Failed to create folder');
       }
-      await loadTree();
+      await reloadFiles();
       setCreatingFolder(null);
     } catch (err: any) {
       alert(`Error: ${err.message}`);
@@ -268,7 +341,7 @@ export default function AdminDocumentLibrary() {
         const error = await response.json();
         throw new Error(error.details || 'Failed to upload');
       }
-      await loadTree();
+      await reloadFiles();
     } catch (err: any) {
       alert(`Error: ${err.message}`);
     } finally {
@@ -284,114 +357,17 @@ export default function AdminDocumentLibrary() {
     setSelectedItem(item);
   };
 
-  // Render tree node
-  const renderTreeNode = (node: FileNode, level: number = 0): React.ReactElement => {
-    const isFolder = node.type === 'folder';
-    const isExpanded = node.expanded || false;
-    const hasChildren = node.children && node.children.length > 0;
-    const indent = level * 24;
-
-    return (
-      <div key={node.id}>
-        <div
-          className={`flex items-center py-1 px-2 hover:bg-gray-100 cursor-pointer group ${
-            selectedItem?.id === node.id ? 'bg-blue-50' : ''
-          }`}
-          style={{ paddingLeft: `${indent + 8}px` }}
-          onClick={() => {
-            if (isFolder) toggleFolder(node);
-            setSelectedItem(node);
-          }}
-          onContextMenu={(e) => handleContextMenu(e, node)}
-          onDoubleClick={() => {
-            if (isFolder) toggleFolder(node);
-          }}
-          onDragOver={(e) => {
-            if (isFolder && clipboard) {
-              e.preventDefault();
-              e.currentTarget.classList.add('bg-blue-100');
-            }
-          }}
-          onDragLeave={(e) => {
-            e.currentTarget.classList.remove('bg-blue-100');
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            e.currentTarget.classList.remove('bg-blue-100');
-            if (isFolder && clipboard) {
-              handlePaste(node.path);
-            }
-          }}
-        >
-          <div className="flex items-center flex-1 min-w-0">
-            {isFolder ? (
-              <>
-                {isExpanded ? (
-                  <ChevronDown className="w-4 h-4 mr-1 text-gray-500" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 mr-1 text-gray-500" />
-                )}
-                {isExpanded ? (
-                  <FolderOpen className="w-5 h-5 mr-2 text-blue-500" />
-                ) : (
-                  <Folder className="w-5 h-5 mr-2 text-blue-500" />
-                )}
-              </>
-            ) : (
-              <>
-                <div className="w-6 mr-2" />
-                <File className="w-5 h-5 mr-2 text-gray-500" />
-              </>
-            )}
-            <span className="flex-1 truncate">{node.name}</span>
-            {node.size && (
-              <span className="text-xs text-gray-500 ml-2">{node.size}</span>
-            )}
-          </div>
-          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
-            {isFolder && (
-              <>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCreatingFolder({ parentPath: node.path, name: '' });
-                  }}
-                  className="p-1 hover:bg-gray-200 rounded"
-                  title="Create folder"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    fileInputRef.current?.click();
-                    setUploadingTo(node.path);
-                  }}
-                  className="p-1 hover:bg-gray-200 rounded"
-                  title="Upload file"
-                >
-                  <Upload className="w-4 h-4" />
-                </button>
-              </>
-            )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleContextMenu(e, node);
-              }}
-              className="p-1 hover:bg-gray-200 rounded"
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-        {isFolder && isExpanded && hasChildren && (
-          <div>
-            {node.children!.map(child => renderTreeNode(child, level + 1))}
-          </div>
-        )}
-      </div>
-    );
+  // Get breadcrumb path parts
+  const getBreadcrumbs = () => {
+    if (!currentPath) return [{ name: 'Root', path: '' }];
+    const parts = currentPath.split('/').filter(p => p);
+    const breadcrumbs = [{ name: 'Root', path: '' }];
+    let current = '';
+    parts.forEach(part => {
+      current = current ? `${current}/${part}` : part;
+      breadcrumbs.push({ name: part, path: current });
+    });
+    return breadcrumbs;
   };
 
   if (loading) {
@@ -430,12 +406,22 @@ export default function AdminDocumentLibrary() {
             )}
             <button
               onClick={() => {
-                setCreatingFolder({ parentPath: '', name: '' });
+                setCreatingFolder({ parentPath: currentPath, name: '' });
               }}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               <Plus className="w-4 h-4" />
               New Folder
+            </button>
+            <button
+              onClick={() => {
+                fileInputRef.current?.click();
+                setUploadingTo(currentPath);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            >
+              <Upload className="w-4 h-4" />
+              Upload File
             </button>
           </div>
         </div>
@@ -446,14 +432,139 @@ export default function AdminDocumentLibrary() {
           </div>
         )}
 
+        {/* Breadcrumb Navigation */}
+        <div className="bg-white rounded-xl shadow-lg p-4 mb-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={navigateUp}
+              disabled={!currentPath}
+              className={`p-2 rounded-lg ${currentPath ? 'hover:bg-gray-100' : 'opacity-50 cursor-not-allowed'}`}
+              title="Go up one level"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => navigateToPath('', allFiles)}
+              className="p-2 rounded-lg hover:bg-gray-100"
+              title="Go to root"
+            >
+              <Home className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-1 flex-1 min-w-0">
+              {getBreadcrumbs().map((crumb, index) => (
+                <React.Fragment key={index}>
+                  {index > 0 && <ChevronRight className="w-4 h-4 text-gray-400 mx-1" />}
+                  <button
+                    onClick={() => navigateToBreadcrumb(index)}
+                    className={`px-2 py-1 rounded hover:bg-gray-100 truncate max-w-[200px] ${
+                      index === getBreadcrumbs().length - 1 ? 'font-semibold text-blue-600' : ''
+                    }`}
+                    title={crumb.path || 'Root'}
+                  >
+                    {crumb.name}
+                  </button>
+                </React.Fragment>
+              ))}
+            </div>
+            <div className="text-sm text-gray-500 px-2">
+              {currentPath || 'Root'}
+            </div>
+          </div>
+        </div>
+
+        {/* Current Folder Contents */}
         <div className="bg-white rounded-xl shadow-lg p-4">
           <div className="border rounded-lg overflow-auto" style={{ maxHeight: '70vh' }}>
-            {tree.length === 0 ? (
+            {currentFolderContents.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
-                No files or folders found
+                {loading ? 'Loading...' : 'This folder is empty'}
               </div>
             ) : (
-              tree.map(node => renderTreeNode(node))
+              <div className="grid grid-cols-1 gap-1">
+                {currentFolderContents.map((item) => {
+                  const isFolder = item.type === 'folder';
+                  return (
+                    <div
+                      key={item.path}
+                      className={`flex items-center py-2 px-3 hover:bg-gray-100 cursor-pointer group rounded ${
+                        selectedItem?.path === item.path ? 'bg-blue-50' : ''
+                      }`}
+                      onClick={() => setSelectedItem(item)}
+                      onDoubleClick={() => handleFolderClick(item)}
+                      onContextMenu={(e) => handleContextMenu(e, item)}
+                      onDragOver={(e) => {
+                        if (isFolder && clipboard) {
+                          e.preventDefault();
+                          e.currentTarget.classList.add('bg-blue-100');
+                        }
+                      }}
+                      onDragLeave={(e) => {
+                        e.currentTarget.classList.remove('bg-blue-100');
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.currentTarget.classList.remove('bg-blue-100');
+                        if (isFolder && clipboard) {
+                          handlePaste(item.path);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center flex-1 min-w-0">
+                        {isFolder ? (
+                          <Folder className="w-6 h-6 mr-3 text-blue-500" />
+                        ) : (
+                          <File className="w-6 h-6 mr-3 text-gray-500" />
+                        )}
+                        <span className="flex-1 truncate font-medium">{item.name}</span>
+                        {item.size && (
+                          <span className="text-xs text-gray-500 ml-2">{item.size}</span>
+                        )}
+                        {item.modifiedTime && (
+                          <span className="text-xs text-gray-400 ml-4">
+                            {new Date(item.modifiedTime).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
+                        {isFolder && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCreatingFolder({ parentPath: item.path, name: '' });
+                              }}
+                              className="p-1 hover:bg-gray-200 rounded"
+                              title="Create folder"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                fileInputRef.current?.click();
+                                setUploadingTo(item.path);
+                              }}
+                              className="p-1 hover:bg-gray-200 rounded"
+                              title="Upload file"
+                            >
+                              <Upload className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleContextMenu(e, item);
+                          }}
+                          className="p-1 hover:bg-gray-200 rounded"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
@@ -490,8 +601,7 @@ export default function AdminDocumentLibrary() {
               {clipboard && (
                 <button
                   onClick={() => {
-                    const parentPath = getParentPath(contextMenu.item);
-                    handlePaste(parentPath);
+                    handlePaste(currentPath);
                   }}
                   className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
                 >
