@@ -429,7 +429,9 @@ export default function Documents() {
                                                 onClick={async (e) => {
                                                   e.stopPropagation();
                                                   try {
-                                                    const response = await fetch(`/api/documents/download?url=${encodeURIComponent(doc.downloadUrl)}`);
+                                                    // downloadUrl is now the Google Drive file ID
+                                                    const fileId = doc.downloadUrl || (doc as any).googleDriveFileId;
+                                                    const response = await fetch(`/api/documents/download?fileId=${encodeURIComponent(fileId)}`);
                                                     if (response.ok) {
                                                       const blob = await response.blob();
                                                       const url = window.URL.createObjectURL(blob);
@@ -440,9 +442,11 @@ export default function Documents() {
                                                       window.URL.revokeObjectURL(url);
                                                     } else {
                                                       console.error('Download failed');
+                                                      alert('Failed to download file. Please try again.');
                                                     }
                                                   } catch (error) {
                                                     console.error('Download error:', error);
+                                                    alert('Error downloading file. Please try again.');
                                                   }
                                                 }}
                                                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#012C61] to-blue-600 text-white rounded-lg text-sm font-medium hover:from-[#014085] hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 whitespace-nowrap"

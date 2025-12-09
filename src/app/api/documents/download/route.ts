@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
+import { downloadFileAsBuffer, getFileMetadata } from '@/lib/google-drive';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,32 +11,34 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const url = searchParams.get('url');
+    // Support both 'url' (for backward compatibility) and 'fileId' parameters
+    const fileId = searchParams.get('fileId') || searchParams.get('url');
 
-    if (!url) {
-      return NextResponse.json({ error: 'No URL provided' }, { status: 400 });
+    if (!fileId) {
+      return NextResponse.json({ error: 'No file ID provided' }, { status: 400 });
     }
 
-    // Fetch the file from Vercel Blob
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      return NextResponse.json({ error: 'File not found' }, { status: 404 });
-    }
+    // Get file metadata to determine content type and filename
+    const fileMetadata = await getFileMetadata(fileId);
+    const fileName = fileMetadata.name || 'document';
+    const mimeType = fileMetadata.mimeType || 'application/octet-stream';
 
-    const fileBuffer = await response.arrayBuffer();
-    const fileName = url.split('/').pop() || 'document';
+    // Download file from Google Drive
+    const fileBuffer = await downloadFileAsBuffer(fileId);
 
     // Return the file with proper headers
     return new NextResponse(fileBuffer, {
       headers: {
-        'Content-Type': response.headers.get('content-type') || 'application/octet-stream',
+        'Content-Type': mimeType,
         'Content-Disposition': `attachment; filename="${fileName}"`,
-        'Content-Length': fileBuffer.byteLength.toString(),
+        'Content-Length': fileBuffer.length.toString(),
       },
     });
   } catch (error) {
-    console.error('Error downloading document:', error);
-    return NextResponse.json({ error: 'Failed to download document' }, { status: 500 });
+    console.error('Error downloading document from Google Drive:', error);
+    return NextResponse.json({ 
+      error: 'Failed to download document',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
