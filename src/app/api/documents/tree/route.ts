@@ -91,28 +91,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    // Get all files from Vercel Blob
+    // Get all files from Vercel Blob - NO FILTERING for admin management page
+    // Show everything including archives, billing manuals, metadata, etc.
     const { blobs } = await list();
     
-    // Filter out metadata, archives, and billing manuals
-    const documentBlobs = blobs.filter(blob => {
-      const p = (blob.pathname || '');
-      if (p.startsWith('_metadata/')) return false;
-      if (p.toLowerCase().endsWith('.json')) return false;
-      const pathParts = p.split('/').filter(part => part && part !== '');
-      const hasArchiveFolder = pathParts.some(part => 
-        part.toUpperCase().includes('ARCHIVE') || 
-        part.toUpperCase().endsWith('_ARCHIVE')
-      );
-      if (hasArchiveFolder) return false;
-      const hasBillingManuals = pathParts.some(part => {
-        const normalized = part.toUpperCase().replace(/[_\s-]/g, '');
-        return normalized === 'BILLINGMANUALS' || 
-               (part.toUpperCase().includes('BILLING') && part.toUpperCase().includes('MANUAL'));
-      });
-      if (hasBillingManuals) return false;
-      return true;
-    });
+    // Don't filter anything - show all files and folders
+    const documentBlobs = blobs;
 
     // Build tree structure
     const tree = buildTreeFromPaths(documentBlobs);

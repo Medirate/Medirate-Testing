@@ -123,6 +123,7 @@ export default function AdminDocumentLibrary() {
     });
     
     // Separate folders and files, sort them
+    // Show ALL folders and files - no filtering
     const folders = contents.filter(f => f.type === 'folder').sort((a, b) => a.name.localeCompare(b.name));
     const filesList = contents.filter(f => f.type === 'file').sort((a, b) => a.name.localeCompare(b.name));
     
