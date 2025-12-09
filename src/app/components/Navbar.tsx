@@ -145,6 +145,7 @@ const Navbar = () => {
     "/admin-dashboard/rate-developments/update-database",
     "/admin-dashboard/rate-developments/send-email-alerts",
     "/admin-dashboard/marketing-emails",
+    "/admin-dashboard/document-library",
     "/rate-developments/email-alerts",
     "/support",
   ];

@@ -169,6 +169,14 @@ export default function AdminDashboard() {
           <p className="text-gray-700">Create and manage marketing campaigns with AI-powered templates.</p>
         </div>
 
+        {/* Document Library Card */}
+        <div
+          className="bg-green-50 rounded-xl shadow-lg p-6 mb-8 max-w-xl cursor-pointer hover:bg-green-100 transition"
+          onClick={() => router.push("/admin-dashboard/document-library")}
+        >
+          <h2 className="text-xl font-semibold text-green-900 mb-2">Document Library</h2>
+          <p className="text-gray-700">Manage documents, folders, and files with cut/copy/paste functionality.</p>
+        </div>
 
       </div>
     </AppLayout>

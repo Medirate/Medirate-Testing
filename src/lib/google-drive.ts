@@ -489,20 +489,29 @@ export async function getFolderTree(folderId: string): Promise<any[]> {
           const currentPath = [...path, item.name || 'Unknown'];
           
           if (item.mimeType === 'application/vnd.google-apps.folder') {
-            // It's a folder
-            const folderItem = {
-              id: item.id,
-              name: item.name,
-              type: 'folder',
-              path: currentPath.join('/'),
-              children: [] as any[],
-              modifiedTime: item.modifiedTime,
-            };
+            // It's a folder - skip archive and billing manuals
+            const fileName = item.name || '';
+            const normalized = fileName.toUpperCase().replace(/[_\s-]/g, '');
+            const isArchive = fileName.toUpperCase().includes('ARCHIVE') || fileName.toUpperCase().endsWith('_ARCHIVE');
+            const isBillingManual = normalized === 'BILLINGMANUALS' || 
+              (fileName.toUpperCase().includes('BILLING') && fileName.toUpperCase().includes('MANUAL'));
             
-            tree.push(folderItem);
-            
-            // Recursively get children
-            await buildTree(item.id!, currentPath);
+            if (!isArchive && !isBillingManual) {
+              const folderItem = {
+                id: item.id,
+                name: item.name,
+                type: 'folder',
+                path: currentPath.join('/'),
+                children: [] as any[],
+                modifiedTime: item.modifiedTime,
+                parentId: currentFolderId,
+              };
+              
+              tree.push(folderItem);
+              
+              // Recursively get children
+              await buildTree(item.id!, currentPath);
+            }
           } else {
             // It's a file
             tree.push({
