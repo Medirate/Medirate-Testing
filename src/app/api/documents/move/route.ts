@@ -35,16 +35,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File or folder not found' }, { status: 404 });
     }
 
-    // Filter out .gitkeep files - we want to preserve empty folders
-    // Only move .gitkeep if it's the only file (meaning it's an empty folder marker)
-    const nonGitkeepFiles = filesToMove.filter(f => !f.pathname.endsWith('/.gitkeep'));
-    const gitkeepFiles = filesToMove.filter(f => f.pathname.endsWith('/.gitkeep'));
+    // NEVER move .gitkeep files - always preserve them in source folders
+    // This ensures empty folders remain visible after files are moved
+    const filesToActuallyMove = filesToMove.filter(f => !f.pathname.endsWith('/.gitkeep'));
     
-    // If there are other files, don't move .gitkeep (preserve source folder)
-    // If .gitkeep is the only file, move it (it's an empty folder being moved)
-    const filesToActuallyMove = nonGitkeepFiles.length > 0 
-      ? nonGitkeepFiles 
-      : filesToMove; // Move everything if only .gitkeep exists
+    // If only .gitkeep exists (empty folder), return error - can't move empty folder
+    if (filesToActuallyMove.length === 0 && filesToMove.length > 0) {
+      return NextResponse.json({ 
+        error: 'Cannot move empty folder. Please move files individually or use the folder itself.',
+        details: 'Empty folders are preserved and cannot be moved'
+      }, { status: 400 });
+    }
 
     // Move each file (download, upload with new path, delete old)
     for (const fileBlob of filesToActuallyMove) {
