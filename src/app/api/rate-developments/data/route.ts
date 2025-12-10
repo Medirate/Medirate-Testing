@@ -13,11 +13,24 @@ export async function GET() {
     const user = await getUser();
 
     if (!user || !user.email) {
+      console.error("❌ Rate Dev Data API - Unauthorized: No user or email");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    console.log(`✅ Rate Dev Data API - Authenticated user: ${user.email}`);
+
+    // Verify service role key is available
+    if (!process.env.SUPABASE_SERVICE_ROLE) {
+      console.error("❌ Rate Dev Data API - SUPABASE_SERVICE_ROLE not configured");
+      return NextResponse.json(
+        { error: "Server configuration error", details: "Service role key not available" },
+        { status: 500 }
+      );
     }
 
     // Use service role client to bypass RLS
     const supabase = createServiceClient();
+    console.log("✅ Rate Dev Data API - Service client created, fetching data...");
 
     // Fetch Provider Alerts
     const { data: providerAlerts, error: providerError } = await supabase
@@ -59,11 +72,19 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({
+    const response = {
       providerAlerts: providerAlerts || [],
       bills: billsData || [],
       statePlanAmendments: statePlanAmendments || [],
+    };
+
+    console.log(`✅ Rate Dev Data API - Successfully fetched data:`, {
+      providerAlerts: response.providerAlerts.length,
+      bills: response.bills.length,
+      statePlanAmendments: response.statePlanAmendments.length,
     });
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error("Error in rate developments data API:", error);
     return NextResponse.json(
