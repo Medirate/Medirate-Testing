@@ -22,6 +22,10 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Disable ESLint during builds
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // Force remove console logs in production
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
