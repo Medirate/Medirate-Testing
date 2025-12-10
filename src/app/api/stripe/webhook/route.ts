@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createServiceClient } from "@/lib/supabase";
 
-export const config = {
-  api: {
-    bodyParser: false, // Stripe requires raw body
-  },
-};
+// Route segment config for webhook - disable body parsing to get raw body
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 // Initialize Stripe & Supabase
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
