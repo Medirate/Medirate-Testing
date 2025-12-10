@@ -170,6 +170,15 @@ export default function AdminDashboard() {
         </div>
 
 
+        {/* Test User View Card */}
+        <div
+          className="bg-purple-50 rounded-xl shadow-lg p-6 mb-8 max-w-xl cursor-pointer hover:bg-purple-100 transition"
+          onClick={() => router.push("/admin-dashboard/test-user-view")}
+        >
+          <h2 className="text-xl font-semibold text-purple-900 mb-2">Test User View</h2>
+          <p className="text-gray-700">Simulate what any user sees on the Rate Developments page. Debug access and data visibility issues.</p>
+        </div>
+
       </div>
     </AppLayout>
   );

@@ -692,26 +692,53 @@ export default function RateDevelopments() {
     setSelectedBillProgress("");
   };
 
-  // Authentication and subscription checks are now handled by useRequireSubscription hook
+  // Authentication and subscription checks are now handled by useProtectedPage hook (same as dashboard)
 
   // Fetch data once authentication is complete
+  // Use same access logic as dashboard: hasActiveSubscription || isSubUser || isWireTransferUser
   useEffect(() => {
-    if (auth.isAuthenticated && auth.hasActiveSubscription && !auth.isLoading) {
-      fetchData();
+    if (auth.isAuthenticated && !auth.isLoading && auth.isCheckComplete) {
+      // Check access same way as dashboard: subscription OR sub-user OR wire transfer
+      const hasAccess = auth.hasActiveSubscription || auth.isSubUser || auth.isWireTransferUser;
+      console.log("🔍 Rate Dev Page - Auth check:", {
+        isAuthenticated: auth.isAuthenticated,
+        hasActiveSubscription: auth.hasActiveSubscription,
+        isSubUser: auth.isSubUser,
+        isWireTransferUser: auth.isWireTransferUser,
+        hasAccess,
+      });
+      if (hasAccess) {
+        console.log("✅ Rate Dev Page - User has access, calling fetchData()");
+        fetchData();
+      } else {
+        console.log("❌ Rate Dev Page - User does NOT have access");
+      }
+    } else {
+      console.log("⏳ Rate Dev Page - Waiting for auth check:", {
+        isAuthenticated: auth.isAuthenticated,
+        isLoading: auth.isLoading,
+        isCheckComplete: auth.isCheckComplete,
+      });
     }
-  }, [auth.isAuthenticated, auth.hasActiveSubscription, auth.isLoading]);
+  }, [auth.isAuthenticated, auth.hasActiveSubscription, auth.isSubUser, auth.isWireTransferUser, auth.isLoading, auth.isCheckComplete]);
 
   const fetchData = async () => {
+    console.log("🚀 Rate Dev Page - fetchData() called");
     setLoading(true);
+    setError(null);
+    
     // Fetch Provider Alerts from Supabase
     const { data: providerAlerts, error: providerError } = await supabase
       .from("provider_alerts")
       .select("*")
       .order("announcement_date", { ascending: false });
     if (providerError) {
+      console.error("❌ Error fetching provider alerts:", providerError);
       setAlerts([]);
+      setError(`Failed to load provider alerts: ${providerError.message}`);
     } else {
       setAlerts(providerAlerts || []);
+      console.log(`✅ Loaded ${providerAlerts?.length || 0} provider alerts`);
     }
 
     // Fetch Legislative Updates from Supabase
@@ -719,9 +746,12 @@ export default function RateDevelopments() {
       .from("bill_track_50")
       .select("*");
     if (billsError) {
+      console.error("❌ Error fetching legislative updates:", billsError);
       setBills([]);
+      setError(prev => prev ? `${prev}; Failed to load bills: ${billsError.message}` : `Failed to load legislative updates: ${billsError.message}`);
     } else {
       setBills(billsData || []);
+      console.log(`✅ Loaded ${billsData?.length || 0} legislative updates`);
     }
 
     // Fetch State Plan Amendments from Supabase
@@ -729,10 +759,12 @@ export default function RateDevelopments() {
       .from("state_plan_amendments")
       .select("*");
     if (spaError) {
-      console.error("Error fetching state plan amendments:", spaError);
+      console.error("❌ Error fetching state plan amendments:", spaError);
       setStatePlanAmendments([]);
+      setError(prev => prev ? `${prev}; Failed to load SPAs: ${spaError.message}` : `Failed to load state plan amendments: ${spaError.message}`);
     } else {
       setStatePlanAmendments(spaData || []);
+      console.log(`✅ Loaded ${spaData?.length || 0} state plan amendments`);
     }
     setLoading(false);
   };
@@ -996,6 +1028,19 @@ export default function RateDevelopments() {
       <h1 className="text-3xl md:text-4xl text-[#012C61] font-lemonMilkRegular uppercase mb-6">
         Rate Developments
       </h1>
+
+      {/* Error Message Display */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <FaExclamationCircle className="text-red-500 mr-2" />
+            <p className="text-red-700 text-sm font-medium">{error}</p>
+          </div>
+          <p className="text-red-600 text-xs mt-2">
+            If this issue persists, please contact support. Error details have been logged to the console.
+          </p>
+        </div>
+      )}
 
       {/* Search Bars and Filters Container */}
       <div className="mb-10 p-6 sm:p-10 bg-white rounded-3xl shadow-2xl border border-blue-200">
