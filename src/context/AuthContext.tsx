@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const userEmail = user?.email || "";
 
-  const checkSubscriptionAndUserStatus = async () => {
+  const checkSubscriptionAndUserStatus = useCallback(async () => {
     if (!isAuthenticated || !userEmail) {
       setAuthState(prev => ({ ...prev, isCheckComplete: true }));
       return;
@@ -327,12 +327,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("❌ AuthContext: Error during auth check:", error);
       setAuthState(prev => ({ ...prev, isCheckComplete: true }));
     }
-  };
+  }, [isAuthenticated, userEmail]); // Memoize checkSubscriptionAndUserStatus
 
   // Memoize checkStatus to avoid recreating it on every render
   const checkStatus = useCallback(async () => {
     await checkSubscriptionAndUserStatus();
-  }, [isAuthenticated, userEmail]); // Include dependencies that checkSubscriptionAndUserStatus uses
+  }, [checkSubscriptionAndUserStatus]); // Include checkSubscriptionAndUserStatus as dependency
 
   // Run check when authentication state changes
   useEffect(() => {
