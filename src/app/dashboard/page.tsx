@@ -441,7 +441,7 @@ export default function Dashboard() {
 
 
 
-  const refreshData = async (filters: Record<string, string> = {}): Promise<RefreshDataResponse | null> => {
+  const refreshData = useCallback(async (filters: Record<string, string> = {}): Promise<RefreshDataResponse | null> => {
     setLoading(true);
     setError(null);
     try {
@@ -480,7 +480,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // refreshData doesn't depend on any state/props
 
   // All useCallback hooks
   const loadFilterOptions = useCallback(async () => {
@@ -680,6 +680,11 @@ export default function Dashboard() {
     }
   }, [selections, startDate, endDate, currentPage, itemsPerPage, refreshData]);
 
+  // Function to check if filters are applied
+  const getAreFiltersApplied = useCallback(() => {
+    return selections.state_name && selections.service_category && (selections.service_code || selections.service_description || selections.fee_schedule_date || (startDate && endDate));
+  }, [selections, startDate, endDate]);
+
   // All useEffect hooks
   // Authentication is now handled by useProtectedPage hook
   
@@ -722,7 +727,7 @@ export default function Dashboard() {
       clearInterval(authCheckInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [auth.isAuthenticated, router, hasSearched, authError, handleSearch]);
+  }, [auth.isAuthenticated, router, hasSearched, authError, handleSearch, getAreFiltersApplied]);
 
   useEffect(() => {
     async function loadUltraFilterOptions() {
@@ -859,9 +864,6 @@ export default function Dashboard() {
     setPendingFilters(prev => new Set(prev).add(field));
     setTimeout(() => loadFilterOptions(), 100);
   };
-
-  // Function to check if filters are applied
-  const getAreFiltersApplied = () => selections.state_name && selections.service_category && (selections.service_code || selections.service_description || selections.fee_schedule_date || (startDate && endDate));
 
   // Update the handleSort function
   const handleSort = (key: string, event: React.MouseEvent) => {
@@ -1750,7 +1752,7 @@ export default function Dashboard() {
   };
 
   // Helper
-  function getAvailableOptionsForFilter(filterKey: keyof Selections) {
+  const getAvailableOptionsForFilter = useCallback((filterKey: keyof Selections) => {
     if (!filterOptionsData || !filterOptionsData.combinations) return [];
     
     // Special handling for fee_schedule_date to aggregate dates from the 'rate_effective_date' column
@@ -1873,7 +1875,7 @@ export default function Dashboard() {
     }
     
     return availableOptions.sort();
-  }
+  }, [filterOptionsData, selections]);
 
   // Helper function to check if there are blank entries for a secondary filter
   const hasBlankEntriesForFilter = (filterKey: keyof Selections): boolean => {

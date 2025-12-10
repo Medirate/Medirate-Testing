@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, memo, useRef } from "react";
+import { useEffect, useState, memo, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
 import { useAuth } from "@/context/AuthContext";
@@ -80,7 +80,7 @@ const SideNav = memo(() => {
   const shouldRestrictSubscriptionManager = userRole === 'subscription_manager' && auth.isCheckComplete;
 
   // Check admin access
-  const checkAdminAccess = async () => {
+  const checkAdminAccess = useCallback(async () => {
     const userEmail = user?.email ?? "";
     console.log("🔍 Checking admin access for:", userEmail);
     
@@ -112,10 +112,10 @@ const SideNav = memo(() => {
       setIsAdmin(false);
       setAdminCheckComplete(true);
     }
-  };
+  }, [user?.email]);
 
   // Check user role
-  const checkUserRole = async () => {
+  const checkUserRole = useCallback(async () => {
     if (!user?.email) {
       setRoleCheckComplete(true);
       return;
@@ -139,7 +139,7 @@ const SideNav = memo(() => {
     } finally {
       setRoleCheckComplete(true);
     }
-  };
+  }, [user?.email]);
 
   // Check admin access when user changes
   useEffect(() => {
@@ -147,7 +147,7 @@ const SideNav = memo(() => {
       checkAdminAccess();
       checkUserRole();
     }
-  }, [user]);
+  }, [user, checkAdminAccess, checkUserRole]);
 
   // Tab mapping is now handled in SideNavContext
 
