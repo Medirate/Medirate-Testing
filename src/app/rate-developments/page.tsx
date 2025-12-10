@@ -727,46 +727,36 @@ export default function RateDevelopments() {
     setLoading(true);
     setError(null);
     
-    // Fetch Provider Alerts from Supabase
-    const { data: providerAlerts, error: providerError } = await supabase
-      .from("provider_alerts")
-      .select("*")
-      .order("announcement_date", { ascending: false });
-    if (providerError) {
-      console.error("❌ Error fetching provider alerts:", providerError);
+    try {
+      // Use API endpoint that bypasses RLS using service role client
+      // This ensures authenticated users always get data regardless of RLS policies
+      const response = await fetch("/api/rate-developments/data");
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || `Failed to fetch data: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      // Set the data from the API response
+      setAlerts(data.providerAlerts || []);
+      setBills(data.bills || []);
+      setStatePlanAmendments(data.statePlanAmendments || []);
+      
+      console.log(`✅ Loaded ${data.providerAlerts?.length || 0} provider alerts`);
+      console.log(`✅ Loaded ${data.bills?.length || 0} legislative updates`);
+      console.log(`✅ Loaded ${data.statePlanAmendments?.length || 0} state plan amendments`);
+    } catch (err) {
+      console.error("❌ Error fetching rate developments data:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to load data";
+      setError(errorMessage);
       setAlerts([]);
-      setError(`Failed to load provider alerts: ${providerError.message}`);
-    } else {
-      setAlerts(providerAlerts || []);
-      console.log(`✅ Loaded ${providerAlerts?.length || 0} provider alerts`);
-    }
-
-    // Fetch Legislative Updates from Supabase
-    const { data: billsData, error: billsError } = await supabase
-      .from("bill_track_50")
-      .select("*");
-    if (billsError) {
-      console.error("❌ Error fetching legislative updates:", billsError);
       setBills([]);
-      setError(prev => prev ? `${prev}; Failed to load bills: ${billsError.message}` : `Failed to load legislative updates: ${billsError.message}`);
-    } else {
-      setBills(billsData || []);
-      console.log(`✅ Loaded ${billsData?.length || 0} legislative updates`);
-    }
-
-    // Fetch State Plan Amendments from Supabase
-    const { data: spaData, error: spaError } = await supabase
-      .from("state_plan_amendments")
-      .select("*");
-    if (spaError) {
-      console.error("❌ Error fetching state plan amendments:", spaError);
       setStatePlanAmendments([]);
-      setError(prev => prev ? `${prev}; Failed to load SPAs: ${spaError.message}` : `Failed to load state plan amendments: ${spaError.message}`);
-    } else {
-      setStatePlanAmendments(spaData || []);
-      console.log(`✅ Loaded ${spaData?.length || 0} state plan amendments`);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // Function to toggle sort direction
