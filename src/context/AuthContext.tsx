@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useKindeBrowserClient } from "@kinde-oss/kinde-auth-nextjs";
 import { useRouter } from "next/navigation";
 
@@ -329,16 +329,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Memoize checkStatus to avoid recreating it on every render
+  const checkStatus = useCallback(async () => {
+    await checkSubscriptionAndUserStatus();
+  }, [isAuthenticated, userEmail]); // Include dependencies that checkSubscriptionAndUserStatus uses
+
   // Run check when authentication state changes
   useEffect(() => {
     if (!isLoading) {
       checkStatus();
     }
-  }, [isAuthenticated, isLoading, userEmail]);
-
-  const checkStatus = async () => {
-    await checkSubscriptionAndUserStatus();
-  };
+  }, [isAuthenticated, isLoading, userEmail, checkStatus]);
 
   const contextValue: AuthState = {
     isLoading: !!isLoading,
