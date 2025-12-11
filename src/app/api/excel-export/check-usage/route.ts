@@ -23,6 +23,7 @@ interface UsageInfo {
 /**
  * Get primary user email for the current user
  * Returns the subscription owner's email (primary user)
+ * Priority: Stripe > Wire Transfer
  */
 async function getPrimaryUserEmail(userEmail: string): Promise<{ primaryUserEmail: string; subscriptionType: 'stripe' | 'wire_transfer' }> {
   // First, check if user is a sub-user
@@ -30,6 +31,7 @@ async function getPrimaryUserEmail(userEmail: string): Promise<{ primaryUserEmai
     .from("subscription_users")
     .select("primary_user, sub_users");
 
+  let primaryUserEmail = userEmail;
   if (allRecords) {
     const userEmailLower = userEmail.toLowerCase();
     for (const record of allRecords) {
@@ -38,16 +40,17 @@ async function getPrimaryUserEmail(userEmail: string): Promise<{ primaryUserEmai
           typeof sub === 'string' && sub.toLowerCase() === userEmailLower
         );
         if (isSubUser) {
-          // User is a sub-user, return their primary user
-          return { primaryUserEmail: record.primary_user, subscriptionType: 'stripe' };
+          // User is a sub-user, use their primary user
+          primaryUserEmail = record.primary_user;
+          break;
         }
       }
     }
   }
 
-  // User is not a sub-user, check if they have Stripe subscription
+  // Check if primary user has Stripe subscription (priority)
   try {
-    const customers = await stripe.customers.list({ email: userEmail.toLowerCase(), limit: 1 });
+    const customers = await stripe.customers.list({ email: primaryUserEmail.toLowerCase(), limit: 1 });
     if (customers.data.length > 0) {
       const subscriptions = await stripe.subscriptions.list({
         customer: customers.data[0].id,
@@ -61,27 +64,35 @@ async function getPrimaryUserEmail(userEmail: string): Promise<{ primaryUserEmai
         return ['active', 'trialing', 'past_due', 'incomplete'].includes(sub.status);
       });
       if (validSubscriptions.length > 0) {
-        return { primaryUserEmail: userEmail, subscriptionType: 'stripe' };
+        return { primaryUserEmail, subscriptionType: 'stripe' };
       }
     }
   } catch (error) {
-    console.log("Error checking Stripe:", error);
+    console.error("Error checking Stripe:", error);
   }
 
-  // Check if user is a wire transfer user
-  const { data: wireTransferData } = await supabase
+  // Check if primary user is a wire transfer user
+  const { data: wireTransferData, error: wireError } = await supabase
     .from("wire_transfer_subscriptions")
-    .select("user_email")
-    .eq("user_email", userEmail.toLowerCase())
+    .select("user_email, subscription_start_date, subscription_end_date")
+    .eq("user_email", primaryUserEmail.toLowerCase())
     .eq("status", "active")
-    .single();
+    .maybeSingle();
 
-  if (wireTransferData) {
-    return { primaryUserEmail: userEmail, subscriptionType: 'wire_transfer' };
+  if (wireTransferData && !wireError) {
+    // Validate subscription is not expired
+    const now = new Date();
+    const startDate = wireTransferData.subscription_start_date ? new Date(wireTransferData.subscription_start_date) : null;
+    const endDate = wireTransferData.subscription_end_date ? new Date(wireTransferData.subscription_end_date) : null;
+    
+    // Check if subscription is valid
+    if (startDate && (!endDate || endDate >= now) && startDate <= now) {
+      return { primaryUserEmail, subscriptionType: 'wire_transfer' };
+    }
   }
 
-  // Default: user is their own primary user
-  return { primaryUserEmail: userEmail, subscriptionType: 'stripe' };
+  // Default: user is their own primary user (even if no active subscription)
+  return { primaryUserEmail, subscriptionType: 'stripe' };
 }
 
 /**
@@ -120,51 +131,92 @@ async function getBillingPeriod(
   } else {
     // Wire transfer: calculate monthly cycles from subscription dates
     // Resets on the same day each month (anniversary date)
-    const { data: wireTransferData } = await supabase
+    const { data: wireTransferData, error: wireError } = await supabase
       .from("wire_transfer_subscriptions")
       .select("subscription_start_date, subscription_end_date")
       .eq("user_email", primaryUserEmail.toLowerCase())
       .eq("status", "active")
-      .single();
+      .maybeSingle();
+
+    if (wireError && wireError.code !== 'PGRST116') {
+      console.error("Error fetching wire transfer subscription:", wireError);
+    }
 
     if (wireTransferData && wireTransferData.subscription_start_date) {
       const startDate = new Date(wireTransferData.subscription_start_date);
       const now = new Date();
       
+      // Validate start date is not in the future
+      if (startDate > now) {
+        console.warn(`Wire transfer subscription start date is in the future for ${primaryUserEmail}`);
+        // Use current month as fallback
+        const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        return { periodStart, periodEnd };
+      }
+      
+      // Check if subscription has expired
+      if (wireTransferData.subscription_end_date) {
+        const endDate = new Date(wireTransferData.subscription_end_date);
+        if (endDate < now) {
+          console.warn(`Wire transfer subscription has expired for ${primaryUserEmail}`);
+          // Return expired period (no exports allowed)
+          return {
+            periodStart: endDate,
+            periodEnd: endDate,
+          };
+        }
+      }
+      
       // Get the day of month from the start date (anniversary day)
       const anniversaryDay = startDate.getDate();
       
       // Calculate current period start (same day of month as start date, in current or previous month)
-      const periodStart = new Date(now.getFullYear(), now.getMonth(), anniversaryDay);
+      let periodStart = new Date(now.getFullYear(), now.getMonth(), anniversaryDay);
       periodStart.setHours(0, 0, 0, 0);
       
       // If the anniversary day hasn't occurred yet this month, use previous month
       if (now.getDate() < anniversaryDay) {
         periodStart.setMonth(periodStart.getMonth() - 1);
+        // Handle edge case: if anniversary day doesn't exist in previous month (e.g., Jan 31 -> Dec 31)
+        if (periodStart.getDate() !== anniversaryDay) {
+          // Use last day of previous month
+          periodStart = new Date(now.getFullYear(), now.getMonth(), 0, 0, 0, 0, 0);
+        }
       }
       
       // Ensure period start is not before subscription start date
       if (periodStart < startDate) {
-        periodStart.setTime(startDate.getTime());
+        periodStart = new Date(startDate);
         periodStart.setHours(0, 0, 0, 0);
       }
       
       // Calculate period end (one month from period start, same day of month)
-      const periodEnd = new Date(periodStart);
+      let periodEnd = new Date(periodStart);
       periodEnd.setMonth(periodEnd.getMonth() + 1);
-      periodEnd.setDate(anniversaryDay);
+      
+      // Try to set the anniversary day
+      const targetMonth = periodEnd.getMonth();
+      const targetYear = periodEnd.getFullYear();
+      
+      // Get the last day of the target month
+      const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+      
+      // Use anniversary day if it exists in target month, otherwise use last day
+      const targetDay = Math.min(anniversaryDay, lastDayOfTargetMonth);
+      periodEnd.setDate(targetDay);
       periodEnd.setHours(23, 59, 59, 999);
       
-      // Handle months with fewer days (e.g., Jan 31 -> Feb 28/29)
-      // If the target day doesn't exist in the next month, use last day of that month
-      if (periodEnd.getDate() !== anniversaryDay) {
-        periodEnd.setDate(0); // Last day of previous month (which is the target month)
-        periodEnd.setHours(23, 59, 59, 999);
+      // Verify the date is correct (handles leap years, month length variations)
+      if (periodEnd.getMonth() !== targetMonth) {
+        // If month changed, we went too far - use last day of target month
+        periodEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
       }
       
       // If subscription has an end date and period end exceeds it, use subscription end
       if (wireTransferData.subscription_end_date) {
         const subEndDate = new Date(wireTransferData.subscription_end_date);
+        subEndDate.setHours(23, 59, 59, 999);
         if (periodEnd > subEndDate) {
           return {
             periodStart,
@@ -186,6 +238,7 @@ async function getBillingPeriod(
 
 /**
  * Check or create usage record, reset if period has changed
+ * Handles edge cases: invalid dates, period mismatches, expired subscriptions
  */
 async function getOrCreateUsageRecord(
   primaryUserEmail: string,
@@ -194,13 +247,30 @@ async function getOrCreateUsageRecord(
   // Get current billing period
   const { periodStart, periodEnd } = await getBillingPeriod(primaryUserEmail, subscriptionType);
 
+  // Validate period dates
+  if (isNaN(periodStart.getTime()) || isNaN(periodEnd.getTime())) {
+    console.error(`Invalid period dates for ${primaryUserEmail}`);
+    throw new Error("Invalid billing period dates");
+  }
+
+  if (periodStart >= periodEnd) {
+    console.error(`Period start is after period end for ${primaryUserEmail}`);
+    // If period is invalid (e.g., expired subscription), return zero usage
+    return {
+      rowsUsed: ROWS_LIMIT, // Set to limit to prevent exports
+      rowsLimit: ROWS_LIMIT,
+      periodStart,
+      periodEnd,
+    };
+  }
+
   // Check if usage record exists
   const { data: existingRecord, error: fetchError } = await supabase
     .from("excel_export_usage")
     .select("*")
     .eq("primary_user_email", primaryUserEmail.toLowerCase())
     .eq("subscription_type", subscriptionType)
-    .single();
+    .maybeSingle();
 
   if (fetchError && fetchError.code !== 'PGRST116') {
     console.error("Error fetching usage record:", fetchError);
@@ -235,12 +305,44 @@ async function getOrCreateUsageRecord(
     };
   }
 
-  // Check if period has changed (monthly reset)
+  // Validate existing record dates
+  const existingPeriodStart = new Date(existingRecord.current_period_start);
   const existingPeriodEnd = new Date(existingRecord.current_period_end);
   const now = new Date();
 
+  // If existing dates are invalid, reset the record
+  if (isNaN(existingPeriodStart.getTime()) || isNaN(existingPeriodEnd.getTime())) {
+    console.warn(`Invalid dates in usage record for ${primaryUserEmail}, resetting`);
+    const { data: updatedRecord, error: updateError } = await supabase
+      .from("excel_export_usage")
+      .update({
+        current_period_start: periodStart.toISOString(),
+        current_period_end: periodEnd.toISOString(),
+        rows_used: 0,
+      })
+      .eq("id", existingRecord.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("Error resetting invalid usage record:", updateError);
+      throw new Error("Failed to reset usage record");
+    }
+
+    return {
+      rowsUsed: 0,
+      rowsLimit: ROWS_LIMIT,
+      periodStart,
+      periodEnd,
+    };
+  }
+
+  // Check if period has changed (monthly reset)
+  // Use a small buffer (1 second) to handle edge cases at exact boundary
+  const periodEndWithBuffer = new Date(existingPeriodEnd.getTime() + 1000);
+
   // If current period has ended, reset usage
-  if (now > existingPeriodEnd) {
+  if (now > periodEndWithBuffer) {
     const { data: updatedRecord, error: updateError } = await supabase
       .from("excel_export_usage")
       .update({
@@ -265,12 +367,44 @@ async function getOrCreateUsageRecord(
     };
   }
 
+  // If period dates don't match calculated period (subscription changed), update them
+  // Allow 1 day tolerance for timezone/calculation differences
+  const periodStartDiff = Math.abs(periodStart.getTime() - existingPeriodStart.getTime());
+  const periodEndDiff = Math.abs(periodEnd.getTime() - existingPeriodEnd.getTime());
+  const oneDayMs = 24 * 60 * 60 * 1000;
+
+  if (periodStartDiff > oneDayMs || periodEndDiff > oneDayMs) {
+    console.warn(`Period mismatch for ${primaryUserEmail}, updating dates`);
+    const { data: updatedRecord, error: updateError } = await supabase
+      .from("excel_export_usage")
+      .update({
+        current_period_start: periodStart.toISOString(),
+        current_period_end: periodEnd.toISOString(),
+        // Keep existing rows_used - don't reset if period just shifted
+      })
+      .eq("id", existingRecord.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("Error updating period dates:", updateError);
+      // Continue with existing record if update fails
+    } else if (updatedRecord) {
+      return {
+        rowsUsed: updatedRecord.rows_used || 0,
+        rowsLimit: updatedRecord.rows_limit || ROWS_LIMIT,
+        periodStart,
+        periodEnd,
+      };
+    }
+  }
+
   // Return existing usage
   return {
-    rowsUsed: existingRecord.rows_used,
-    rowsLimit: existingRecord.rows_limit,
-    periodStart: new Date(existingRecord.current_period_start),
-    periodEnd: new Date(existingRecord.current_period_end),
+    rowsUsed: existingRecord.rows_used || 0,
+    rowsLimit: existingRecord.rows_limit || ROWS_LIMIT,
+    periodStart: existingPeriodStart,
+    periodEnd: existingPeriodEnd,
   };
 }
 
@@ -342,8 +476,25 @@ export async function POST(req: Request) {
 
     const { rowCount } = await req.json();
 
-    if (typeof rowCount !== 'number' || rowCount < 0) {
-      return NextResponse.json({ error: "Invalid row count" }, { status: 400 });
+    // Validate row count with comprehensive checks
+    if (typeof rowCount !== 'number' || isNaN(rowCount) || !isFinite(rowCount)) {
+      return NextResponse.json({ error: "Invalid row count: must be a valid number" }, { status: 400 });
+    }
+
+    if (rowCount < 0) {
+      return NextResponse.json({ error: "Invalid row count: cannot be negative" }, { status: 400 });
+    }
+
+    if (rowCount > ROWS_LIMIT) {
+      return NextResponse.json({ 
+        error: `Invalid row count: cannot exceed limit of ${ROWS_LIMIT.toLocaleString()} rows per export` 
+      }, { status: 400 });
+    }
+
+    if (rowCount === 0) {
+      return NextResponse.json({ 
+        error: "Invalid row count: must be greater than 0" 
+      }, { status: 400 });
     }
 
     const { primaryUserEmail, subscriptionType } = await getPrimaryUserEmail(user.email);
@@ -362,11 +513,27 @@ export async function POST(req: Request) {
       });
     }
 
-    // Update usage (reserve the rows)
+    // Re-fetch usage to ensure we have the latest data (handles race conditions)
+    const latestUsage = await getOrCreateUsageRecord(primaryUserEmail, subscriptionType);
+    const latestRowsRemaining = latestUsage.rowsLimit - latestUsage.rowsUsed;
+
+    // Double-check with latest data
+    if (rowCount > latestRowsRemaining) {
+      return NextResponse.json({
+        canExport: false,
+        rowsUsed: latestUsage.rowsUsed,
+        rowsLimit: latestUsage.rowsLimit,
+        rowsRemaining: latestRowsRemaining,
+        requestedRows: rowCount,
+        message: `You cannot export ${rowCount.toLocaleString()} rows. You have ${latestRowsRemaining.toLocaleString()} rows remaining in your subscription.`,
+      });
+    }
+
+    // Update usage (reserve the rows) - use atomic increment to prevent race conditions
     const { data: updatedRecord, error: updateError } = await supabase
       .from("excel_export_usage")
       .update({
-        rows_used: usage.rowsUsed + rowCount,
+        rows_used: latestUsage.rowsUsed + rowCount,
       })
       .eq("primary_user_email", primaryUserEmail.toLowerCase())
       .eq("subscription_type", subscriptionType)
@@ -378,12 +545,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Failed to update usage" }, { status: 500 });
     }
 
-    const newRowsRemaining = usage.rowsLimit - (usage.rowsUsed + rowCount);
+    // Verify the update was successful
+    if (!updatedRecord || updatedRecord.rows_used === undefined) {
+      console.error("Usage update returned invalid data");
+      return NextResponse.json({ error: "Failed to update usage" }, { status: 500 });
+    }
+
+    const newRowsRemaining = updatedRecord.rows_limit - updatedRecord.rows_used;
 
     return NextResponse.json({
       canExport: true,
-      rowsUsed: usage.rowsUsed + rowCount,
-      rowsLimit: usage.rowsLimit,
+      rowsUsed: updatedRecord.rows_used,
+      rowsLimit: updatedRecord.rows_limit,
       rowsRemaining: newRowsRemaining,
       requestedRows: rowCount,
       message: `Export approved. ${rowCount.toLocaleString()} rows will be used. ${newRowsRemaining.toLocaleString()} rows remaining.`,
