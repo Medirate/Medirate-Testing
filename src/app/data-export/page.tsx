@@ -67,25 +67,17 @@ interface SelectionModalData {
   selectedColumns: string[];
 }
 
-// All columns from master_data_sept_2 table based on schema
+// Only allowed columns for export - restricted list
 const ALL_COLUMN_OPTIONS: ColumnOption[] = [
-  { key: "id", label: "ID", description: "Unique record identifier" },
-  { key: "new_field", label: "New Field", description: "Additional field" },
   { key: "service_category", label: "Service Category", description: "Primary service line" },
-  { key: "service_sub_category", label: "Service Sub Category", description: "Sub-category classification" },
-  { key: "state_id_pk", label: "State ID", description: "State identifier" },
-  { key: "state_name", label: "State", description: "Full state name" },
+  { key: "state_name", label: "State Name", description: "Full state name" },
   { key: "state_code", label: "State Code", description: "Two letter abbreviation" },
-  { key: "filename", label: "Filename", description: "Source document filename" },
-  { key: "page_number", label: "Page Number", description: "Page in source document" },
-  { key: "service_id_pk", label: "Service ID", description: "Service identifier" },
+  { key: "filename", label: "Fee Schedule Name", description: "Fee schedule document name" },
   { key: "service_code", label: "Service Code", description: "HCPCS/CPT or state code" },
   { key: "service_description", label: "Service Description", description: "Plain language description" },
-  { key: "rate", label: "Rate per Base Unit", description: "Latest rate", formatter: (row) => formatRate(row.rate) },
-  { key: "rate_last_updated", label: "Rate Last Updated", description: "Last update timestamp" },
-  { key: "rate_effective_date", label: "Effective Date", description: "Rate effective date", formatter: (row) => formatDate(row.rate_effective_date) },
+  { key: "rate", label: "Rate", description: "Latest rate", formatter: (row) => formatRate(row.rate) },
+  { key: "rate_effective_date", label: "Rate Effective Date", description: "Rate effective date", formatter: (row) => formatDate(row.rate_effective_date) },
   { key: "duration_unit", label: "Duration Unit", description: "Unit of measure" },
-  { key: "minutes", label: "Minutes", description: "Duration in minutes" },
   { key: "program", label: "Program", description: "Waiver or program name" },
   { key: "modifier_1", label: "Modifier 1", description: "Modifier code" },
   { key: "modifier_1_details", label: "Modifier 1 Details", description: "Modifier description" },
@@ -97,23 +89,11 @@ const ALL_COLUMN_OPTIONS: ColumnOption[] = [
   { key: "modifier_4_details", label: "Modifier 4 Details", description: "Modifier description" },
   { key: "fee", label: "Fee", description: "Fee amount" },
   { key: "max_fee", label: "Max Fee", description: "Maximum fee amount" },
-  { key: "modifier_id_pk", label: "Modifier ID", description: "Modifier identifier" },
-  { key: "service_id_fk", label: "Service Foreign Key", description: "Service reference" },
   { key: "prior_auth_required", label: "Prior Auth Required", description: "Prior authorization requirement" },
-  { key: "comments", label: "Comments", description: "Additional comments" },
   { key: "location_region", label: "Location / Region", description: "County or metro" },
-  { key: "update_id_pk", label: "Update ID", description: "Update identifier" },
-  { key: "times_rate_updated", label: "Times Rate Updated", description: "Number of rate updates" },
-  { key: "percentage_change", label: "Percentage Change", description: "Rate change percentage" },
-  { key: "last_database_refresh", label: "Last Database Refresh", description: "Last refresh timestamp" },
   { key: "requires_pa", label: "Requires PA", description: "Prior authorization flag" },
-  { key: "rate_per_hour", label: "Rate per Hour", description: "Calculated hourly rate" },
   { key: "provider_type", label: "Provider Type", description: "Provider category" },
   { key: "age", label: "Age", description: "Age requirement" },
-  { key: "unnamed_40", label: "Unnamed 40", description: "Additional field 40" },
-  { key: "unnamed_41", label: "Unnamed 41", description: "Additional field 41" },
-  { key: "created_at", label: "Created At", description: "Record creation timestamp", formatter: (row) => formatDate(row.created_at) },
-  { key: "updated_at", label: "Updated At", description: "Record update timestamp", formatter: (row) => formatDate(row.updated_at) },
 ];
 
 const COLUMN_MAP = ALL_COLUMN_OPTIONS.reduce((acc, option) => {
