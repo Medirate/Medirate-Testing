@@ -707,26 +707,14 @@ export default function DataExport() {
 
   return (
     <AppLayout activeTab="dataExport">
-      {/* Temporarily disabled */}
-      {/* <DataExportTemplatesIcon
+      <DataExportTemplatesIcon
         onLoadTemplate={handleLoadTemplate}
         currentSelections={selections as unknown as Record<string, string | null>}
         currentStartDate={startDate}
         currentEndDate={endDate}
         currentSelectedColumns={selectedColumns}
-      /> */}
+      />
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-8">
-        {/* Temporarily Disabled Notice */}
-        <div className="mb-6 p-6 bg-yellow-50 border-2 border-yellow-300 rounded-xl shadow-lg">
-          <div className="flex items-center mb-2">
-            <span className="text-yellow-600 text-2xl mr-3">⚠️</span>
-            <h2 className="text-xl font-bold text-yellow-800">Data Export Temporarily Disabled</h2>
-          </div>
-          <p className="text-yellow-700 mt-2">
-            The data export functionality is currently under maintenance and has been temporarily disabled. 
-            We apologize for any inconvenience. Please check back soon.
-          </p>
-        </div>
         
         <div className="flex items-center justify-between">
           <div>
@@ -977,8 +965,7 @@ export default function DataExport() {
           </div>
         </div>
 
-        {/* Temporarily disabled */}
-        {/* <div className="mt-8 flex flex-wrap items-center gap-3">
+        <div className="mt-8 flex flex-wrap items-center gap-3">
           <button
             onClick={prepareExport}
             disabled={isPreparingExport || isExporting}
@@ -994,7 +981,7 @@ export default function DataExport() {
           <p className="text-xs text-slate-500">
             Excel files include watermark and usage tracking. You can regenerate the same export as many times as you like.
           </p>
-        </div> */}
+        </div>
 
         {showLimitModal && (
           <ModalShell onClose={() => setShowLimitModal(false)}>
