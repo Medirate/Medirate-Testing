@@ -1930,13 +1930,19 @@ export default function Dashboard() {
 
   // Replace the getDropdownOptions function with the following:
   const getDropdownOptions = (options: (Option | string)[], isMandatory: boolean, filterKey?: keyof Selections): Option[] => {
+    const opts: Option[] = options.map(opt => (typeof opt === 'string' ? { value: opt, label: opt } : opt));
+    
+    // duration_unit should NEVER get the "-" option
+    if (filterKey === 'duration_unit') {
+      return opts;
+    }
+    
     // For secondary filters, use the smart logic that checks for blank entries
     if (!isMandatory && filterKey && ['program', 'location_region', 'provider_type', 'modifier_1'].includes(filterKey as string)) {
       return buildSecondaryFilterOptions(options, filterKey);
     }
     
     // For other filters, use the original logic
-    const opts: Option[] = options.map(opt => (typeof opt === 'string' ? { value: opt, label: opt } : opt));
     return isMandatory ? opts : [{ value: '-', label: '-' }, ...opts];
   };
 
@@ -2683,7 +2689,8 @@ export default function Dashboard() {
                       durationUnitCalculated 
                         ? durationUnitOptionsWithCounts 
                         : availableDurationUnits.map(unit => ({ value: unit, label: unit })),
-                      false
+                      false,
+                      'duration_unit' // Pass filterKey to prevent "-" option from being added
                     )}
                     value={selections.duration_unit ? selections.duration_unit.split(',').map(d => {
                       const trimmedValue = d.trim();
