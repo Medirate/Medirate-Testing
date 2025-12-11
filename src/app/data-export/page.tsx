@@ -716,6 +716,18 @@ export default function DataExport() {
         currentSelectedColumns={selectedColumns}
       /> */}
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-8">
+        {/* Temporarily Disabled Notice */}
+        <div className="mb-6 p-6 bg-yellow-50 border-2 border-yellow-300 rounded-xl shadow-lg">
+          <div className="flex items-center mb-2">
+            <span className="text-yellow-600 text-2xl mr-3">⚠️</span>
+            <h2 className="text-xl font-bold text-yellow-800">Data Export Temporarily Disabled</h2>
+          </div>
+          <p className="text-yellow-700 mt-2">
+            The data export functionality is currently under maintenance and has been temporarily disabled. 
+            We apologize for any inconvenience. Please check back soon.
+          </p>
+        </div>
+        
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-[#5c759c]">Export Center</p>

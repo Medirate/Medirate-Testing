@@ -69,7 +69,6 @@ const SideNav = memo(() => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminCheckComplete, setAdminCheckComplete] = useState(false);
   const [adminMenuOpen, setAdminMenuOpen] = useState(false);
-  const [rateDevMenuOpen, setRateDevMenuOpen] = useState(false);
   const [rateComparisonMenuOpen, setRateComparisonMenuOpen] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [roleCheckComplete, setRoleCheckComplete] = useState(false);
@@ -155,9 +154,6 @@ const SideNav = memo(() => {
   useEffect(() => {
     if (pathname.startsWith("/admin-dashboard")) {
       setAdminMenuOpen(true);
-    }
-    if (pathname.startsWith("/admin-dashboard/rate-developments")) {
-      setRateDevMenuOpen(true);
     }
   }, [pathname]);
 
@@ -628,52 +624,26 @@ const SideNav = memo(() => {
                       </button>
                     )}
                   </div>
-                  {/* Rate Developments Submenu */}
+                  {/* Admin Dashboard Submenu */}
                   {adminMenuOpen && !isSidebarCollapsed && (
                     <ul className="ml-8 mt-1 space-y-1 bg-blue-900/80 rounded-lg py-2 shadow-lg">
-                      <li>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            // Only toggle submenu if sidebar is expanded
-                            if (!isSidebarCollapsed) {
-                              setRateDevMenuOpen((open) => !open);
-                            }
-                          }}
-                          className={`flex items-center w-full px-4 py-2 rounded-md transition-all duration-200 focus:outline-none mb-1 ${
-                            pathname.startsWith("/admin-dashboard/rate-developments")
-                              ? "bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold shadow"
-                              : "text-blue-100 hover:bg-blue-800/80 hover:text-white"
-                          }`}
-                        >
-                          <Megaphone size={18} className="mr-2" />
-                          <span className="ml-1">Rate Developments</span>
-                          <span className="ml-auto">
-                            {rateDevMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                          </span>
-                        </button>
-                        {/* Third-level submenu */}
-                        {rateDevMenuOpen && (
-                          <ul className="ml-4 mt-1 space-y-1">
-                            {adminRateDevLinks.map((link) => (
-                              <li key={link.href}>
-                                <Link
-                                  href={link.href}
-                                  onClick={() => setActiveTab("adminDashboard")}
-                                  className={`flex items-center px-4 py-2 rounded-md transition-all duration-200 ml-2 text-sm ${
-                                    pathname === link.href
-                                      ? "bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold shadow"
-                                      : "text-blue-100 hover:bg-blue-800/80 hover:text-white"
-                                  }`}
-                                >
-                                  {link.icon}
-                                  <span className="ml-2">{link.label}</span>
-                                </Link>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </li>
+                      {/* Rate Developments submenu items - shown directly without parent */}
+                      {adminRateDevLinks.map((link) => (
+                        <li key={link.href}>
+                          <Link
+                            href={link.href}
+                            onClick={() => setActiveTab("adminDashboard")}
+                            className={`flex items-center px-4 py-2 rounded-md transition-all duration-200 text-sm ${
+                              pathname === link.href || pathname.startsWith(link.href)
+                                ? "bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold shadow"
+                                : "text-blue-100 hover:bg-blue-800/80 hover:text-white"
+                            }`}
+                          >
+                            {link.icon}
+                            <span className="ml-2">{link.label}</span>
+                          </Link>
+                        </li>
+                      ))}
                       <li>
                         <Link
                           href="/admin-dashboard/marketing-emails"
@@ -686,6 +656,20 @@ const SideNav = memo(() => {
                         >
                           <Mail size={18} className="mr-2" />
                           <span className="ml-1">Marketing Emails</span>
+                        </Link>
+                      </li>
+                      <li>
+                        <Link
+                          href="/admin-dashboard/document-library"
+                          onClick={() => setActiveTab("adminDashboard")}
+                          className={`flex items-center w-full px-4 py-2 rounded-md transition-all duration-200 focus:outline-none ${
+                            pathname.startsWith("/admin-dashboard/document-library")
+                              ? "bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold shadow"
+                              : "text-blue-100 hover:bg-blue-800/80 hover:text-white"
+                          }`}
+                        >
+                          <FileText size={18} className="mr-2" />
+                          <span className="ml-1">Document Library</span>
                         </Link>
                       </li>
                     </ul>
